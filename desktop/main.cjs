@@ -8,6 +8,10 @@ process.env.GO_TRAINER_EMBEDDED = '1';
 app
   .whenReady()
   .then(async () => {
+    const icon = app.isPackaged
+      ? join(process.resourcesPath, 'app-icon.png')
+      : join(__dirname, '../.local/icons/icon.png');
+    if (process.platform === 'darwin' && !app.isPackaged) app.dock.setIcon(icon);
     process.env.GO_TRAINER_HISTORY_DIR ||= join(app.getPath('userData'), 'history');
     // Packaged app reads user configuration from its private application-data folder.
     if (app.isPackaged) {
@@ -29,6 +33,7 @@ app
         minHeight: 480,
         backgroundColor: '#f1f2ed',
         title: 'LLM Go Trainer',
+        icon,
         webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
       });
       win.webContents.setWindowOpenHandler(({ url }) => {

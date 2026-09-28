@@ -1,6 +1,6 @@
 {
   "name": "llm-go-trainer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Local-first Go training with KataGo and an evidence-grounded LLM coach",
@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
-    "build": "tsc --noEmit && vite build && tsup server/index.ts --format esm --platform node --target node22 --out-dir dist-server --clean",
+    "build": "npm run build:icons && tsc --noEmit && vite build && tsup server/index.ts --format esm --platform node --target node22 --out-dir dist-server --clean",
+    "build:icons": "node scripts/generate-icons.mjs",
     "start": "node dist-server/index.js",
     "check": "tsc --noEmit",
     "test": "vitest run",
@@ -34,6 +35,7 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/express": "^5.0.3",
     "@types/node": "^22.18.0",
     "@types/react": "^19.1.12",
@@ -70,6 +72,7 @@
       "package.json"
     ],
     "mac": {
+      "icon": ".local/icons/icon.icns",
       "target": [
         "dmg"
       ],
@@ -77,6 +80,7 @@
       "minimumSystemVersion": "15.0.0"
     },
     "win": {
+      "icon": ".local/icons/icon.ico",
       "target": [
         "nsis"
       ]

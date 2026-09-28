@@ -13,6 +13,15 @@ const resources = join(
     : 'win-unpacked/resources',
 );
 const models = join(resources, 'katago-models');
+const icon = await readFile(join(resources, 'app-icon.png'));
+const expectedIcon = await readFile('.local/icons/icon.png');
+if (!icon.equals(expectedIcon))
+  throw new Error('Packaged application icon does not match the logo');
+if (process.platform === 'darwin') {
+  const nativeIcon = await readFile(join(resources, 'icon.icns'));
+  if (!nativeIcon.equals(await readFile('.local/icons/icon.icns')))
+    throw new Error('macOS application icon does not match the logo');
+}
 if (variant === 'with-models') {
   for (const artifact of [artifacts.main, artifacts.human])
     if (!(await verified(join(models, `${artifact.sha256}.bin.gz`), artifact.sha256)))

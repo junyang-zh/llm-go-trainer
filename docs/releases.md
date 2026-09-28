@@ -32,6 +32,8 @@ npm run package:desktop -- with-models
 
 输出位于 `release/no-models/` 和 `release/with-models/`。macOS 只在 Apple Silicon 构建 arm64 DMG；Windows 只在 x64 构建 NSIS EXE。两个版本共享应用标识和用户数据目录，可相互覆盖升级。
 
+应用图标和界面共用 `public/logo.svg`。构建时自动生成多分辨率 Windows ICO、macOS ICNS 和窗口 PNG，输出到忽略提交的 `.local/icons/`；修改 logo 后重新构建即可。
+
 `with-models` 在 `Resources/katago-models/` 携带主模型、HumanSL、来源摘要及上游模型许可。启动时优先复用用户数据目录内校验通过的权重，再从安装包复制，缺失/损坏时才联网下载。`no-models` 不携带这部分资源。两者都在首次运行联网安装 KataGo 可执行文件及依赖，因此含权重版不是完整离线包。
 
 当前 CI 校验安装包内权重，但不具备目标显卡驱动，不能代替真实 Windows OpenCL、macOS Metal 和安装流程的验证。公开发布前后应在目标系统检查安装、启动、引擎分析及退出。

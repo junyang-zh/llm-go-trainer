@@ -42,6 +42,9 @@ await build({
   config: {
     directories: { output: `release/${variant}` },
     artifactName: `LLM-Go-Trainer-\${version}-${mac ? 'mac-arm64' : 'windows-x64'}-${variant}.\${ext}`,
-    extraResources: variant === 'with-models' ? [{ from: staging, to: 'katago-models' }] : [],
+    extraResources: [
+      { from: join(root, '.local/icons/icon.png'), to: 'app-icon.png' },
+      ...(variant === 'with-models' ? [{ from: staging, to: 'katago-models' }] : []),
+    ],
   },
 });

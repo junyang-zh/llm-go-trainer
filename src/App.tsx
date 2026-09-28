@@ -469,16 +469,7 @@ export default function App() {
             aria-expanded={settings}
             onClick={() => setSettings(true)}
           >
-            <svg className="board-logo" viewBox="0 0 32 32" aria-hidden="true">
-              <rect x="1" y="1" width="30" height="30" rx="7" fill="#294d40" />
-              <path
-                d="M8 6v20M16 6v20M24 6v20M6 8h20M6 16h20M6 24h20"
-                stroke="#b4c8b6"
-                strokeWidth=".8"
-              />
-              <circle cx="16" cy="16" r="4" fill="#f0e9d8" />
-              <circle cx="24" cy="8" r="3.3" fill="#294d40" stroke="#b4c8b6" />
-            </svg>
+            <img className="board-logo" src="/logo.svg" alt="" aria-hidden="true" />
           </button>
           <label className="auto-play-toggle">
             <input
