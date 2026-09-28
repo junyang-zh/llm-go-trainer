@@ -106,6 +106,7 @@ app
           preload: join(__dirname, 'preload.cjs'),
         },
       });
+      if (process.platform === 'win32') win.removeMenu();
       win.webContents.setWindowOpenHandler(({ url }) => {
         // Markdown links open in the system browser; never execute custom/file protocols.
         if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => {});
