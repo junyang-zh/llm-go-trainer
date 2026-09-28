@@ -1,0 +1,60 @@
+# 架构与后续路线
+
+```mermaid
+flowchart LR
+  UI[React / SVG 棋盘] --> API[Loopback HTTP API]
+  Desktop[Electron 桌面外壳] --> UI
+  API --> Rules[共享 Go 规则 / SGF]
+  API --> Manager[引擎生命周期管理]
+  Manager --> Installer[校验下载 / 缓存 / GPU 初始化]
+  Manager --> Engine[KataGo JSONL 子进程]
+  Manager --> External[其他围棋 AI HTTP 适配器]
+  API --> Evidence[棋盘事实 + 前后分析]
+  Evidence --> Coach[教练提示词]
+  Coach --> DS[DeepSeek API]
+  Coach --> CLI[Codex / Claude CLI]
+```
+
+- `shared/`：棋盘重建、提子、禁着、SGF、面积计分及对手策略；不依赖 UI 或 Node。
+- `server/`：参数校验、进程生命周期、分析请求关联、LLM provider 及证据构造。分析请求带完整历史，讲解使用服务端取得的引擎结果。
+- `src/`：训练设置、棋盘、主线导航、临时 PV 试读、聊天；棋谱存浏览器 localStorage，聊天仅在内存中，切换局面即清空。
+- `desktop/`：关闭 renderer Node 集成，开启 context isolation / sandbox。后端仅监听 `127.0.0.1` 随机端口，退出时释放 KataGo。
+- `prompts/` 与 `skills/`：共用讲棋契约；不重复维护不同的推理视角。
+
+`src/useEvaluations.ts` 串行调度当前局面的后台分析及用户发起的曲线补全，前台任务开始或局面变化时取消旧请求。临时历史按棋盘大小、规则、贴目、初始摆子与完整落子前缀关联，并隔离引擎实例；新棋谱显式清空。只保存每手根节点胜率、目差、visits 和完成状态，完整候选/归属数据只保留当前查询。数值直接使用黑方视角；曲线仅在绘制百分比时将胜率乘 100，目差不反号。缺失手数不连线，未完成结果保留空心点。
+
+Markdown 使用 `react-markdown` + `remark-gfm` 渲染累计公开正文，不启用原始 HTML 或远程图片。链接只接受 HTTP(S)，桌面端交给系统浏览器，不允许模型输出替换应用页面或执行本地协议。
+
+## 引擎管理
+
+`EngineManager` 默认异步安装并预热 KataGo；界面通过 `/api/status` 读取阶段、下载进度和 PID。启动、停止、重启、切换按队列串行执行；停止会中断下载和预热，等待旧子进程退出再启动新进程。KataGo 使用 `shell:false` / `detached:false` / stdin 管道；退出钩子和 stdin EOF 负责清理，正常关闭最多等待 2 秒后强制结束子进程。源码数据位于 `.local/katago`，桌面归档数据位于 userData。
+
+下载清单固定版本和 SHA-256；临时文件校验后重命名，安装有进程锁和 staging 目录。每次启动复核本地文件。外部适配器与 KataGo 共用 `AnalysisEngine`，返回统一黑方视角；连接方式写入缓存目录的 `connection.json`。详见 [接口与部署](engines.md)。
+
+## 流式协议
+
+`POST /api/analyze` 与 `POST /api/coach` 在 `Accept: application/x-ndjson` 下返回按行 JSON：`status`、`analysis`（before/after，final 区分中间搜索结果）、`text`（累计公开回答）、`done` 或 `error`。不指定该 Accept 时保留 JSON 响应。
+
+KataGo 开启 `reportDuringSearchEvery`，搜索中的数值只用于即时显示，最终分析才进入讲解证据。DeepSeek 解析 SSE；Claude 解析 `stream_event` 的 `text_delta`；Codex 解析 `item.*` 的 `agent_message`，最终文本以输出文件为准。推理私有内容不进入消息。连接关闭通过 AbortSignal 取消上游；错误和不完整数据流不会被当成成功结果。
+
+## 数据与权限
+
+开发环境只开放 Vite 5173 与本地服务 3001；服务校验 Host、Origin、JSON 与自定义应用请求头。不开放 CORS、不提供任意命令执行或文件读取接口。CLI 用参数数组启动，棋谱/问题只走 stdin。API key 可以从 UI 写入服务端私有配置文件，或使用环境默认值，任何响应都不回传密钥；API 响应禁用缓存。该服务面向单用户本机，不是多租户公网服务。
+
+`server/llm-settings.ts` 负责认证探测、默认服务选择和原子保存。UI 只接收已脱敏的配置，密钥不进入 localStorage。每次讲棋请求固定服务与配置快照；之后修改设置影响下一次请求。模型、思考深度和服务偏好分别持久化，配置变更使 30 秒的认证探测缓存失效。
+
+棋谱导入不上传。只有提问时，当前棋盘、短历史、候选分析和当前对话才发到所选 LLM。默认不发棋手名字、评论或原始 SGF 文件。CLI 服务可能根据其账号/供应商策略保存请求；不能把“本地 CLI”当成“离线模型”。
+
+## 首版边界
+
+可以逐手查看和请求讲解，并补全整局的引擎曲线；尚无整局 LLM 自动讲解。SGF 首条主线导入，原注释、分支不进入训练记录。自由落子只追加在末尾；从中途继续会先导出原谱，再切成新主线。PV 仅作临时试读，不污染实战。
+
+数目是用户标死子后的中国面积预览；日本正式数目、双活裁定、复杂循环无胜负未完成。难度没有野狐/星阵 Elo 校准；激进度是近似接触偏好。
+
+## 迭代顺序
+
+1. 教学质量：固定证据数据集、人工盲评、实战落点强制搜索、主要变化再分析；支持棋盘高亮教练提到的坐标。
+2. 复盘效率：持久化分析缓存（模型/规则/贴目/历史/profile/visits 联合键）、更细的搜索优先级、逐手目损和关键手索引。
+3. 棋谱编辑：完整变体树、保留注释与标记、试下分支、导入集合、平台样例适配器。
+4. 对战：读秒、认输、稳定段位评测、让子策略校准、基于实战的棋风指标。
+5. 发布：离线资源打包、系统钥匙串、签名/公证、自动更新和回滚。

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "katago",
+    "version": "1.18.2",
+    "url": "https://ghcr.io/v2/homebrew/core/katago/blobs/sha256:7ff0aef28c12264c64b8d03f2b0168a7e92a7b5c9e6bd5ee1cc5ea2a54cd865a",
+    "sha256": "7ff0aef28c12264c64b8d03f2b0168a7e92a7b5c9e6bd5ee1cc5ea2a54cd865a",
+    "kind": "tar"
+  },
+  {
+    "name": "libzip",
+    "version": "1.11.4",
+    "url": "https://ghcr.io/v2/homebrew/core/libzip/blobs/sha256:6a65f5a729a460ee8988e05e9af08880215a008692dffede96e51694d0a8b428",
+    "sha256": "6a65f5a729a460ee8988e05e9af08880215a008692dffede96e51694d0a8b428",
+    "kind": "tar"
+  },
+  {
+    "name": "xz",
+    "version": "5.8.4",
+    "url": "https://ghcr.io/v2/homebrew/core/xz/blobs/sha256:c2724c0db0398134694b8366d30d14f4de376115fb54c559c331d5fd0474af76",
+    "sha256": "c2724c0db0398134694b8366d30d14f4de376115fb54c559c331d5fd0474af76",
+    "kind": "tar"
+  },
+  {
+    "name": "zstd",
+    "version": "1.5.7",
+    "url": "https://ghcr.io/v2/homebrew/core/zstd/blobs/sha256:d72adf48460a8384b256f88061cd7b9df4977df7fa2e0794051d427db754a565",
+    "sha256": "d72adf48460a8384b256f88061cd7b9df4977df7fa2e0794051d427db754a565",
+    "kind": "tar"
+  },
+  {
+    "name": "lz4",
+    "version": "1.10.0",
+    "url": "https://ghcr.io/v2/homebrew/core/lz4/blobs/sha256:91674f1c7407b1f7b73d5bd1d85ed1abaaca93be3b68607af4ef3df632540ac0",
+    "sha256": "91674f1c7407b1f7b73d5bd1d85ed1abaaca93be3b68607af4ef3df632540ac0",
+    "kind": "tar"
+  },
+  {
+    "name": "abseil",
+    "version": "20260817.0",
+    "url": "https://ghcr.io/v2/homebrew/core/abseil/blobs/sha256:8a6b64d5f9d44c579343f1ffa7587d08be653c193f5af24579f6ffc1530431ea",
+    "sha256": "8a6b64d5f9d44c579343f1ffa7587d08be653c193f5af24579f6ffc1530431ea",
+    "kind": "tar"
+  },
+  {
+    "name": "protobuf",
+    "version": "36.2",
+    "url": "https://ghcr.io/v2/homebrew/core/protobuf/blobs/sha256:153d9b9b322fc8c54fe66dbaf2c8fe382294ee6a8fba35fd4c090dd61de3d77a",
+    "sha256": "153d9b9b322fc8c54fe66dbaf2c8fe382294ee6a8fba35fd4c090dd61de3d77a",
+    "kind": "tar"
+  }
+]

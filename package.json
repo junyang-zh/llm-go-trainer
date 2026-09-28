@@ -1,0 +1,83 @@
+{
+  "name": "llm-go-trainer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Go training with KataGo and an evidence-grounded LLM coach",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
+    "build": "tsc --noEmit && vite build && tsup server/index.ts --format esm --platform node --target node22 --out-dir dist-server --clean",
+    "start": "node dist-server/index.js",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "desktop": "npm run build && electron desktop/main.cjs",
+    "package:desktop": "npm run build && electron-builder --publish never",
+    "doctor": "node --import tsx scripts/doctor.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tar": "^7.5.22",
+    "yauzl": "^3.4.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^5.0.2",
+    "concurrently": "^9.2.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.0.12",
+    "jsdom": "~27.4.0",
+    "prettier": "^3.9.9",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4",
+    "vitest": "^5.0.2"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  },
+  "main": "desktop/main.cjs",
+  "build": {
+    "appId": "com.junyang.llm-go-trainer",
+    "productName": "LLM Go Trainer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-server/**/*",
+      "desktop/**/*",
+      "prompts/**/*",
+      "config/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "author": "junyang-zh"
+}

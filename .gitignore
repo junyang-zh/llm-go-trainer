@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-server/
+release/
+coverage/
+.env
+.env.*
+!.env.example
+models/*
+!models/.gitkeep
+*.log
+.DS_Store
+test-results/
+playwright-report/
+.local/

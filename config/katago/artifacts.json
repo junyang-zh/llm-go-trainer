@@ -1,0 +1,18 @@
+{
+  "revision": "2026-09-28-1",
+  "main": {
+    "name": "KataGo 主模型",
+    "url": "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
+    "sha256": "9d7a6afed8ff5b74894727e156f04f0cd36060a24824892008fbb6e0cba51f1d"
+  },
+  "human": {
+    "name": "HumanSL 模型",
+    "url": "https://github.com/lightvector/KataGo/releases/download/v1.15.0/b18c384nbt-humanv0.bin.gz",
+    "sha256": "637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5"
+  },
+  "windows": {
+    "name": "KataGo 1.18.1 OpenCL",
+    "url": "https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-opencl-windows-x64.zip",
+    "sha256": "1710db1903ab921aa6837a9599c8474f8a59f057650217c5d9bc125ee393a9ff"
+  }
+}
