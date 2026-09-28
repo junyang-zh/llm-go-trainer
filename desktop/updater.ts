@@ -13,7 +13,7 @@ export function updateFeed(edition: AppEdition) {
     channel: edition === 'minimal' ? 'minimal' : 'latest',
   };
 }
-// Reject metadata that would switch editions or target another platform.
+// Validate against the selected download edition, which may omit already cached models.
 export function matchesEdition(info: UpdateInfo, edition: AppEdition, platform: string) {
   const target = platform === 'darwin' ? 'mac-arm64' : 'windows-x64';
   const base = `LLM-Go-Trainer-${info.version}-${target}${edition === 'minimal' ? '-minimal' : ''}`;
@@ -34,6 +34,7 @@ interface Options {
   settingsFile: string;
   updater?: AppUpdater;
   beforeInstall: () => Promise<void>;
+  hasCachedModels?: () => Promise<boolean>;
 }
 export class DesktopUpdates {
   private state: UpdateStatus;
@@ -43,7 +44,9 @@ export class DesktopUpdates {
   private settingsQueue: Promise<unknown> = Promise.resolve();
   private disposed = false;
   private cancellation?: CancellationToken;
+  private downloadEdition: AppEdition;
   constructor(private options: Options) {
+    this.downloadEdition = options.edition;
     this.state = {
       version: options.version,
       edition: options.edition,
@@ -60,12 +63,13 @@ export class DesktopUpdates {
     updater.allowPrerelease = false;
     updater.allowDowngrade = false;
     updater.disableWebInstaller = true;
-    // Each edition has its own full installer; don't reuse another edition's block map.
+    // A standard-to-minimal transition cannot reuse the standard installer's block map.
+    // Minimal carries application code only; models and engine caches stay in userData.
     updater.disableDifferentialDownload = true;
     updater.setFeedURL(updateFeed(options.edition));
     const supportsSystem = updater.isUpdateSupported.bind(updater);
     updater.isUpdateSupported = async (info) => {
-      if (!matchesEdition(info, options.edition, options.platform))
+      if (!matchesEdition(info, this.downloadEdition, options.platform))
         throw new Error('更新文件与当前系统或版本类型不匹配');
       return supportsSystem(info);
     };
@@ -158,6 +162,13 @@ export class DesktopUpdates {
     this.task = Promise.resolve()
       .then(async () => {
         try {
+          const reusesModels = (await this.options.hasCachedModels?.()) ?? false;
+          const edition = reusesModels ? 'minimal' : this.options.edition;
+          if (edition !== this.downloadEdition) {
+            this.options.updater!.setFeedURL(updateFeed(edition));
+            this.downloadEdition = edition;
+          }
+          this.state = { ...this.state, reusesModels, downloadEdition: edition };
           const result = await this.options.updater!.checkForUpdates();
           if (!result) throw new Error('当前安装方式不支持更新检查');
           this.cancellation = result.cancellationToken;

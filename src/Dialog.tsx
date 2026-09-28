@@ -4,10 +4,12 @@ export function Dialog({
   title,
   onClose,
   children,
+  wide = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const label = useId();
@@ -19,7 +21,7 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className="settings-dialog"
+      className={`settings-dialog${wide ? ' settings-wide' : ''}`}
       aria-labelledby={label}
       onCancel={(event) => {
         event.preventDefault();

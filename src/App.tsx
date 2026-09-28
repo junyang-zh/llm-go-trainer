@@ -83,7 +83,9 @@ export default function App() {
   const setQuestion = (value: string) => library.update('draft', value);
   const setEvidence = (value: unknown) => library.update('evidence', value);
   const [settings, setSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'training' | 'connections'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'training' | 'models' | 'connections'>(
+    'general',
+  );
   const [setup, setSetup] = useState(false);
   const [size, setSize] = useState(19),
     [handicap, setHandicap] = useState(0),
@@ -890,7 +892,7 @@ export default function App() {
         </aside>
       </div>
       {settings && (
-        <Dialog title="设置" onClose={() => setSettings(false)}>
+        <Dialog title="设置" wide onClose={() => setSettings(false)}>
           <div className="settings-tabs" role="tablist" aria-label="设置类别">
             <button
               role="tab"
@@ -902,11 +904,19 @@ export default function App() {
             </button>
             <button
               role="tab"
+              aria-selected={settingsTab === 'models'}
+              className={settingsTab === 'models' ? 'selected' : ''}
+              onClick={() => setSettingsTab('models')}
+            >
+              围棋模型
+            </button>
+            <button
+              role="tab"
               aria-selected={settingsTab === 'training'}
               className={settingsTab === 'training' ? 'selected' : ''}
               onClick={() => setSettingsTab('training')}
             >
-              对局训练
+              AI 自动落子
             </button>
             <button
               role="tab"
@@ -914,7 +924,7 @@ export default function App() {
               className={settingsTab === 'connections' ? 'selected' : ''}
               onClick={() => setSettingsTab('connections')}
             >
-              连接
+              连接 LLM
             </button>
           </div>
           {settingsTab === 'general' ? (
@@ -1010,9 +1020,10 @@ export default function App() {
                 </select>
               </label>
             </fieldset>
-          ) : (
+          ) : settingsTab === 'models' ? (
             <div className="connections">
               <EngineSettings
+                busy={locked}
                 status={status?.engine}
                 onChange={(engine) => {
                   statusRequest.current++;
@@ -1023,6 +1034,9 @@ export default function App() {
                   void refreshStatus();
                 }}
               />
+            </div>
+          ) : (
+            <div className="connections">
               <LlmSettings
                 status={status?.llm}
                 onChange={(llm) => {

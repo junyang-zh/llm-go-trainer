@@ -125,3 +125,55 @@ it('rejects cross-edition, external and cross-platform update payloads', async (
   await controller.download();
   expect(updater.downloadUpdate).not.toHaveBeenCalled();
 });
+it('uses the model-free update feed when a standard installation has cached its selected models', async () => {
+  const { options } = await setup();
+  const updater = new TestUpdater();
+  const hasCachedModels = vi.fn(async () => true);
+  updater.info.files[0].url = 'LLM-Go-Trainer-0.2.0-windows-x64-minimal.exe';
+  const controller = new DesktopUpdates({
+    ...options,
+    updater: updater.adapter(),
+    hasCachedModels,
+  });
+  controllers.push(controller);
+  await controller.check();
+  expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('minimal'));
+  expect(controller.status()).toMatchObject({
+    phase: 'available',
+    edition: 'standard',
+    downloadEdition: 'minimal',
+    reusesModels: true,
+  });
+  await controller.download();
+  expect(updater.downloadUpdate).toHaveBeenCalledTimes(1);
+  expect(controller.status().phase).toBe('downloaded');
+});
+it('does not silently fall back to a model-bundled installer when cached-model update metadata is wrong', async () => {
+  const { options } = await setup();
+  const updater = new TestUpdater();
+  const controller = new DesktopUpdates({
+    ...options,
+    updater: updater.adapter(),
+    hasCachedModels: async () => true,
+  });
+  controllers.push(controller);
+  expect((await controller.check()).error).toContain('不匹配');
+  await controller.download();
+  expect(updater.downloadUpdate).not.toHaveBeenCalled();
+});
+it('keeps standard updates when no verified model is cached and reevaluates it on a new check', async () => {
+  const { options } = await setup();
+  const updater = new TestUpdater();
+  const hasCachedModels = vi.fn(async () => false);
+  const controller = new DesktopUpdates({
+    ...options,
+    updater: updater.adapter(),
+    hasCachedModels,
+  });
+  controllers.push(controller);
+  expect((await controller.check()).downloadEdition).toBe('standard');
+  hasCachedModels.mockResolvedValue(true);
+  updater.info.files[0].url = 'LLM-Go-Trainer-0.2.0-windows-x64-minimal.exe';
+  expect((await controller.check()).downloadEdition).toBe('minimal');
+  expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('minimal'));
+});

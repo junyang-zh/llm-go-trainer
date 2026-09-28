@@ -1,0 +1,28 @@
+[
+  {
+    "id": "3d8a24697ba25fe4da39af4c2b6bd405907b0ad8295322f5a550fa2d8fe4a2f4",
+    "sha256": "3d8a24697ba25fe4da39af4c2b6bd405907b0ad8295322f5a550fa2d8fe4a2f4",
+    "name": "KataGo B10 · 轻量快速",
+    "url": "https://github.com/lightvector/KataGo/releases/download/v1.3/g170e-b10c128-s1141046784-d204142634.txt.gz",
+    "bytes": 14466254,
+    "role": "main",
+    "tier": "light",
+    "architecture": "b10c128",
+    "description": "小体积历史网络，适合资源有限的设备与快速试用。分析质量不代表当前主模型水平；HumanSL 另占资源。",
+    "boards": [9, 13, 19],
+    "source": "https://github.com/lightvector/KataGo/releases/tag/v1.3"
+  },
+  {
+    "id": "4a6312e80faadee7b7dd28689a2e87a1efb4640c10132f16290da7a17b4c6d9e",
+    "sha256": "4a6312e80faadee7b7dd28689a2e87a1efb4640c10132f16290da7a17b4c6d9e",
+    "name": "KataGo Transformer · 进阶分析",
+    "url": "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-tf3-b11c768-s12002M-d6304M.bin.gz",
+    "bytes": 262017809,
+    "role": "main",
+    "tier": "advanced",
+    "architecture": "tf3-b11c768",
+    "description": "适合愿意投入更多计算资源的用户。建议 NVIDIA 用户比较 CUDA / TensorRT；OpenCL 运行可能较慢。",
+    "boards": [9, 13, 19],
+    "source": "https://katagotraining.org/api/networks/kata1-tf3-b11c768-s12002M-d6304M/"
+  }
+]

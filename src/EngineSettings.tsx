@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Dialog } from './Dialog';
 import type { EngineConnection, EngineStatus } from '../shared/types';
+import { ModelSettings } from './ModelSettings';
 
 export function engineLabel(status?: EngineStatus) {
   if (!status) return '引擎状态读取中';
@@ -23,7 +24,18 @@ export function engineLabel(status?: EngineStatus) {
   return `${status.name || 'KataGo'} · ${status.phase ? labels[status.phase] : status.running ? '运行中' : '未启动'}${progress ? ` · ${progress.label}${percentage}` : ''}`;
 }
 type Action = 'start' | 'stop' | 'restart' | 'connect';
-export function EngineSettings({
+export function EngineSettings(props: {
+  status?: EngineStatus;
+  onChange: (status: EngineStatus) => void;
+  busy?: boolean;
+}) {
+  return (
+    <ModelSettings {...props}>
+      <EngineConnectionSettings {...props} />
+    </ModelSettings>
+  );
+}
+function EngineConnectionSettings({
   status,
   onChange,
 }: {

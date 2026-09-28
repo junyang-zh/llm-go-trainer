@@ -20,6 +20,8 @@ export interface UpdateStatus {
   progress?: number;
   checkedAt?: string;
   error?: string;
+  downloadEdition?: AppEdition;
+  reusesModels?: boolean;
 }
 export interface UpdateBridge {
   status(): Promise<UpdateStatus>;

@@ -80,9 +80,12 @@ export function GeneralSettings({
             自动更新
           </label>
           <p className="engine-detail">
-            启动后自动检查并下载更新，准备好后点击“重启并安装”。更新保留当前版本类型和本地数据。
+            启动后自动检查并下载更新，准备好后点击“重启并安装”。已有模型缓存时只下载不含模型的应用安装包，保留模型、引擎缓存与本地数据；缺失的模型按需下载。
           </p>
           {status?.reason && <p className="engine-detail">{status.reason}</p>}
+          {status?.reusesModels && (
+            <p className="update-cache-note">本次更新复用本地模型，不重复下载模型权重。</p>
+          )}
           <p role="status">
             {status ? labels[status.phase] : '读取更新设置…'}
             {status?.latestVersion ? ` · ${status.latestVersion}` : ''}

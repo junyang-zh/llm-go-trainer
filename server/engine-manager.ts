@@ -8,6 +8,8 @@ import { KataGo, type EngineConfig } from './katago';
 import { ExternalEngine, validateEngineUrl } from './external-engine';
 import { newGame } from '../shared/go';
 import { trainingForRank } from '../shared/training';
+import type { KataGoModels } from './katago-models';
+import type { ModelSelection } from '../shared/models';
 
 export const connectionSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('managed') }),
@@ -34,6 +36,7 @@ interface Options {
   configured?: EngineConfig;
   install?: (signal: AbortSignal, progress: (state: InstallProgress) => void) => Promise<Runtime>;
   factory?: (config: EngineConfig) => KataGo;
+  models?: KataGoModels;
 }
 export class EngineManager implements AnalysisEngine, EngineController {
   private selected: EngineConnection = { mode: 'managed' };
@@ -96,7 +99,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
       this.launch();
     }
   }
-  private launch() {
+  private launch(selection?: ModelSelection) {
     const controller = new AbortController();
     this.controller = controller;
     this.state = {
@@ -137,6 +140,8 @@ export class EngineManager implements AnalysisEngine, EngineController {
                   this.options.directory,
                   controller.signal,
                   (value) => Object.assign(this.state, value),
+                  undefined,
+                  this.options.models?.artifacts(selection),
                 ));
           controller.signal.throwIfAborted();
           this.state = {
@@ -145,13 +150,27 @@ export class EngineManager implements AnalysisEngine, EngineController {
             phase: 'starting',
             progress: undefined,
             backend: runtime.backend,
+            modelName: this.options.models?.artifacts(selection).main.name,
           };
           const engine = (this.options.factory ?? ((config) => new KataGo(config)))(runtime.config);
           this.engine = engine;
-          await engine.initialize(controller.signal, (label) => {
-            if (!controller.signal.aborted) this.state.progress = { label, received: 0 };
-          });
+          const models = !this.options.configured && this.options.models?.artifacts(selection);
+          const boards = models
+            ? models.main.boards.filter(
+                (size) => !models.human || models.human.boards.includes(size),
+              )
+            : [19];
+          await engine.initialize(
+            controller.signal,
+            (label) => {
+              if (!controller.signal.aborted) this.state.progress = { label, received: 0 };
+            },
+            (boards.includes(19) ? 19 : boards[0]) as Game['size'],
+          );
         }
+        controller.signal.throwIfAborted();
+        if (selection) await this.options.models!.commit(selection);
+        await this.options.models?.scan();
         controller.signal.throwIfAborted();
         this.state = {
           ...this.state,
@@ -164,6 +183,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
       } catch (error) {
         await this.engine?.close();
         this.engine = undefined;
+        await this.options.models?.scan().catch(() => {});
         if (!controller.signal.aborted)
           this.state = {
             ...this.state,
@@ -173,6 +193,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
             error: error instanceof Error ? error.message : '引擎启动失败',
           };
       } finally {
+        if (selection) this.options.models?.release();
         this.task = undefined;
       }
     })();
@@ -203,6 +224,21 @@ export class EngineManager implements AnalysisEngine, EngineController {
       if (!this.closed) this.launch();
     });
   }
+  selectModels(selection: ModelSelection) {
+    return this.enqueue(async () => {
+      if (this.closed || !this.options.models) throw new Error('模型管理不可用');
+      if (this.selected.mode !== 'managed') throw new Error('请先切换到内置 KataGo 引擎');
+      if (this.options.models.view().pending) throw new Error('正在切换模型，请稍候');
+      const reserved = await this.options.models.reserve(selection);
+      try {
+        await this.halt();
+        this.launch(reserved);
+      } catch (error) {
+        this.options.models.release();
+        throw error;
+      }
+    });
+  }
   connect(input: EngineConnection) {
     const connection = connectionSchema.parse(input);
     return this.enqueue(async () => {
@@ -225,6 +261,11 @@ export class EngineManager implements AnalysisEngine, EngineController {
       throw new Error(
         this.state.error || (this.state.phase === 'stopped' ? '引擎已停止' : '引擎初始化中'),
       );
+    if (this.selected.mode === 'managed' && !this.options.configured && this.options.models) {
+      const { main, human } = this.options.models.artifacts();
+      if (!main.boards.includes(game.size) || (human && !human.boards.includes(game.size)))
+        throw new Error(`当前模型不适用于 ${game.size} 路棋盘，请在模型设置中选择支持该尺寸的模型`);
+    }
     return this.engine.analyze(game, training, options);
   }
   async close() {

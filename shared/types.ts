@@ -104,6 +104,7 @@ export interface EngineStatus {
   mode?: EngineConnection['mode'];
   name?: string;
   backend?: string;
+  modelName?: string;
   pid?: number;
   error?: string;
   progress?: { label: string; received: number; total?: number };

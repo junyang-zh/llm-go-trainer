@@ -68,6 +68,7 @@ app
       reason,
       settingsFile: join(app.getPath('userData'), 'updates.json'),
       updater: autoUpdater,
+      hasCachedModels: () => backend.hasCachedModels(),
       beforeInstall: async () => {
         await backend.close();
         quitting = true;

@@ -16,9 +16,9 @@ import { release } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { EngineStatus } from '../shared/types';
 import type { EngineConfig } from './katago';
-import { downloadArtifact, fileHash, verified } from './download';
+import { downloadArtifact, fileHash, verified, type Artifact } from './download';
 import { safeArchivePath, unpackBottle, unpackZip } from './archive';
-import { ensureModel } from './model-files';
+import { ensureModel, modelFilename } from './model-files';
 import artifacts from '../config/katago/artifacts.json';
 import bottles from '../config/katago/macos-bottles.json';
 
@@ -98,6 +98,10 @@ export async function ensureRuntime(
   signal: AbortSignal,
   progress: (state: InstallProgress) => void,
   platform = runtimePlatform(),
+  selection: { main: Artifact; human?: Artifact } = {
+    main: artifacts.main,
+    human: artifacts.human,
+  },
 ): Promise<Runtime> {
   await mkdir(directory, { recursive: true });
   const unlock = await installLock(directory, signal);
@@ -115,8 +119,8 @@ export async function ensureRuntime(
       backend: platform.backend,
       config: {
         executable: join(target, platform.key === 'win32-x64' ? 'bin/katago.exe' : 'bin/katago'),
-        model: join(models, `${artifacts.main.sha256}.bin.gz`),
-        humanModel: join(models, `${artifacts.human.sha256}.bin.gz`),
+        model: join(models, modelFilename(selection.main)),
+        humanModel: selection.human ? join(models, modelFilename(selection.human)) : undefined,
         config,
         cwd: directory,
         env:
@@ -219,7 +223,7 @@ export async function ensureRuntime(
       await rename(staging, target);
       staging = undefined;
     }
-    for (const artifact of [artifacts.main, artifacts.human]) {
+    for (const artifact of [selection.main, ...(selection.human ? [selection.human] : [])]) {
       await ensureModel(
         artifact,
         directory,

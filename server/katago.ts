@@ -41,13 +41,17 @@ export class KataGo {
   private onExit = () => {
     for (const child of this.children.keys()) child.kill('SIGKILL');
   };
-  async initialize(signal?: AbortSignal, onProgress?: (message: string) => void) {
+  async initialize(
+    signal?: AbortSignal,
+    onProgress?: (message: string) => void,
+    size: Game['size'] = 19,
+  ) {
     this.stopped = false;
     this.startupProgress = onProgress;
     onProgress?.('正在加载模型和初始化 GPU；首次 OpenCL 调优可能需要数分钟');
     try {
       await this.request(
-        newGame(19),
+        newGame(size),
         { ...trainingForRank('5k'), visits: 1 },
         { signal },
         this.config.startupTimeout ?? Math.max(this.config.timeout, 600000),

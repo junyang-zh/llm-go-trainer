@@ -1,4 +1,5 @@
 import type { Analysis, EngineConnection, EngineStatus, Game, Training } from '../shared/types';
+import type { ModelSelection } from '../shared/models';
 export interface AnalysisOptions {
   onProgress?: (analysis: Analysis) => void;
   signal?: AbortSignal;
@@ -14,4 +15,5 @@ export interface EngineController {
   restart(): Promise<void>;
   connect(connection: EngineConnection): Promise<void>;
   connection(): EngineConnection;
+  selectModels?(selection: ModelSelection): Promise<void>;
 }

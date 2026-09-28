@@ -14,6 +14,8 @@ import { replay } from '../shared/go';
 import { selectMove } from '../shared/training';
 import { openStream } from './stream';
 import type { AnalysisPhase } from '../shared/types';
+import type { KataGoModels } from './katago-models';
+import { selectionSchema } from './katago-catalog';
 
 export function createApp(
   engine: AnalysisEngine,
@@ -23,6 +25,7 @@ export function createApp(
   controller?: EngineController,
   llm = new LlmSettings(providers),
   library = new HistoryLibrary(),
+  models?: KataGoModels,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -86,6 +89,49 @@ export function createApp(
   app.get('/api/engine/connection', (_req, res) =>
     res.json(controller?.connection() ?? { mode: 'managed' }),
   );
+  app.get('/api/models', (_req, res) => {
+    if (!models) {
+      res.status(501).json({ error: '模型管理不可用' });
+      return;
+    }
+    res.json(models.view());
+  });
+  app.post('/api/models/:action', async (req, res) => {
+    if (!models) {
+      res.status(501).json({ error: '模型管理不可用' });
+      return;
+    }
+    const id = () => z.object({ id: z.string().regex(/^[a-f0-9]{64}$/) }).parse(req.body).id;
+    switch (req.params.action) {
+      case 'download':
+        models.download(id());
+        break;
+      case 'cancel':
+        await models.cancel(id());
+        break;
+      case 'delete':
+        await models.remove(id());
+        break;
+      case 'add':
+        await models.addCustom(req.body);
+        break;
+      case 'refresh': {
+        const { page } = z
+          .object({ page: z.number().int().min(1).max(100).default(1) })
+          .parse(req.body);
+        await models.refresh(page);
+        break;
+      }
+      case 'select':
+        if (!controller?.selectModels) throw new Error('当前引擎不支持模型选择');
+        await controller.selectModels(selectionSchema.parse(req.body));
+        break;
+      default:
+        res.status(404).json({ error: 'Unknown model action' });
+        return;
+    }
+    res.status(202).json(models.view());
+  });
   app.post('/api/engine/:action', async (req, res) => {
     if (!controller) {
       res.status(501).json({ error: '引擎管理不可用' });

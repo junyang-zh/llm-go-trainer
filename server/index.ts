@@ -7,6 +7,7 @@ import { createApp } from './app';
 import { EngineManager } from './engine-manager';
 import type { ProviderConfig } from './providers';
 import { LlmSettings } from './llm-settings';
+import { KataGoModels } from './katago-models';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 dotenv.config({ path: process.env.GO_TRAINER_ENV ?? resolve(root, '.env'), quiet: true });
@@ -15,9 +16,13 @@ function duration(value: string | undefined, fallback: number) {
   return Number.isFinite(n) && n >= 1000 ? n : fallback;
 }
 export async function startServer(port = Number(process.env.PORT ?? 3001)) {
+  const directory = resolve(process.env.GO_TRAINER_DATA_DIR || resolve(root, '.local/katago'));
+  const models = new KataGoModels(directory, { canSelect: !process.env.KATAGO_MODEL });
+  await models.load();
   const engine = new EngineManager({
     root,
-    directory: resolve(process.env.GO_TRAINER_DATA_DIR || resolve(root, '.local/katago')),
+    directory,
+    models,
     // Existing custom installations remain supported. Defaults need no .env file.
     configured: process.env.KATAGO_MODEL
       ? {
@@ -65,8 +70,13 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
     new HistoryLibrary(
       resolve(process.env.GO_TRAINER_HISTORY_DIR || resolve(root, '.local/history')),
     ),
+    models,
   );
-  return new Promise<{ port: number; close: () => Promise<void> }>((done, reject) => {
+  return new Promise<{
+    port: number;
+    close: () => Promise<void>;
+    hasCachedModels: () => Promise<boolean>;
+  }>((done, reject) => {
     let closing: Promise<void> | undefined;
     const server = app.listen(port, '127.0.0.1', () => {
       const address = server.address();
@@ -78,6 +88,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
       void engine.load();
       done({
         port: address.port,
+        hasCachedModels: () => models.hasCachedModels(),
         close: () =>
           (closing ??= (async () => {
             llm.close();
@@ -86,7 +97,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
               server.close((error) => (error ? reject(error) : resolve())),
             );
             server.closeAllConnections();
-            await Promise.all([stopped, httpClosed]);
+            await Promise.all([stopped, httpClosed, models.close()]);
           })()),
       });
     });

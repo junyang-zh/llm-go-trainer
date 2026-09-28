@@ -2,6 +2,11 @@ import { copyFile, mkdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { downloadArtifact, verified, type Artifact, type DownloadProgress } from './download';
 
+export function modelFilename(artifact: Artifact) {
+  // KataGo chooses its weight parser using the filename, even for gzip payloads.
+  return `${artifact.sha256}${new URL(artifact.url).pathname.toLowerCase().endsWith('.txt.gz') ? '.txt.gz' : '.bin.gz'}`;
+}
+
 // Called under the install lock. Native KataGo needs real files outside app.asar.
 export async function ensureModel(
   artifact: Artifact,
@@ -12,7 +17,7 @@ export async function ensureModel(
 ) {
   signal.throwIfAborted();
   const models = join(directory, 'models');
-  const filename = `${artifact.sha256}.bin.gz`;
+  const filename = modelFilename(artifact);
   const target = join(models, filename);
   if (await verified(target, artifact.sha256)) return target;
   const bundled = bundledModels && join(bundledModels, filename);
