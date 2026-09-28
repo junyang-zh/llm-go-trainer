@@ -19,8 +19,22 @@ async function checkLayout() {
       await delay(20);
     }
   }
-  await until(() => document.querySelector('.candidates'));
+  await until(() => !document.querySelector('[aria-label="AI 自动落子"]').disabled);
+  if (document.querySelector('.candidates') || document.querySelector('.evaluation-current'))
+    throw new Error('Evaluation details should be hidden initially');
   await delay(100);
+  const toolbar = document.querySelector('.board-toolbar').getBoundingClientRect();
+  const notification = document.querySelector('.workspace-status').getBoundingClientRect();
+  if (Math.abs(toolbar.top + toolbar.height / 2 - notification.top - notification.height / 2) > 1)
+    throw new Error('Notification is not aligned with the toolbar');
+  if (innerWidth >= 640 && toolbar.right > notification.left)
+    throw new Error('Toolbar overlaps the notification');
+  const settings = document.querySelector('.settings-trigger');
+  if (!settings.querySelector('.board-logo')) throw new Error('Logo is not the settings entry');
+  settings.click();
+  await until(() => document.querySelector('dialog[open]'));
+  document.querySelector('.dialog-toolbar button').click();
+  await until(() => !document.querySelector('dialog[open]'));
   const frame = document.querySelector('.board-frame');
   const stage = document.querySelector('.board-stage');
   const initial = frame.getBoundingClientRect();
@@ -55,7 +69,9 @@ async function checkLayout() {
       document
         .querySelector(`[aria-label="${point} 空点"]`)
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await until(() => document.querySelector('.board-status')?.textContent.includes('搜索中'));
+      await until(() =>
+        document.querySelector('.workspace-status')?.textContent.includes('搜索中'),
+      );
       await until(() => +document.querySelector('.timeline').value === (index + 1) * 2);
       await delay(250);
       document.querySelector('[aria-label="关闭通知"]').click();
@@ -64,7 +80,7 @@ async function checkLayout() {
     document
       .querySelector('[aria-label="D4 黑子"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await until(() => document.querySelector('.board-status[role="alert"]'));
+    await until(() => document.querySelector('.workspace-status[role="alert"]'));
     await delay(50);
     document.querySelector('[aria-label="关闭通知"]').click();
     document.querySelector('.evaluation-toggle').click();
@@ -72,6 +88,10 @@ async function checkLayout() {
       (button) => button.textContent === '解释这一手',
     );
     explain.click();
+    await until(() => document.querySelector('textarea').value === '解释这一手');
+    if (document.querySelector('.agent-tool.running'))
+      throw new Error('Quick prompt sent without confirmation');
+    document.querySelector('.chat-input button.primary').click();
     await until(() => document.querySelector('.agent-tool.running'));
     document.querySelector('.agent-tool summary').click();
     if (!document.querySelector('.agent-tool').open) throw new Error('Tool details did not expand');
@@ -82,6 +102,10 @@ async function checkLayout() {
       throw new Error('Agent answer did not render Markdown');
     await until(() => !explain.disabled);
     explain.click();
+    await until(() => document.querySelector('textarea').value === '解释这一手');
+    if (document.querySelector('.agent-tool.running'))
+      throw new Error('Quick prompt sent without confirmation');
+    document.querySelector('.chat-input button.primary').click();
     await until(() => document.querySelector('.agent-tool.running'));
     [...document.querySelectorAll('.chat-input button')]
       .find((button) => button.textContent === '停止')
@@ -90,6 +114,20 @@ async function checkLayout() {
     await delay(400);
     if (document.querySelector('.agent-tool.running'))
       throw new Error('Stopped tool is still running');
+    document.querySelector('[aria-label="AI 自动落子"]').click();
+    document.querySelector('[aria-label="上一手"]').click();
+    await delay(100);
+    document
+      .querySelector('[aria-label="C4 空点"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await until(() => document.querySelector('[aria-label="C4 试下"]'));
+    await delay(100);
+    [...document.querySelectorAll('.trial-bar button')]
+      .find((button) => button.textContent === '清空试下')
+      .click();
+    await until(() => !document.querySelector('[aria-label="C4 试下"]'));
+    document.querySelector('[aria-label="下一手"]').click();
+    await delay(100);
   } finally {
     cancelAnimationFrame(animation);
   }
@@ -114,6 +152,7 @@ app.whenReady().then(async () => {
       [900, 540],
       [760, 480],
       [640, 800],
+      [640, 480],
     ]) {
       await fetch(`http://127.0.0.1:${server.address().port}/api/fixture/reset`, {
         method: 'POST',

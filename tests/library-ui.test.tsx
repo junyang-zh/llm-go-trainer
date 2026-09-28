@@ -67,6 +67,7 @@ async function point(point: string) {
 it('keeps a conversation across navigation and games, snapshots trial context, restores conversations and branches independently', async () => {
   await act(async () => root.render(<App />));
   await click('当前局势');
+  await click('发送');
   const originalChat = host.querySelector('.chat-log')!.textContent;
   expect(originalChat).toContain('第一局 · 第 3 手');
   await act(async () => (host.querySelector('[aria-label="上一手"]') as HTMLButtonElement).click());
@@ -75,6 +76,7 @@ it('keeps a conversation across navigation and games, snapshots trial context, r
   expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
   expect(saved.games.find((game) => game.id === firstGameId)!.game.moves).toHaveLength(3);
   await click('当前局势');
+  await click('发送');
   const payload = vi.mocked(streamApi).mock.calls.at(-1)![1] as {
     context: unknown;
     history: unknown[];
@@ -105,6 +107,7 @@ it('keeps a conversation across navigation and games, snapshots trial context, r
   );
   expect(host.querySelector('.chat-log')!.textContent).toContain('试下 +1 手');
   await click('当前局势');
+  await click('发送');
   expect(
     (vi.mocked(streamApi).mock.calls.at(-1)![1] as { context: { gameId: string } }).context.gameId,
   ).toBe(secondGameId);
@@ -133,6 +136,7 @@ it('keeps a conversation across navigation and games, snapshots trial context, r
 it('uses normal moves at the end of the main line and preserves the conversation on new games', async () => {
   await act(async () => root.render(<App />));
   await click('当前局势');
+  await click('发送');
   await click('新对局');
   await act(async () =>
     host
@@ -179,7 +183,7 @@ it('AI and manual moves from history share a trial branch; forking makes followi
   await act(async () =>
     (host.querySelector('[aria-label="AI 自动落子"]') as HTMLInputElement).click(),
   );
-  await click('分支新棋局');
+  await click('保存试下为新棋局');
   await point('H5');
   expect(host.querySelector('.trial-stone')).toBeNull();
   expect(saved.games[0].game.moves).toHaveLength(5);
@@ -206,4 +210,20 @@ it('the home page AI switch and color selector play real moves at the main-line 
     point: 'F5',
   });
   expect(host.querySelector('.trial-stone')).toBeNull();
+});
+
+it('inserts quick prompts as editable drafts and only requests coaching after send', async () => {
+  await act(async () => root.render(<App />));
+  const input = host.querySelector('textarea')!;
+  for (const prompt of ['解释这一手', '当前局势', '分析后续变化']) {
+    await click(prompt);
+    expect(input.value).toBe(prompt);
+    expect(document.activeElement).toBe(input);
+    expect(streamApi).not.toHaveBeenCalled();
+    expect(host.querySelector('.chat-log')!.textContent).toBe('');
+  }
+  await click('发送');
+  expect(streamApi).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(streamApi).mock.calls[0][1]).toMatchObject({ action: 'variation' });
+  expect(input.value).toBe('');
 });

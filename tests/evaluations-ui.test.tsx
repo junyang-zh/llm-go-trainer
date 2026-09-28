@@ -165,25 +165,56 @@ it('stops curve completion, preserves finished points and rejects late partial-q
   expect(latest.points[3].final).toBe(true);
   expect(latest.error).toBe('');
 });
-it('toggles board candidates and the candidate list together while keeping the graph panel visible', async () => {
+it('automatically analyzes with evaluations hidden, and independently reveals details and board candidates', async () => {
   vi.mocked(api).mockImplementation(async (path) =>
     path === 'library' ? { games: [], conversations: [] } : testStatus,
   );
   await act(async () => root.render(<App />));
   await tick();
+  expect(streamApi).toHaveBeenCalled();
+  expect(
+    [...host.querySelectorAll('button')].some((button) => button.textContent === '分析局面'),
+  ).toBe(false);
+  expect(host.querySelector('[aria-label="回到开局"]')).toBeNull();
+  expect(host.querySelector('[aria-label="最后一手"]')).toBeNull();
   const toggle = Array.from(host.querySelectorAll('button')).find(
     (button) => button.textContent === '候选点',
   )!;
-  expect(toggle.getAttribute('aria-pressed')).toBe('true');
-  expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
-  expect(host.querySelector('.candidates')).not.toBeNull();
-  expect(host.querySelector('.evaluation-toggle')?.getAttribute('aria-expanded')).toBe('false');
-  await act(async () => toggle.click());
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
   expect(host.querySelector('[aria-label="候选 A：D4"]')).toBeNull();
   expect(host.querySelector('.candidates')).toBeNull();
-  expect(host.querySelector('.evaluation')).not.toBeNull();
-  await act(async () => (host.querySelector('.evaluation-toggle') as HTMLButtonElement).click());
+  expect(host.querySelector('.evaluation-current')).toBeNull();
+  const expand = host.querySelector('.evaluation-toggle') as HTMLButtonElement;
+  expect(expand.getAttribute('aria-expanded')).toBe('false');
+  await act(async () => expand.click());
   expect(host.querySelector('.evaluation-chart')).not.toBeNull();
+  expect(host.querySelector('.evaluation-current')?.textContent).toContain('20.0%');
+  expect(host.querySelector('.candidates')).not.toBeNull();
   await act(async () => toggle.click());
   expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
+  await act(async () => expand.click());
+  expect(host.querySelector('.candidates')).toBeNull();
+  expect(host.querySelector('.evaluation-current')).toBeNull();
+});
+
+it('shows engine startup outside the conversation and clears it when the engine becomes ready', async () => {
+  let ready = false;
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === 'library'
+      ? { games: [], conversations: [] }
+      : { ...testStatus, engine: { ...testEngine, ready, phase: ready ? 'ready' : 'starting' } },
+  );
+  await act(async () => root.render(<App />));
+  const status = host.querySelector('.workspace-status')!;
+  expect(status.textContent).toBe('KataGo · 启动中');
+  expect(status.getAttribute('aria-hidden')).toBe('false');
+  expect(status.closest('.chat-panel')).toBeNull();
+  expect(status.querySelector('[aria-label="关闭通知"]')).toBeNull();
+  ready = true;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1500);
+  });
+  expect(status.textContent).toBe('');
+  expect(status.getAttribute('aria-hidden')).toBe('true');
+  expect(host.querySelector('.engine-progress')).toBeNull();
 });

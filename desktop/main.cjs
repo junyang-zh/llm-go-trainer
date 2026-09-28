@@ -24,7 +24,7 @@ app
       const win = new BrowserWindow({
         width: 1280,
         height: 800,
-        minWidth: 760,
+        minWidth: 640,
         minHeight: 480,
         backgroundColor: '#f1f2ed',
         title: 'LLM Go Trainer',

@@ -50,6 +50,7 @@ export default function App() {
   const [trialMoves, setTrialMoves] = useState<Move[]>([]);
   const [showGames, setShowGames] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
   const [turn, setTurn] = useState(game.moves.length);
   const [autoPlay, setAutoPlay] = useState(false);
   const [aiColor, setAiColor] = useState<Color>('W');
@@ -59,7 +60,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [showOwnership, setShowOwnership] = useState(false);
-  const [showCandidates, setShowCandidates] = useState(true);
+  const [showCandidates, setShowCandidates] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [dead, setDead] = useState<number[]>([]);
   const { messages, history, draft: question, evidence } = library.activeConversation;
@@ -82,6 +83,7 @@ export default function App() {
     statusRequest = useRef(0),
     fileInput = useRef<HTMLInputElement>(null),
     chatLog = useRef<HTMLDivElement>(null),
+    questionInput = useRef<HTMLTextAreaElement>(null),
     followChat = useRef(true),
     activeStream = useRef<AbortController | null>(null);
   const current = useMemo(
@@ -173,7 +175,7 @@ export default function App() {
   useEffect(() => {
     const log = chatLog.current;
     if (log && followChat.current) log.scrollTop = log.scrollHeight;
-  }, [messages]);
+  }, [messages, chatCollapsed]);
   useEffect(() => () => activeStream.current?.abort(), []);
   function invalidate() {
     setNotice('');
@@ -307,12 +309,7 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  async function requestAnalysis(
-    title: string,
-    endpoint: 'analyze' | 'coach',
-    payload: unknown,
-    territory = false,
-  ) {
+  async function requestAnalysis(title: string, endpoint: 'analyze' | 'coach', payload: unknown) {
     await run('分析中', async () => {
       const controller = new AbortController();
       activeStream.current = controller;
@@ -345,7 +342,6 @@ export default function App() {
             );
             if (event.type === 'analysis') {
               evaluations.record(current, event.analysis, event.final);
-              if (territory && event.phase === 'after') setShowOwnership(true);
             }
             if (event.type === 'done') {
               if (event.analysis) evaluations.record(current, event.analysis, true);
@@ -381,22 +377,17 @@ export default function App() {
       }
     });
   }
-  async function analyze(territory = false) {
-    await requestAnalysis(
-      territory ? '领地预测' : '分析局面',
-      'analyze',
-      { game: current, training },
-      territory,
-    );
-  }
-  async function ask(action: CoachAction) {
+  async function ask() {
     if (!llmReady) {
       setSettingsTab('connections');
       setSettings(true);
       return;
     }
-    if (action === 'chat' && !question.trim()) return;
-    const text = action === 'chat' ? question.trim() : labels[action];
+    const text = question.trim();
+    if (!text) return;
+    const action: CoachAction =
+      (['move', 'position', 'variation'] as const).find((action) => labels[action] === text) ??
+      'chat';
     await requestAnalysis(text, 'coach', {
       game: current,
       context: boardContext,
@@ -436,21 +427,15 @@ export default function App() {
       ? 'LLM · 未连接'
       : 'LLM · 检测中';
   const engineStatus = engineLabel(status?.engine);
-  const boardStatus = error || library.error || busy || notice;
+  const engineProgress =
+    status?.engine.phase && !['ready', 'stopped'].includes(status.engine.phase) ? engineStatus : '';
+  const workspaceError =
+    error || library.error || (status?.engine.phase === 'error' ? engineProgress : '');
+  const workspaceStatus = workspaceError || busy || engineProgress || notice;
   return (
-    <main className="workspace">
+    <main className={`workspace${chatCollapsed ? ' chat-collapsed' : ''}`}>
       <section className="board-panel" aria-label="棋盘">
         <div className="board-toolbar">
-          <svg className="board-logo" viewBox="0 0 32 32" role="img" aria-label="棋盘图标">
-            <rect x="1" y="1" width="30" height="30" rx="7" fill="#294d40" />
-            <path
-              d="M8 6v20M16 6v20M24 6v20M6 8h20M6 16h20M6 24h20"
-              stroke="#b4c8b6"
-              strokeWidth=".8"
-            />
-            <circle cx="16" cy="16" r="4" fill="#f0e9d8" />
-            <circle cx="24" cy="8" r="3.3" fill="#294d40" stroke="#b4c8b6" />
-          </svg>
           <button
             className="settings-trigger"
             aria-label="设置"
@@ -459,16 +444,15 @@ export default function App() {
             aria-expanded={settings}
             onClick={() => setSettings(true)}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M10 2h4l.7 3 2 1.2 3-.9 2 3.4-2.3 2.1v2.4l2.3 2.1-2 3.4-3-.9-2 1.2-.7 3h-4l-.7-3-2-1.2-3 .9-2-3.4 2.3-2.1v-2.4L2.3 8.7l2-3.4 3 .9 2-1.2z" />
-              <circle cx="12" cy="12" r="3.2" />
+            <svg className="board-logo" viewBox="0 0 32 32" aria-hidden="true">
+              <rect x="1" y="1" width="30" height="30" rx="7" fill="#294d40" />
+              <path
+                d="M8 6v20M16 6v20M24 6v20M6 8h20M6 16h20M6 24h20"
+                stroke="#b4c8b6"
+                strokeWidth=".8"
+              />
+              <circle cx="16" cy="16" r="4" fill="#f0e9d8" />
+              <circle cx="24" cy="8" r="3.3" fill="#294d40" stroke="#b4c8b6" />
             </svg>
           </button>
           <label className="auto-play-toggle">
@@ -573,9 +557,6 @@ export default function App() {
             </div>
           ) : (
             <div className="move-controls">
-              <button aria-label="回到开局" disabled={locked || !turn} onClick={() => navigate(0)}>
-                ⇤
-              </button>
               <button
                 aria-label="上一手"
                 disabled={locked || !turn}
@@ -593,13 +574,6 @@ export default function App() {
               >
                 →
               </button>
-              <button
-                aria-label="最后一手"
-                disabled={locked || turn === game.moves.length}
-                onClick={() => navigate(game.moves.length)}
-              >
-                ⇥
-              </button>
               <input
                 className="timeline"
                 aria-label="复盘手数"
@@ -612,13 +586,52 @@ export default function App() {
               />
             </div>
           )}
-          {trialMoves.length > 0 && (
-            <div className="trial-bar">
+          <div className="board-tools">
+            <button disabled={locked || !!pv || scoring} onClick={() => place('pass')}>
+              停一手
+            </button>
+            <div className="board-tools-right">
+              <button
+                className={showCandidates ? 'selected' : ''}
+                aria-pressed={showCandidates}
+                onClick={() => setShowCandidates((value) => !value)}
+              >
+                候选点
+              </button>
+              <button
+                className={showOwnership ? 'selected' : ''}
+                disabled={locked || !!pv || scoring || (!analysis && !status?.engine.ready)}
+                aria-pressed={showOwnership}
+                onClick={() => setShowOwnership((value) => !value)}
+              >
+                领地预测
+              </button>
+              <button
+                className={scoring ? 'selected' : ''}
+                disabled={locked || !!pv || game.rules === 'japanese'}
+                title={game.rules === 'japanese' ? '日本规则数目未实现' : '中国规则面积计分'}
+                onClick={() => {
+                  setScoring(!scoring);
+                  setDead([]);
+                }}
+              >
+                数目
+              </button>
+            </div>
+          </div>
+          <div className="board-secondary">
+            <div className="board-meta">
+              {game.size} 路 · {game.rules === 'chinese' ? '中国' : '日本'} · 贴 {game.komi}
+            </div>
+            <div
+              className="trial-bar"
+              aria-hidden={turn === game.moves.length && !trialMoves.length}
+            >
               <span>
-                试下 · 第 {turn} 手起 +{trialMoves.length} 手
+                {trialMoves.length ? `试下 · 第 ${turn} 手起 +${trialMoves.length} 手` : '复盘中'}
               </span>
               <button
-                disabled={locked}
+                disabled={locked || !trialMoves.length}
                 onClick={() => {
                   setTrialMoves([]);
                   setPv(null);
@@ -628,54 +641,10 @@ export default function App() {
               >
                 清空试下
               </button>
-              <button disabled={locked} onClick={forkGame}>
-                保存试下为新棋局
+              <button disabled={locked || !!pv} onClick={forkGame}>
+                {trialMoves.length ? '保存试下为新棋局' : '分支新棋局'}
               </button>
             </div>
-          )}
-          <div className="board-tools">
-            <button disabled={locked || !!pv || scoring} onClick={() => place('pass')}>
-              停一手
-            </button>
-            <button
-              disabled={locked || !!pv || !status?.engine.ready}
-              onClick={() => void analyze()}
-            >
-              分析局面
-            </button>
-            <button
-              className={showCandidates ? 'selected' : ''}
-              aria-pressed={showCandidates}
-              onClick={() => setShowCandidates((value) => !value)}
-            >
-              候选点
-            </button>
-            <button
-              className={showOwnership ? 'selected' : ''}
-              disabled={locked || !!pv || scoring || (!analysis && !status?.engine.ready)}
-              onClick={() => (analysis ? setShowOwnership(!showOwnership) : void analyze(true))}
-            >
-              领地预测
-            </button>
-            <button
-              className={scoring ? 'selected' : ''}
-              disabled={locked || !!pv || game.rules === 'japanese'}
-              title={game.rules === 'japanese' ? '日本规则数目未实现' : '中国规则面积计分'}
-              onClick={() => {
-                setScoring(!scoring);
-                setDead([]);
-              }}
-            >
-              数目
-            </button>
-            {turn < game.moves.length && !pv && (
-              <button disabled={locked} onClick={forkGame}>
-                分支新棋局
-              </button>
-            )}
-            <span className="board-meta">
-              {game.size} 路 · {game.rules === 'chinese' ? '中国' : '日本'} · 贴 {game.komi}
-            </span>
           </div>
           {scoring && (
             <div className="score-line">
@@ -684,71 +653,76 @@ export default function App() {
               <span>标记死子 {dead.length}</span>
             </div>
           )}
-          <div
-            className={`board-status ${error || library.error ? 'error' : ''}`}
-            role={error || library.error ? 'alert' : 'status'}
-            aria-hidden={!boardStatus}
-            title={boardStatus}
-          >
-            <span>{boardStatus}</span>
-            {library.error && <button onClick={library.retry}>重试</button>}
-            {botFailed && (
-              <button
-                onClick={() => {
-                  setBotFailed(false);
-                  setError('');
-                }}
-              >
-                重试
-              </button>
-            )}
-            {boardStatus && !busy && (
-              <button
-                aria-label="关闭通知"
-                onClick={() => {
-                  setError('');
-                  setNotice('');
-                }}
-              >
-                ×
-              </button>
-            )}
-          </div>
         </div>
       </section>
-      <aside className="chat-panel" aria-label="分析对话">
-        <div className="chat-toolbar">
-          <span
-            className={`engine-status llm-status ${llmReady ? 'online' : ''}`}
-            aria-label={llmLabel}
-            title={llmLabel}
-          >
-            <i />
-            {llmLabel}
-          </span>
-          <span
-            className={`engine-status ${status?.engine.ready ? 'online' : ''}`}
-            title={engineStatus}
-            aria-label={engineStatus}
-          >
-            <i />
-            {status?.engine.name || 'KataGo'}
-          </span>
+      <div className="right-column">
+        <button
+          type="button"
+          className="chat-collapse-toggle"
+          aria-label={chatCollapsed ? '展开对话面板' : '收起对话面板'}
+          title={chatCollapsed ? '展开对话面板' : '收起对话面板'}
+          aria-expanded={!chatCollapsed}
+          aria-controls="chat-panel"
+          onClick={() => setChatCollapsed((collapsed) => !collapsed)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d={chatCollapsed ? 'M12 5 7 10l5 5' : 'M8 5l5 5-5 5'} />
+          </svg>
+        </button>
+        <div
+          className={`workspace-status ${workspaceError ? 'error' : ''}`}
+          role={workspaceError ? 'alert' : 'status'}
+          aria-hidden={!workspaceStatus}
+          title={workspaceStatus}
+        >
+          <span>{workspaceStatus}</span>
+          {library.error && <button onClick={library.retry}>重试</button>}
+          {botFailed && (
+            <button
+              onClick={() => {
+                setBotFailed(false);
+                setError('');
+              }}
+            >
+              重试
+            </button>
+          )}
+          {!busy && (error || (!library.error && !engineProgress && notice)) && (
+            <button
+              aria-label="关闭通知"
+              onClick={() => {
+                setError('');
+                setNotice('');
+              }}
+            >
+              ×
+            </button>
+          )}
         </div>
-        {status?.engine.phase && !['ready', 'stopped'].includes(status.engine.phase) && (
-          <div
-            className={`engine-progress ${status.engine.phase === 'error' ? 'error' : ''}`}
-            role="status"
-          >
-            {engineStatus}
+        <aside id="chat-panel" className="chat-panel" aria-label="分析对话" hidden={chatCollapsed}>
+          <div className="chat-toolbar">
+            <span
+              className={`engine-status llm-status ${llmReady ? 'online' : ''}`}
+              aria-label={llmLabel}
+              title={llmLabel}
+            >
+              <i />
+              {llmLabel}
+            </span>
+            <span
+              className={`engine-status ${status?.engine.ready ? 'online' : ''}`}
+              title={engineStatus}
+              aria-label={engineStatus}
+            >
+              <i />
+              {status?.engine.name || 'KataGo'}
+            </span>
           </div>
-        )}
-        {!trialMoves.length && (
           <EvaluationPanel
             history={evaluations.points}
-            turn={turn}
-            total={game.moves.length}
-            disabled={locked || !!pv || scoring}
+            turn={current.moves.length}
+            total={trialMoves.length ? current.moves.length : game.moves.length}
+            disabled={locked || !!pv || scoring || !!trialMoves.length}
             ready={!!status?.engine.ready}
             completing={evaluations.completing}
             pendingTurn={evaluations.pendingTurn}
@@ -757,164 +731,170 @@ export default function App() {
             complete={evaluations.complete}
             stop={evaluations.stop}
             retry={evaluations.retry}
-          />
-        )}
-        {showCandidates && !pv && !scoring && candidates.length > 0 && (
-          <div className="candidates">
-            {candidates.map((candidate, i) => (
-              <button
-                key={candidate.move}
-                disabled={locked || scoring}
-                onClick={() => setPv({ moves: candidate.pv, step: 0 })}
-                title={candidate.pv.join(' → ')}
-              >
-                <b>{String.fromCharCode(65 + i)}</b> {candidate.move}{' '}
-                <small>
-                  {candidate.scoreLead > 0 ? '+' : ''}
-                  {candidate.scoreLead.toFixed(1)}
-                </small>
-              </button>
+          >
+            {!pv && !scoring && candidates.length > 0 && (
+              <div className="candidates">
+                {candidates.map((candidate, i) => (
+                  <button
+                    key={candidate.move}
+                    disabled={locked || scoring}
+                    onClick={() => setPv({ moves: candidate.pv, step: 0 })}
+                    title={candidate.pv.join(' → ')}
+                  >
+                    <b>{String.fromCharCode(65 + i)}</b> {candidate.move}{' '}
+                    <small>
+                      {candidate.scoreLead > 0 ? '+' : ''}
+                      {candidate.scoreLead.toFixed(1)}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </EvaluationPanel>
+          <div className="conversation-toolbar">
+            <span title={library.activeConversation.title}>{library.activeConversation.title}</span>
+            <button disabled={locked} onClick={() => library.newConversation()}>
+              新对话
+            </button>
+            <button disabled={locked} onClick={() => setShowConversations(true)}>
+              历史对话
+            </button>
+          </div>
+          <div
+            className="chat-log"
+            ref={chatLog}
+            role="log"
+            aria-label="分析结果"
+            aria-live="polite"
+            onScroll={(e) => {
+              const log = e.currentTarget;
+              followChat.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+            }}
+          >
+            {messages.map((message) => (
+              <article className="chat-message" key={message.id}>
+                {message.context && (
+                  <div className="message-context">
+                    {message.context.gameTitle} · 第 {message.context.turn} 手
+                    {message.context.trialMoves.length > 0 &&
+                      ` · 试下 +${message.context.trialMoves.length} 手`}
+                    <small title={message.context.gameId}>
+                      {' '}
+                      · {message.context.gameId.slice(0, 8)}
+                    </small>
+                  </div>
+                )}
+                <div className="chat-question">
+                  <MarkdownText>{message.question}</MarkdownText>
+                </div>
+                {(['after', 'before'] as const).map((phase) => {
+                  const evaluation = message.evaluations[phase];
+                  if (!evaluation) return null;
+                  const { analysis: value, final } = evaluation;
+                  const candidate = value.moveInfos.find((move) => move.order === 0);
+                  return (
+                    <div className="search-result" key={phase}>
+                      <span>
+                        {phase === 'before' ? '落子前' : '当前局面'} ·{' '}
+                        {final ? '搜索完成' : message.state === 'running' ? '搜索中' : '搜索未完成'}{' '}
+                        · {value.rootInfo.visits.toLocaleString()} visits
+                      </span>
+                      <div>
+                        黑胜率 {(value.rootInfo.winrate * 100).toFixed(1)}% · 黑目差{' '}
+                        {value.rootInfo.scoreLead > 0 ? '+' : ''}
+                        {value.rootInfo.scoreLead.toFixed(1)}
+                      </div>
+                      {candidate && (
+                        <div className="search-pv">{candidate.pv.slice(0, 8).join(' → ')}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                <AgentActivity tools={message.tools ?? []} />
+                {message.text && <MarkdownText>{message.text}</MarkdownText>}
+                {message.state !== 'done' && (
+                  <div
+                    className={`message-status ${message.state}`}
+                    role={message.state === 'error' ? 'alert' : undefined}
+                  >
+                    {message.state === 'running' && <i />}
+                    {message.status}
+                  </div>
+                )}
+              </article>
             ))}
           </div>
-        )}
-        <div className="conversation-toolbar">
-          <span title={library.activeConversation.title}>{library.activeConversation.title}</span>
-          <button disabled={locked} onClick={() => library.newConversation()}>
-            新对话
-          </button>
-          <button disabled={locked} onClick={() => setShowConversations(true)}>
-            历史对话
-          </button>
-        </div>
-        <div className="quick-actions">
-          {(['move', 'position', 'variation'] as const).map((action) => (
-            <button
-              key={action}
-              disabled={locked || !llmReady || !!pv || (action === 'move' && !current.moves.length)}
-              onClick={() => void ask(action)}
-            >
-              {labels[action]}
-            </button>
-          ))}
-        </div>
-        <div
-          className="chat-log"
-          ref={chatLog}
-          role="log"
-          aria-label="分析结果"
-          aria-live="polite"
-          onScroll={(e) => {
-            const log = e.currentTarget;
-            followChat.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
-          }}
-        >
-          {messages.map((message) => (
-            <article className="chat-message" key={message.id}>
-              {message.context && (
-                <div className="message-context">
-                  {message.context.gameTitle} · 第 {message.context.turn} 手
-                  {message.context.trialMoves.length > 0 &&
-                    ` · 试下 +${message.context.trialMoves.length} 手`}
-                  <small title={message.context.gameId}>
-                    {' '}
-                    · {message.context.gameId.slice(0, 8)}
-                  </small>
-                </div>
-              )}
-              <div className="chat-question">
-                <MarkdownText>{message.question}</MarkdownText>
-              </div>
-              {(['after', 'before'] as const).map((phase) => {
-                const evaluation = message.evaluations[phase];
-                if (!evaluation) return null;
-                const { analysis: value, final } = evaluation;
-                const candidate = value.moveInfos.find((move) => move.order === 0);
-                return (
-                  <div className="search-result" key={phase}>
-                    <span>
-                      {phase === 'before' ? '落子前' : '当前局面'} ·{' '}
-                      {final ? '搜索完成' : message.state === 'running' ? '搜索中' : '搜索未完成'} ·{' '}
-                      {value.rootInfo.visits.toLocaleString()} visits
-                    </span>
-                    <div>
-                      黑胜率 {(value.rootInfo.winrate * 100).toFixed(1)}% · 黑目差{' '}
-                      {value.rootInfo.scoreLead > 0 ? '+' : ''}
-                      {value.rootInfo.scoreLead.toFixed(1)}
-                    </div>
-                    {candidate && (
-                      <div className="search-pv">{candidate.pv.slice(0, 8).join(' → ')}</div>
-                    )}
-                  </div>
-                );
-              })}
-              <AgentActivity tools={message.tools ?? []} />
-              {message.text && <MarkdownText>{message.text}</MarkdownText>}
-              {message.state !== 'done' && (
-                <div
-                  className={`message-status ${message.state}`}
-                  role={message.state === 'error' ? 'alert' : undefined}
-                >
-                  {message.state === 'running' && <i />}
-                  {message.status}
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-        <form
-          className="chat-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask('chat');
-          }}
-        >
-          <textarea
-            aria-label="问题"
-            maxLength={4000}
-            placeholder="输入问题"
-            value={question}
-            disabled={locked || !!pv}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void ask('chat');
-              }
+          <form
+            className="chat-input"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void ask();
             }}
-          />
-          <div>
-            <button
-              type="button"
-              disabled={!evidence || locked}
-              onClick={() =>
-                download(
-                  'analysis-evidence.json',
-                  JSON.stringify(evidence, null, 2),
-                  'application/json',
-                )
-              }
-            >
-              导出分析
-            </button>
-            {activeStream.current && locked ? (
+          >
+            <div className="quick-actions" aria-label="快捷提示">
+              {(['move', 'position', 'variation'] as const).map((action) => (
+                <button
+                  type="button"
+                  key={action}
+                  disabled={locked || !!pv || (action === 'move' && !current.moves.length)}
+                  onClick={() => {
+                    setQuestion(labels[action]);
+                    questionInput.current?.focus();
+                  }}
+                >
+                  {labels[action]}
+                </button>
+              ))}
+            </div>
+            <textarea
+              ref={questionInput}
+              aria-label="问题"
+              maxLength={4000}
+              placeholder="输入问题"
+              value={question}
+              disabled={locked || !!pv}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void ask();
+                }
+              }}
+            />
+            <div className="chat-submit">
               <button
                 type="button"
-                className="primary"
-                onClick={() => activeStream.current?.abort()}
+                disabled={!evidence || locked}
+                onClick={() =>
+                  download(
+                    'analysis-evidence.json',
+                    JSON.stringify(evidence, null, 2),
+                    'application/json',
+                  )
+                }
               >
-                停止
+                导出分析
               </button>
-            ) : (
-              <button
-                className="primary"
-                disabled={locked || !llmReady || !!pv || !question.trim()}
-              >
-                发送
-              </button>
-            )}
-          </div>
-        </form>
-      </aside>
+              {activeStream.current && locked ? (
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => activeStream.current?.abort()}
+                >
+                  停止
+                </button>
+              ) : (
+                <button
+                  className="primary"
+                  disabled={locked || !llmReady || !!pv || !question.trim()}
+                >
+                  发送
+                </button>
+              )}
+            </div>
+          </form>
+        </aside>
+      </div>
       {settings && (
         <Dialog title="设置" onClose={() => setSettings(false)}>
           <div className="settings-tabs" role="tablist" aria-label="设置类别">

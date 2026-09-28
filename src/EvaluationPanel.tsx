@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { evaluationSegments, type EvaluationHistory } from './evaluation-history';
 
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
@@ -134,6 +134,7 @@ export function EvaluationPanel({
   complete,
   stop,
   retry,
+  children,
 }: {
   history: EvaluationHistory;
   turn: number;
@@ -147,6 +148,7 @@ export function EvaluationPanel({
   complete: () => void;
   stop: () => void;
   retry: () => void;
+  children?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const current = history[turn];
@@ -161,20 +163,21 @@ export function EvaluationPanel({
         onClick={() => setExpanded((value) => !value)}
       >
         <span>{expanded ? '⌄' : '›'} 目差 / 胜率</span>
-        <span className="evaluation-current">
-          {current
-            ? `黑 ${signed(current.scoreLead)} · ${(current.winrate * 100).toFixed(1)}%${current.final ? '' : pendingTurn === turn ? ' · 搜索中' : ' · 未完成'}`
-            : error
-              ? '分析失败'
-              : pendingTurn !== null
-                ? '分析中'
-                : ready
-                  ? '未分析'
-                  : '引擎未就绪'}
-        </span>
       </button>
       {expanded && (
         <div id="evaluation-plot" className="evaluation-body">
+          <span className="evaluation-current">
+            {current
+              ? `黑 ${signed(current.scoreLead)} · ${(current.winrate * 100).toFixed(1)}%${current.final ? '' : pendingTurn === turn ? ' · 搜索中' : ' · 未完成'}`
+              : error
+                ? '分析失败'
+                : pendingTurn !== null
+                  ? '分析中'
+                  : ready
+                    ? '未分析'
+                    : '引擎未就绪'}
+          </span>
+          {children}
           <EvaluationChart
             history={history}
             turn={turn}
