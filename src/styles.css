@@ -591,6 +591,63 @@ h2 {
   padding-left: 9px;
   margin-bottom: 10px;
 }
+.agent-activity {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  font-size: 11px;
+}
+.agent-tool {
+  border: 1px solid #e0e6d8;
+  border-radius: 5px;
+  background: #f1f4ed;
+}
+.agent-tool summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 5px 7px;
+  list-style: none;
+}
+.agent-tool summary::-webkit-details-marker {
+  display: none;
+}
+.agent-tool summary::after {
+  content: '›';
+}
+.agent-tool[open] summary::after {
+  content: '⌄';
+}
+.agent-tool summary > span {
+  flex: 1;
+  min-width: 0;
+}
+.agent-tool small {
+  white-space: nowrap;
+  color: #7f8b76;
+}
+.agent-tool i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #729260;
+  flex-shrink: 0;
+}
+.agent-tool.running i {
+  animation: pulse 1s infinite alternate;
+}
+.agent-tool.error i {
+  background: #955138;
+}
+.agent-tool.stopped i {
+  background: #9c9b80;
+}
+.agent-tool-detail {
+  padding: 0 8px 7px;
+  color: #65755b;
+  overflow-wrap: anywhere;
+}
 .search-result > span {
   color: #7f8c77;
 }
@@ -744,7 +801,8 @@ h2 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .message-status i {
+  .message-status i,
+  .agent-tool.running i {
     animation: none;
   }
 }

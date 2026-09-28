@@ -1,4 +1,5 @@
 import express from 'express';
+import { CoachTools } from './coach-tools';
 import { join } from 'node:path';
 import { LlmSettings } from './llm-settings';
 import { z } from 'zod';
@@ -163,6 +164,23 @@ export function createApp(
     const stream = req.headers.accept?.includes('application/x-ndjson')
       ? openStream(res)
       : undefined;
+    const controller = new AbortController();
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(config.timeout),
+      ...(stream ? [stream.signal] : []),
+    ]);
+    const disconnected = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.on('close', disconnected);
+    const tools = new CoachTools(
+      engine,
+      game,
+      training,
+      (activity) => stream?.send({ type: 'tool', activity }),
+      signal,
+    );
     try {
       const analyze = async (phase: AnalysisPhase) => {
         stream?.send({
@@ -173,7 +191,7 @@ export function createApp(
           phase === 'before' ? { ...game, moves: game.moves.slice(0, -1) } : game,
           training,
           {
-            signal: stream?.signal,
+            signal,
             onProgress: stream
               ? (analysis) => stream.send({ type: 'analysis', phase, analysis, final: false })
               : undefined,
@@ -213,18 +231,23 @@ export function createApp(
         `${action}: ${tasks[action]}${action !== 'chat' && question ? '\n' + question : ''}`,
         history,
         {
-          signal: stream?.signal,
+          signal,
+          tools,
           onText: stream ? (text) => stream.send({ type: 'text', text }) : undefined,
           onStatus: stream ? (text) => stream.send({ type: 'status', text }) : undefined,
         },
       );
-      if (stream) stream.send({ type: 'done', answer, evidence, analysis: after });
-      else res.json({ answer, evidence, analysis: after });
+      const fullEvidence = { ...evidence, toolResults: tools.results };
+      if (stream) stream.send({ type: 'done', answer, evidence: fullEvidence, analysis: after });
+      else res.json({ answer, evidence: fullEvidence, analysis: after });
     } catch (error) {
       if (stream)
         stream.send({ type: 'error', error: error instanceof Error ? error.message : '分析失败' });
       else throw error;
     } finally {
+      controller.abort();
+      tools.close();
+      res.off('close', disconnected);
       stream?.close();
       coaching = false;
     }

@@ -32,15 +32,17 @@ DeepSeek 走兼容 Chat Completions 的 HTTP 接口；base URL、模型名、思
 
 Codex 使用 `codex exec` stdin + 最终答复文件，独立临时工作目录、read-only sandbox、禁用 shell 功能且不加载用户配置。CLI 需支持本项目参数；不同安装版本先运行 doctor，并以本机 `codex exec --help` 为准。[OpenAI 非交互模式](https://developers.openai.com/codex/noninteractive)
 
-Claude Code 使用 `-p --output-format stream-json --verbose --include-partial-messages`，通过 stdin 传任务；禁用内置工具，提供空的 strict MCP 配置，不加载项目/用户 settings sources。CLI 登录由用户完成，应用不处理登录令牌。[Claude CLI 参考](https://code.claude.com/docs/en/cli-reference)
+Claude Code 使用 `-p --output-format stream-json --verbose --include-partial-messages`，通过 stdin 传任务；关闭内置工具，使用 strict MCP 配置接入本次讲解的围棋工具，并用 allowedTools 授权。不加载项目/用户 settings sources。[Claude CLI 参考](https://code.claude.com/docs/en/cli-reference)
+
+Codex 和 Claude Code 均支持 Streamable HTTP MCP；本项目在请求期间创建本机 MCP 服务，通过执行回调报告搜索进度，CLI 的工具事件用于补充调用阶段。Codex 使用 `mcp_servers` 参数配置，Claude 使用 `--mcp-config`；两者均不修改用户全局配置。[Codex MCP](https://developers.openai.com/codex/mcp/) · [Claude MCP](https://code.claude.com/docs/en/mcp)
+
+DeepSeek 使用原生 `tools` / `tool_calls` 多轮调用。流式参数需要按调用索引拼接，工具结果通过 `role=tool` 与 `tool_call_id` 关联；思考模式下保留并回传同次请求的 `reasoning_content`，界面只显示公开回答和执行状态。[DeepSeek 工具调用](https://api-docs.deepseek.com/guides/tool_calls/) · [思考模式](https://api-docs.deepseek.com/guides/thinking_mode/)
 
 跨平台不拼接 shell 命令。Windows npm 的 `.cmd` 包装需改成原生 exe，或 `node + CLI JS 入口`。连接检查使用 CLI 登录状态命令以及 DeepSeek `/models`，据此自动选择可用服务；检查不生成回答，也不证明特定 CLI 模型有额度。模型及深度分别映射到各家参数，Codex 可用档位来自本机公开模型缓存。[DeepSeek 模型列表](https://api-docs.deepseek.com/api/list-models/) · [Codex 配置](https://developers.openai.com/codex/config-reference/) · [Claude 模型设置](https://code.claude.com/docs/en/model-config)
 
 ## 怎样提高讲解质量
 
 讲解以结构化证据为基础：合法棋盘和棋块气数由代码计算，胜率/目差/PV 由 KataGo 计算，LLM 解释目的、取舍和训练问题。每手采用前后两次分析，目损估计受搜索量影响；征子、双活等战术判断需要具体变化支持。
-
-讲解质量的评估方法是由强业余/职业棋手标注错误类型，比较纯 SGF 提问、结构化棋盘、加入 KataGo 证据三组，同时记录模型、版本、visits、延迟、花费与专家评分。详见[评估方案](coach-evaluation.md)。
 
 ## Web UI 到桌面
 

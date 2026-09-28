@@ -13,6 +13,11 @@ flowchart LR
   Evidence --> Coach[教练提示词]
   Coach --> DS[DeepSeek API]
   Coach --> CLI[Codex / Claude CLI]
+  DS --> Tools[围棋工具执行器]
+  CLI --> MCP[本机 MCP 桥接]
+  MCP --> Tools
+  Tools --> Rules
+  Tools --> Manager
 ```
 
 - `shared/`：棋盘重建、提子、禁着、SGF、面积计分及对手策略；不依赖 UI 或 Node。
@@ -33,9 +38,19 @@ Markdown 使用 `react-markdown` + `remark-gfm` 渲染累计公开正文，不�
 
 ## 流式协议
 
-`POST /api/analyze` 与 `POST /api/coach` 在 `Accept: application/x-ndjson` 下返回按行 JSON：`status`、`analysis`（before/after，final 区分中间搜索结果）、`text`（累计公开回答）、`done` 或 `error`。不指定该 Accept 时保留 JSON 响应。
+`POST /api/analyze` 与 `POST /api/coach` 在 `Accept: application/x-ndjson` 下返回按行 JSON：`status`、`analysis`（before/after，final 区分中间搜索结果）、`tool`（按 ID 更新执行状态与搜索进度）、`text`（累计公开回答）、`done` 或 `error`。不指定该 Accept 时保留 JSON 响应。
 
 KataGo 开启 `reportDuringSearchEvery`，搜索中的数值只用于即时显示，最终分析才进入讲解证据。DeepSeek 解析 SSE；Claude 解析 `stream_event` 的 `text_delta`；Codex 解析 `item.*` 的 `agent_message`，最终文本以输出文件为准。推理私有内容不进入消息。连接关闭通过 AbortSignal 取消上游；错误和不完整数据流不会被当成成功结果。
+
+## 讲棋 Agent
+
+`server/coach-tools.ts` 提供 `inspect_position` 和 `analyze_variation`。每次讲解固定棋谱快照；工具从当前局面或最后一手之前开始，使用 `shared/` 重建和校验试下手顺，再通过同一 `AnalysisEngine` 查询。工具返回棋盘、重点棋块与气、黑方视角分析和候选变化；试下结果通过 `tool` 事件传给对话，不进入主线曲线。完整工具结果随“导出分析”一起导出。
+
+单次讲解最多调用 12 次工具、追加 12,000 visits；每次搜索 50–4,000 visits，默认 800。相同起点、手顺与 visits 的查询复用本次讲解内的缓存。调用串行执行，错误作为工具结果返回给模型修正；取消信号贯穿排队、引擎搜索和 LLM。总时限使用 `LLM_TIMEOUT_MS`。
+
+DeepSeek 由 `server/deepseek.ts` 驱动多轮调用：拼接流式工具参数、执行工具、回传结果，最多 8 轮工具请求后生成最终回答。`reasoning_content` 仅在服务端回传给供应商以延续同一次讲解。
+
+CLI 通过 `server/coach-mcp.ts` 的临时 Streamable HTTP MCP 服务调用同一执行器。服务监听随机 loopback 端口，使用每次请求独立的令牌，校验 Host 与 Origin；令牌通过子进程环境传递。应用通过调用参数配置 MCP，并只授权这两个围棋工具。CLI 退出后关闭 MCP 服务和未完成搜索。执行器回调与 Codex/Claude 的工具事件共同更新 UI，无需修改用户的全局 hook 或 MCP 配置。
 
 ## 数据与权限
 

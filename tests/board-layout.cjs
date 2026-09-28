@@ -70,8 +70,28 @@ async function checkLayout() {
     await delay(50);
     document.querySelector('[aria-label="关闭通知"]').click();
     document.querySelector('.evaluation-toggle').click();
-    await delay(100);
-    await delay(50);
+    const explain = [...document.querySelectorAll('.quick-actions button')].find(
+      (button) => button.textContent === '解释这一手',
+    );
+    explain.click();
+    await until(() => document.querySelector('.agent-tool.running'));
+    document.querySelector('.agent-tool summary').click();
+    if (!document.querySelector('.agent-tool').open) throw new Error('Tool details did not expand');
+    await until(() => document.querySelector('.agent-tool.done'));
+    if (!document.querySelector('.agent-tool-detail').textContent.includes('黑胜率 60.0%'))
+      throw new Error('Tool evaluation did not render');
+    if (!document.querySelector('.chat-message strong'))
+      throw new Error('Agent answer did not render Markdown');
+    await until(() => !explain.disabled);
+    explain.click();
+    await until(() => document.querySelector('.agent-tool.running'));
+    [...document.querySelectorAll('.chat-input button')]
+      .find((button) => button.textContent === '停止')
+      .click();
+    await until(() => document.querySelector('.agent-tool.stopped'));
+    await delay(400);
+    if (document.querySelector('.agent-tool.running'))
+      throw new Error('Stopped tool is still running');
   } finally {
     cancelAnimationFrame(animation);
   }

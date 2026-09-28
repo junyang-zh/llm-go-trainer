@@ -73,8 +73,20 @@ export interface ChatMessage {
   content: string;
 }
 export type AnalysisPhase = 'before' | 'after';
+export interface ToolActivity {
+  id: string;
+  name: string;
+  label: string;
+  state: 'running' | 'done' | 'error' | 'stopped';
+  baseTurn?: number;
+  moves?: Move[];
+  detail?: string;
+  elapsedMs?: number;
+  evaluation?: { visits: number; winrate: number; scoreLead: number; pv: Move[] };
+}
 export type StreamEvent =
   | { type: 'status'; text: string }
+  | { type: 'tool'; activity: ToolActivity }
   | { type: 'analysis'; phase: AnalysisPhase; analysis: Analysis; final: boolean }
   | { type: 'text'; text: string }
   | { type: 'done'; answer?: string; evidence?: unknown; analysis: Analysis | null }

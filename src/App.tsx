@@ -3,7 +3,8 @@ import { EngineSettings, engineLabel } from './EngineSettings';
 import { LlmSettings } from './LlmSettings';
 import { availabilityLabel, providerNames } from '../shared/llm';
 import { Dialog } from './Dialog';
-import { type AnalysisMessage, updateMessage } from './messages';
+import { type AnalysisMessage, updateMessage, finishMessage } from './messages';
+import { AgentActivity } from './AgentActivity';
 import { Board } from './Board';
 import { MarkdownText } from './MarkdownText';
 import { EvaluationPanel } from './EvaluationPanel';
@@ -307,11 +308,11 @@ export default function App() {
         setMessages((previous) =>
           previous.map((message) =>
             message.id === id
-              ? {
-                  ...message,
-                  state: stopped ? 'stopped' : 'error',
-                  status: stopped ? '已停止' : (error as Error).message,
-                }
+              ? finishMessage(
+                  message,
+                  stopped ? 'stopped' : 'error',
+                  stopped ? '已停止' : (error as Error).message,
+                )
               : message,
           ),
         );
@@ -735,6 +736,7 @@ export default function App() {
                   </div>
                 );
               })}
+              <AgentActivity tools={message.tools ?? []} />
               {message.text && <MarkdownText>{message.text}</MarkdownText>}
               {message.state !== 'done' && (
                 <div

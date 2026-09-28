@@ -14,7 +14,16 @@ module.exports = function layoutApi() {
         name: 'KataGo',
         pid: 100,
       },
-      providers: { deepseek: false, codex: false, claude: false },
+      providers: { deepseek: false, codex: true, claude: false },
+      llm: {
+        preference: 'auto',
+        selected: 'codex',
+        providers: {
+          codex: { available: true, state: 'ready' },
+          claude: { available: false, state: 'missing' },
+          deepseek: { available: false, state: 'unconfigured' },
+        },
+      },
     }),
   );
   function analysis(game) {
@@ -39,6 +48,39 @@ module.exports = function layoutApi() {
         analysis: analysis(game),
       });
     }, 250);
+  });
+  router.post('/coach', (req, res) => {
+    res.type('application/x-ndjson');
+    const send = (event) => res.write(JSON.stringify(event) + '\n');
+    const activity = {
+      id: 'fixture-search',
+      name: 'analyze_variation',
+      label: '检查断点后的应对',
+      state: 'running',
+      baseTurn: req.body.game.moves.length,
+      moves: [{ color: 'B', point: 'C4' }],
+    };
+    send({ type: 'tool', activity });
+    const timer = setTimeout(() => {
+      send({
+        type: 'tool',
+        activity: {
+          ...activity,
+          state: 'done',
+          elapsedMs: 300,
+          evaluation: {
+            visits: 100,
+            winrate: 0.6,
+            scoreLead: 2.5,
+            pv: [{ color: 'W', point: 'D5' }],
+          },
+        },
+      });
+      send({ type: 'text', text: '**黑棋粘住断点**，保持联络。' });
+      send({ type: 'done', answer: '**黑棋粘住断点**，保持联络。', analysis: null });
+      res.end();
+    }, 300);
+    res.on('close', () => clearTimeout(timer));
   });
   return router;
 };

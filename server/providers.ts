@@ -3,7 +3,11 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, Provider } from '../shared/types';
-import { readSseData } from '../shared/stream';
+import { callDeepSeek } from './deepseek';
+import type { CoachTools } from './coach-tools';
+import { coachToolDefinitions } from './coach-tools';
+import { openCoachMcp, coachMcpName, coachMcpTokenEnv, type CoachMcpConnection } from './coach-mcp';
+export { callDeepSeek } from './deepseek';
 
 export interface ProviderConfig {
   deepseekKey: string;
@@ -24,87 +28,14 @@ export interface ProviderOptions {
   onText?: (text: string) => void;
   onStatus?: (text: string) => void;
   signal?: AbortSignal;
-}
-export async function callDeepSeek(
-  config: ProviderConfig,
-  messages: { role: string; content: string }[],
-  options: ProviderOptions = {},
-) {
-  if (!config.deepseekKey) throw new Error('请在连接设置中配置 DeepSeek API key');
-  const url = new URL(config.deepseekUrl.replace(/\/$/, '') + '/chat/completions');
-  if (
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    (url.protocol !== 'https:' &&
-      !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))
-  )
-    throw new Error('API 地址必须使用 HTTPS');
-  const signal = AbortSignal.any([
-    AbortSignal.timeout(config.timeout),
-    ...(options.signal ? [options.signal] : []),
-  ]);
-  const stream = !!options.onText;
-  const response = await fetch(url, {
-    method: 'POST',
-    signal,
-    redirect: 'error',
-    headers: { Authorization: `Bearer ${config.deepseekKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: config.deepseekModel,
-      messages,
-      stream,
-      ...(config.deepseekEffort && config.deepseekEffort !== 'default'
-        ? { reasoning_effort: config.deepseekEffort }
-        : {}),
-    }),
-  });
-  if (!response.ok) throw new Error(`DeepSeek 请求失败（HTTP ${response.status}）`);
-  if (!stream) {
-    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-    const text = data.choices?.[0]?.message?.content;
-    if (!text?.trim()) throw new Error('LLM 未返回内容');
-    return text;
-  }
-  if (!response.body) throw new Error('DeepSeek 未返回数据流');
-  let text = '',
-    complete = false,
-    thinking = false;
-  for await (const data of readSseData(response.body, signal)) {
-    if (data === '[DONE]') {
-      complete = true;
-      break;
-    }
-    let event;
-    try {
-      event = JSON.parse(data);
-    } catch {
-      throw new Error('DeepSeek 数据流格式无效');
-    }
-    if (event.error) throw new Error('DeepSeek 流式请求失败');
-    const choice = event.choices?.[0];
-    if (choice?.finish_reason === 'length') throw new Error('输出达到长度限制，回答未完成');
-    if (choice?.delta?.reasoning_content && !thinking) {
-      thinking = true;
-      options.onStatus?.('DeepSeek 正在分析');
-    }
-    // Forward public answer text, not private model deliberation.
-    if (typeof choice?.delta?.content === 'string') {
-      text += choice.delta.content;
-      if (text.length > 1_000_000) throw new Error('LLM 输出超出限制');
-      options.onText?.(text);
-    }
-  }
-  if (!complete) throw new Error('DeepSeek 连接中断，回答未完成');
-  if (!text.trim()) throw new Error('LLM 未返回内容');
-  return text;
+  tools?: CoachTools;
 }
 export function cliInvocation(
   provider: 'codex' | 'claude',
   config: ProviderConfig,
   output: string,
   stream = false,
+  mcp?: CoachMcpConnection,
 ) {
   if (provider === 'codex')
     return {
@@ -125,6 +56,20 @@ export function cliInvocation(
         'features.shell_tool=false',
         '-c',
         'features.unified_exec=false',
+        ...(mcp
+          ? [
+              '-c',
+              `mcp_servers.${coachMcpName}.url=${JSON.stringify(mcp.url)}`,
+              '-c',
+              `mcp_servers.${coachMcpName}.bearer_token_env_var=${JSON.stringify(coachMcpTokenEnv)}`,
+              '-c',
+              `mcp_servers.${coachMcpName}.required=true`,
+              '-c',
+              `mcp_servers.${coachMcpName}.tool_timeout_sec=180`,
+              '-c',
+              `mcp_servers.${coachMcpName}.default_tools_approval_mode="approve"`,
+            ]
+          : []),
         '--color',
         'never',
         ...(stream ? ['--json'] : []),
@@ -149,7 +94,23 @@ export function cliInvocation(
       '',
       '--strict-mcp-config',
       '--mcp-config',
-      '{"mcpServers":{}}',
+      JSON.stringify({
+        mcpServers: mcp
+          ? {
+              [coachMcpName]: {
+                type: 'http',
+                url: mcp.url,
+                headers: { Authorization: `Bearer \${${coachMcpTokenEnv}}` },
+              },
+            }
+          : {},
+      }),
+      ...(mcp
+        ? [
+            '--allowedTools',
+            ...coachToolDefinitions.map((tool) => `mcp__${coachMcpName}__${tool.name}`),
+          ]
+        : []),
       '--setting-sources',
       '',
       '--no-session-persistence',
@@ -165,15 +126,20 @@ export async function callCli(
   options.signal?.throwIfAborted();
   const cwd = await mkdtemp(join(tmpdir(), 'go-coach-')),
     output = join(cwd, 'answer.txt');
-  const streaming = !!(options.onText || options.onStatus);
-  const invocation = cliInvocation(provider, config, output, streaming);
+  let mcp: Awaited<ReturnType<typeof openCoachMcp>> | undefined;
   try {
+    if (options.tools) mcp = await openCoachMcp(options.tools);
+    options.signal?.throwIfAborted();
+    const streaming = !!(options.onText || options.onStatus || options.tools);
+    const invocation = cliInvocation(provider, config, output, streaming, mcp);
     if (/\.(cmd|bat)$/i.test(invocation.executable))
       throw new Error('请使用原生 CLI 或 Node + JS 入口');
     const result = await new Promise<string>((resolve, reject) => {
       const env = { ...process.env };
       delete env.DEEPSEEK_API_KEY;
       delete env.GO_TRAINER_TOKEN;
+      delete env[coachMcpTokenEnv];
+      if (mcp) env[coachMcpTokenEnv] = mcp.token;
       const child = spawn(invocation.executable, invocation.args, {
         cwd,
         env,
@@ -216,6 +182,10 @@ export async function callCli(
           if (event.type === 'turn.failed' || event.type === 'error')
             throw new Error('Codex 分析失败');
           const item = event.item;
+          if (item?.type === 'mcp_tool_call') {
+            if (event.type === 'item.started') options.onStatus?.('Codex 正在调用围棋工具');
+            if (event.type === 'item.completed') options.onStatus?.('Codex 正在整理分析');
+          }
           if (
             ['item.started', 'item.updated', 'item.completed'].includes(event.type) &&
             item?.type === 'agent_message' &&
@@ -231,6 +201,13 @@ export async function callCli(
           if (event.type === 'system' && event.subtype === 'api_retry')
             options.onStatus?.('Claude 正在重试连接');
           if (event.parent_tool_use_id) return;
+          const block = event.type === 'stream_event' ? event.event?.content_block : undefined;
+          if (block?.type === 'tool_use') options.onStatus?.('Claude 正在调用围棋工具');
+          if (
+            event.type === 'user' &&
+            event.message?.content?.some((part: { type?: string }) => part.type === 'tool_result')
+          )
+            options.onStatus?.('Claude 正在整理分析');
           const delta = event.type === 'stream_event' ? event.event?.delta : undefined;
           if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
             text += delta.text;
@@ -294,6 +271,7 @@ export async function callCli(
     options.onText?.(answer.trim());
     return answer.trim();
   } finally {
+    await mcp?.close();
     await rm(cwd, { recursive: true, force: true });
   }
 }
@@ -310,7 +288,15 @@ export async function coach(
   if (provider === 'deepseek')
     return callDeepSeek(
       config,
-      [{ role: 'system', content: system }, ...history, { role: 'user', content: message }],
+      options.tools
+        ? [
+            { role: 'system', content: system },
+            {
+              role: 'user',
+              content: `历史对话（供理解提问）：\n${JSON.stringify(history)}\n\n${message}`,
+            },
+          ]
+        : [{ role: 'system', content: system }, ...history, { role: 'user', content: message }],
       options,
     );
   return callCli(

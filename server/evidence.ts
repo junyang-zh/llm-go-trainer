@@ -1,7 +1,7 @@
 import { COLUMNS, groupAt, replay, toPoint } from '../shared/go';
 import type { Analysis, Game, Training } from '../shared/types';
 
-function compact(analysis: Analysis | null) {
+export function compact(analysis: Analysis | null) {
   if (!analysis) return null;
   return {
     perspective: 'B',
@@ -13,13 +13,13 @@ function compact(analysis: Analysis | null) {
       .map((c) => ({ ...c, pv: c.pv.slice(0, 10) })),
     ownership: analysis.ownership
       ? {
-          note: 'row-major from top-left; +1 Black, -1 White; prediction, not settled territory',
+          note: 'predicted endgame ownership; row-major from top-left; +1 Black, -1 White',
           values: analysis.ownership.map((v) => Number(v.toFixed(2))),
         }
       : undefined,
   };
 }
-function positionFacts(game: Game) {
+export function positionFacts(game: Game) {
   const position = replay(game),
     seen = new Set<number>();
   const groups = position.board.flatMap((color, i) => {
@@ -83,7 +83,5 @@ export function buildEvidence(
       before && after && last
         ? (last.color === 'B' ? 1 : -1) * (before.rootInfo.scoreLead - after.rootInfo.scoreLead)
         : null,
-    caveat:
-      'Front/back searches may differ. Score is not final. Only supplied PVs are engine-verified candidate lines.',
   };
 }
