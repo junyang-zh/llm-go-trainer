@@ -5,8 +5,10 @@ GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10
 ## 发布步骤
 
 1. 更新 `package.json` 与 `package-lock.json` 中的版本（例如 `npm version 0.1.1 --no-git-tag-version`），按需更新 `docs/release-notes.md`。
-2. 提交修改，确保工作区干净，推送代码。
-3. 创建与 package.json 一致的 tag，并推送：
+2. 准备本地提交，确保工作区干净。将待推送的 commit、具体改动、目标远端与分支、验证结果交给用户审阅，获得对本次推送的明确批准后，才推送代码。
+3. 发布 tag 也必须先审阅：提供准确的版本/tag、目标 commit、目标远端、Release notes 和验证结果，获得明确批准后，才创建并推送与 package.json 一致的 tag。批准仅适用于已审阅的改动和目标；新增改动或替换远端 tag 必须重新审阅。选择版本号或要求实现发布流程不等于批准任何 push。
+
+以下命令仅在相应分支和 tag 推送均获批准后执行：
 
 ```sh
 git tag -a v0.1.0 -m "Release v0.1.0"
