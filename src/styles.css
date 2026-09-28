@@ -242,6 +242,12 @@ h2 {
   font-size: 12px;
   white-space: nowrap;
 }
+.move-controls .move-count {
+  flex-shrink: 0;
+  width: 12ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .timeline-control {
   --timeline-thumb: #4b7056;
   position: relative;
@@ -266,7 +272,8 @@ h2 {
     to right,
     #4b7056 0 var(--history-progress),
     #c44f43 var(--history-progress) var(--trial-progress),
-    #cbd1c6 var(--trial-progress) 100%
+    #cba7a1 var(--trial-progress) var(--trial-end),
+    #cbd1c6 var(--trial-end) 100%
   );
   pointer-events: none;
 }
@@ -274,7 +281,7 @@ h2 {
   position: relative;
   display: block;
   appearance: none;
-  /* Keep the thumb on the full history scale, but make future history unreachable in trials. */
+  /* The reachable range includes the entire trial, including its recoverable suffix. */
   width: calc(16px + (100% - 16px) * var(--timeline-reachable));
   height: 24px;
   margin: 0;
@@ -307,13 +314,6 @@ h2 {
 .timeline:disabled {
   cursor: not-allowed;
   opacity: 0.4;
-}
-.variation-bar {
-  background: #e4ecdf;
-  border-radius: 5px;
-}
-.variation-bar button:last-child {
-  font-size: 12px;
 }
 .board-tools {
   display: flex;

@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import { HistoryLibrary } from '../server/library';
 import { libraryFixture } from './fixtures/library';
 import { newGame, toIndex } from '../shared/go';
-import { trialStoneIndices } from '../shared/trial';
+import { trialStoneNumbers } from '../shared/trial';
 
 it('atomically persists independent records across restarts and rejects illegal game updates', () => {
   const directory = mkdtempSync(join(tmpdir(), 'go-history-test-'));
@@ -47,7 +47,35 @@ it('removes captured trial markers and respects superko/legal play through share
     { color: 'B' as const, point: 'A1' },
     { color: 'W' as const, point: 'B1' },
   ];
-  expect(trialStoneIndices(game, 0, moves)).toEqual([toIndex('B1', 9)]);
+  expect(trialStoneNumbers(game, 0, moves)).toEqual(new Map([[toIndex('B1', 9), 2]]));
   expect(game.moves).toHaveLength(0);
-  expect(() => trialStoneIndices(game, 0, [{ color: 'B', point: 'A2' }])).toThrow('已有棋子');
+  expect(() => trialStoneNumbers(game, 0, [{ color: 'B', point: 'A2' }])).toThrow('已有棋子');
+});
+it('numbers trials relative to the historical turn, including passes and replayed points', () => {
+  const game = libraryFixture.games[0].game;
+  const moves = [
+    { color: 'B' as const, point: 'D4' },
+    { color: 'W' as const, point: 'pass' },
+    { color: 'B' as const, point: 'E4' },
+  ];
+  expect(trialStoneNumbers(game, 2, moves)).toEqual(
+    new Map([
+      [toIndex('D4', 9), 1],
+      [toIndex('E4', 9), 3],
+    ]),
+  );
+  const captureGame = { ...newGame(9), initialStones: [{ color: 'W' as const, point: 'A2' }] };
+  expect(
+    trialStoneNumbers(captureGame, 0, [
+      { color: 'B', point: 'A1' },
+      { color: 'W', point: 'B1' },
+      { color: 'B', point: 'pass' },
+      { color: 'W', point: 'A1' },
+    ]),
+  ).toEqual(
+    new Map([
+      [toIndex('B1', 9), 2],
+      [toIndex('A1', 9), 4],
+    ]),
+  );
 });

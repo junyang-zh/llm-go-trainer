@@ -7,7 +7,7 @@ interface Props {
   lastPoint?: string;
   ownership?: number[];
   candidates?: Candidate[];
-  trialStones?: number[];
+  trialStones?: ReadonlyMap<number, number>;
   dead: number[];
   disabled: boolean;
   scoring: boolean;
@@ -19,7 +19,7 @@ export function Board({
   lastPoint,
   ownership,
   candidates = [],
-  trialStones = [],
+  trialStones = new Map(),
   dead,
   disabled,
   scoring,
@@ -90,7 +90,7 @@ export function Board({
           y = margin + Math.floor(i / size) * step;
         const candidate = candidates.findIndex((c) => c.move === toPoint(i, size));
         const own = ownership?.[i] ?? 0;
-        const trial = trialStones.includes(i);
+        const trial = trialStones.get(i);
         return (
           <g key={i}>
             {color && (
@@ -111,16 +111,6 @@ export function Board({
                 opacity={dead.includes(i) ? 0.3 : 1}
               />
             )}
-            {color && trial && (
-              <circle
-                className="trial-stone"
-                aria-label={`${toPoint(i, size)} 试下`}
-                cx={x + 10}
-                cy={y - 10}
-                r="3.2"
-                fill="#c44f43"
-              />
-            )}
             {Math.abs(own) > 0.15 && (
               <rect
                 x={x - 5}
@@ -134,7 +124,24 @@ export function Board({
                 opacity={Math.abs(own) * 0.85}
               />
             )}
-            {i === last && color && !ownership && (
+            {color && trial && (
+              <text
+                className="trial-stone"
+                aria-label={`${toPoint(i, size)} 试下`}
+                aria-description={`试下第 ${trial} 手`}
+                x={x}
+                y={y}
+                dy=".35em"
+                textAnchor="middle"
+                fontSize={trial >= 100 ? 10 : 13}
+                fontWeight="600"
+                fill={color === 'B' ? '#fffefa' : '#222620'}
+                opacity={dead.includes(i) ? 0.3 : 1}
+              >
+                {trial}
+              </text>
+            )}
+            {i === last && color && !ownership && !trial && (
               <circle
                 cx={x}
                 cy={y}

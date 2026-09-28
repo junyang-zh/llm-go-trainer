@@ -12,6 +12,8 @@ import {
   firstGameId,
   secondGameId,
   libraryBotMove,
+  libraryCandidateAnalysis,
+  captureTrialGame,
 } from './fixtures/library';
 vi.mock('../src/api', () => ({ api: vi.fn(), streamApi: vi.fn() }));
 let root: Root, host: HTMLDivElement, saved: Library;
@@ -52,6 +54,7 @@ afterEach(async () => {
   host.remove();
   localStorage.clear();
   vi.resetAllMocks();
+  vi.useRealTimers();
 });
 async function click(text: string) {
   const button = [...host.querySelectorAll('button')].find((item) => item.textContent === text)!;
@@ -76,37 +79,123 @@ async function previous() {
   expect(button.disabled).toBe(false);
   await act(async () => button.click());
 }
+async function next() {
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="下一手"]')!;
+  expect(button.disabled).toBe(false);
+  await act(async () => button.click());
+}
+it.each([
+  ['panel', 3],
+  ['board', 2],
+] as const)(
+  'adds whole candidate variations through the %s into a numbered, reversible trial',
+  async (entry, turn) => {
+    vi.useFakeTimers();
+    engineReady = true;
+    vi.mocked(streamApi).mockImplementation(async (_path, body, emit) => {
+      const game = (body as { game: import('../shared/types').Game }).game;
+      emit({ type: 'done', analysis: libraryCandidateAnalysis(game) });
+    });
+    await act(async () => root.render(<App />));
+    await seek(turn);
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await act(async () => host.querySelector<HTMLButtonElement>('.evaluation-toggle')!.click());
+    if (entry === 'panel') {
+      await act(async () => host.querySelector<HTMLButtonElement>('.candidates button')!.click());
+    } else {
+      await click('候选点');
+      await point('D4');
+    }
+    const number = (point: string) => host.querySelector(`[aria-label="${point} 试下"]`)!;
+    expect(number('D4').textContent).toBe('1');
+    expect(number('E4').textContent).toBe('2');
+    expect(number('D4').getAttribute('fill')).toBe(turn === 3 ? '#222620' : '#fffefa');
+    expect(number('E4').getAttribute('fill')).toBe(turn === 3 ? '#fffefa' : '#222620');
+    expect(host.querySelector('[aria-label="变化下一手"]')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe(String(turn + 2));
+    await point('F5');
+    expect(number('F5').textContent).toBe('3');
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await act(async () => host.querySelector<HTMLButtonElement>('.candidates button')!.click());
+    expect(number('F4').textContent).toBe('4');
+    expect(number('G4').textContent).toBe('5');
+    await previous();
+    expect(number('G4')).toBeNull();
+    expect(number('F4').textContent).toBe('4');
+    await seek(turn);
+    expect(host.querySelector('.trial-stone')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe(String(turn + 5));
+    await seek(turn + 5);
+    expect(number('G4').textContent).toBe('5');
+    await seek(turn + 1);
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await act(async () => host.querySelector<HTMLButtonElement>('.candidates button')!.click());
+    expect(number('E4').textContent).toBe('2');
+    expect(number('F4').textContent).toBe('3');
+    expect(number('F5')).toBeNull();
+    expect(number('G4')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe(String(turn + 3));
+    expect(saved.games.find((game) => game.id === firstGameId)!.game.moves).toEqual(
+      libraryFixture.games[0].game.moves,
+    );
+  },
+);
+it('rejects an illegal candidate continuation without applying a partial trial', async () => {
+  vi.useFakeTimers();
+  engineReady = true;
+  vi.mocked(streamApi).mockImplementation(async (_path, body, emit) => {
+    const game = (body as { game: import('../shared/types').Game }).game;
+    emit({ type: 'done', analysis: libraryCandidateAnalysis(game, true) });
+  });
+  await act(async () => root.render(<App />));
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  await act(async () => host.querySelector<HTMLButtonElement>('.evaluation-toggle')!.click());
+  await act(async () => host.querySelector<HTMLButtonElement>('.candidates button')!.click());
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector('[aria-label="D4 空点"]')).not.toBeNull();
+  expect(host.querySelector('.workspace-status')!.textContent).toContain('已有棋子');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('3');
+});
 it('rewinds trial moves with buttons and the timeline without entering future history', async () => {
   await act(async () => root.render(<App />));
   await seek(1);
   await point('D4');
   await point('E4');
   const timeline = () => host.querySelector<HTMLInputElement>('.timeline')!;
-  const next = () => host.querySelector<HTMLButtonElement>('[aria-label="下一手"]')!;
+  const nextButton = () => host.querySelector<HTMLButtonElement>('[aria-label="下一手"]')!;
   expect(timeline().value).toBe('3');
-  expect(next().disabled).toBe(true);
+  expect(nextButton().disabled).toBe(true);
   await previous();
   expect(timeline().value).toBe('2');
   expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="E4 空点"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="G7 空点"]')).not.toBeNull();
-  expect(timeline().max).toBe('2');
-  await seek(3);
-  await act(async () => next().click());
-  expect(timeline().value).toBe('2');
-  expect(host.querySelectorAll('.trial-stone')).toHaveLength(1);
+  expect(timeline().max).toBe('3');
+  await next();
+  expect(timeline().value).toBe('3');
+  expect(host.querySelectorAll('.trial-stone')).toHaveLength(2);
+  await seek(2);
   await point('F4');
+  expect(host.querySelector('[aria-label="E4 空点"]')).not.toBeNull();
   await point('G4');
   expect(timeline().value).toBe('4');
   expect(timeline().max).toBe('4');
   await seek(3);
   expect(host.querySelectorAll('.trial-stone')).toHaveLength(2);
   expect(host.querySelector('[aria-label="G4 空点"]')).not.toBeNull();
+  expect(timeline().max).toBe('4');
+  await next();
+  expect(host.querySelector('[aria-label="G4 试下"]')).not.toBeNull();
   await seek(1);
   expect(host.querySelector('.trial-stone')).toBeNull();
-  expect(next().disabled).toBe(false);
+  expect(nextButton().disabled).toBe(false);
+  expect(timeline().max).toBe('4');
+  await next();
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  await seek(0);
   expect(timeline().max).toBe('3');
-  await act(async () => next().click());
+  await next();
+  await next();
   expect(host.querySelector('[aria-label="G7 白子"]')).not.toBeNull();
   expect(saved.games.find((game) => game.id === firstGameId)!.game.moves).toEqual(
     libraryFixture.games[0].game.moves,
@@ -120,6 +209,9 @@ it('can rewind a trial from move zero and jump directly back into earlier histor
   expect(host.querySelector('.trial-stone')).toBeNull();
   expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('0');
   expect(host.querySelector<HTMLButtonElement>('[aria-label="上一手"]')!.disabled).toBe(true);
+  await next();
+  expect(host.querySelector('[aria-label="D4 试下"]')!.textContent).toBe('1');
+  await click('清空试下');
   await seek(2);
   await point('D4');
   await point('E4');
@@ -140,6 +232,71 @@ it('pauses automatic play when undoing its trial move so it does not replay the 
   expect(host.querySelector<HTMLInputElement>('[aria-label="AI 自动落子"]')!.checked).toBe(false);
   expect(host.querySelector('.trial-stone')).toBeNull();
   expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
+  await next();
+  expect(host.querySelector('[aria-label="E5 试下"]')).not.toBeNull();
+  expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
+});
+it('restores captured stones when rewinding and replaces only the future when passing', async () => {
+  saved.games[0].game = structuredClone(captureTrialGame);
+  await act(async () => root.render(<App />));
+  await seek(0);
+  await point('A1');
+  await point('B1');
+  expect(host.querySelector('[aria-label="A1 试下"]')).toBeNull();
+  expect(host.querySelector('[aria-label="B1 试下"]')!.textContent).toBe('2');
+  await previous();
+  expect(host.querySelector('[aria-label="A1 试下"]')!.textContent).toBe('1');
+  expect(host.querySelector('[aria-label="B1 空点"]')).not.toBeNull();
+  await next();
+  expect(host.querySelector('[aria-label="A1 空点"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="B1 试下"]')!.textContent).toBe('2');
+  await previous();
+  await click('停一手');
+  await previous();
+  await next();
+  expect(host.querySelector('[aria-label="A1 试下"]')!.textContent).toBe('1');
+  expect(host.querySelector('[aria-label="B1 空点"]')).not.toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('2');
+});
+it('sends and saves only the viewed trial prefix, excluding its recoverable future', async () => {
+  await act(async () => root.render(<App />));
+  await seek(1);
+  await point('D4');
+  await point('E4');
+  await point('F4');
+  await seek(2);
+  await click('当前局势');
+  await click('发送');
+  expect(vi.mocked(streamApi).mock.calls.at(-1)![1]).toMatchObject({
+    context: { turn: 1, trialMoves: [{ color: 'W', point: 'D4' }] },
+    game: {
+      moves: [
+        { color: 'B', point: 'C3' },
+        { color: 'W', point: 'D4' },
+      ],
+    },
+  });
+  await click('保存试下为新棋局');
+  expect(saved.games[0].game.moves).toHaveLength(2);
+  expect(saved.games[0].game.moves.at(-1)!.point).toBe('D4');
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe('2');
+});
+it('an illegal move leaves the recoverable trial intact', async () => {
+  await act(async () => root.render(<App />));
+  await seek(1);
+  await point('D4');
+  await point('E4');
+  await previous();
+  await act(async () =>
+    host
+      .querySelector('[aria-label="C3 黑子"]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })),
+  );
+  expect(host.querySelector('.workspace-status')!.textContent).toContain('已有棋子');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe('3');
+  await next();
+  expect(host.querySelector('[aria-label="E4 试下"]')!.textContent).toBe('2');
 });
 it('keeps a conversation across navigation and games, snapshots trial context, restores conversations and branches independently', async () => {
   await act(async () => root.render(<App />));

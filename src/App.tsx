@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLibrary } from './useLibrary';
 import { gameTitle, type BoardContext } from '../shared/library';
-import { trialStoneIndices } from '../shared/trial';
+import { extendTrial, trialStoneNumbers, trialVariation, type TrialBranch } from '../shared/trial';
+import { MoveTimeline } from './MoveTimeline';
 import { EngineSettings, engineLabel } from './EngineSettings';
 import { LlmSettings } from './LlmSettings';
 import { availabilityLabel, providerNames } from '../shared/llm';
@@ -16,7 +17,16 @@ import { api, streamApi } from './api';
 import { areaScore, groupAt, newGame, play, replay, toIndex } from '../shared/go';
 import { decodeSgf, exportSgf, importSgf } from '../shared/sgf';
 import { RANKS, trainingForRank } from '../shared/training';
-import type { Analysis, CoachAction, Color, Game, Move, Status, Training } from '../shared/types';
+import type {
+  Analysis,
+  Candidate,
+  CoachAction,
+  Color,
+  Game,
+  Move,
+  Status,
+  Training,
+} from '../shared/types';
 
 const labels: Record<CoachAction, string> = {
   move: '解释这一手',
@@ -47,7 +57,8 @@ export default function App() {
   const [initialGame] = useState(restoredGame);
   const library = useLibrary(initialGame);
   const { game, setGame } = library;
-  const [trialMoves, setTrialMoves] = useState<Move[]>([]);
+  const [trial, setTrial] = useState<TrialBranch | null>(null);
+  const trialMoves = useMemo(() => trial?.moves.slice(0, trial.cursor) ?? [], [trial]);
   const [showGames, setShowGames] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -77,7 +88,6 @@ export default function App() {
     [handicap, setHandicap] = useState(0),
     [komi, setKomi] = useState(7.5);
   const [rules, setRules] = useState<Game['rules']>('chinese');
-  const [pv, setPv] = useState<{ moves: string[]; step: number } | null>(null);
   const [botFailed, setBotFailed] = useState(false);
   const lock = useRef(false),
     statusRequest = useRef(0),
@@ -91,7 +101,7 @@ export default function App() {
     [game, turn, trialMoves],
   );
   const trialStones = useMemo(
-    () => trialStoneIndices(game, turn, trialMoves),
+    () => trialStoneNumbers(game, turn, trialMoves),
     [game, turn, trialMoves],
   );
   const boardContext: BoardContext = {
@@ -102,26 +112,12 @@ export default function App() {
   };
   useEffect(() => {
     setTurn(game.moves.length);
-    setTrialMoves([]);
+    setTrial(null);
   }, [library.gameId]);
   useEffect(() => {
     if (library.ready) setTurn(game.moves.length);
   }, [library.ready]);
   const position = useMemo(() => replay(current), [current]);
-  const preview = useMemo(() => {
-    if (!pv) return { position, last: current.moves.at(-1)?.point };
-    let result = position,
-      last = current.moves.at(-1)?.point;
-    for (const point of pv.moves.slice(0, pv.step)) {
-      try {
-        result = play(result, { color: result.toPlay, point }, game.size, game.rules);
-        last = point;
-      } catch {
-        break;
-      }
-    }
-    return { position: result, last };
-  }, [pv, position, current, game.size, game.rules]);
   const handicapBonus =
     game.rules === 'chinese' &&
     game.initialStones.length >= 2 &&
@@ -132,14 +128,17 @@ export default function App() {
     () => areaScore(position, game.size, game.komi + handicapBonus, dead),
     [position, game.size, game.komi, handicapBonus, dead],
   );
+  const analysisGame = useMemo(
+    () => (trial ? { ...game, moves: [...game.moves.slice(0, turn), ...trial.moves] } : game),
+    [game, turn, trial],
+  );
   const evaluations = useEvaluations(
-    trialMoves.length ? current : game,
+    analysisGame,
     current.moves.length,
     training,
     status?.engine,
     !library.ready ||
       !!busy ||
-      !!pv ||
       setup ||
       scoring ||
       (autoPlay && position.toPlay === aiColor && position.passes < 2),
@@ -179,8 +178,7 @@ export default function App() {
   useEffect(() => () => activeStream.current?.abort(), []);
   function invalidate() {
     setNotice('');
-    setPv(null);
-    setTrialMoves([]);
+    setTrial(null);
     setDead([]);
     setScoring(false);
     setError('');
@@ -188,13 +186,17 @@ export default function App() {
   }
   function navigate(value: number) {
     if (lock.current) return;
-    if (trialMoves.length && value >= current.moves.length) return;
-    // Rewinding a trial discards its suffix. Pause AI so it cannot replay the undone move.
-    if (trialMoves.length) setAutoPlay(false);
-    invalidate();
-    if (trialMoves.length && value > turn) {
-      setTrialMoves(trialMoves.slice(0, value - turn));
+    if (trial && value > turn + trial.moves.length) return;
+    if (trial) setAutoPlay(false);
+    setNotice('');
+    setDead([]);
+    setScoring(false);
+    setError('');
+    setBotFailed(false);
+    if (trial && value >= turn) {
+      setTrial({ ...trial, cursor: value - turn });
     } else {
+      setTrial(null);
       setTurn(Math.max(0, Math.min(game.moves.length, value)));
     }
   }
@@ -240,7 +242,6 @@ export default function App() {
       library.ready &&
       autoPlay &&
       !scoring &&
-      !pv &&
       !setup &&
       !showGames &&
       !showConversations &&
@@ -264,15 +265,14 @@ export default function App() {
     busy,
     botFailed,
     scoring,
-    pv,
     setup,
     status?.engine.ready,
     library.ready,
   ]);
   function appendMove(move: Move) {
     play(position, move, game.size, game.rules);
-    if (turn < game.moves.length || trialMoves.length) {
-      setTrialMoves((moves) => [...moves, move]);
+    if (turn < game.moves.length || trial) {
+      setTrial((previous) => extendTrial(previous, [move]));
       setError('');
       setDead([]);
     } else changeGame({ ...current, moves: [...current.moves, move] });
@@ -289,8 +289,23 @@ export default function App() {
     setTurn(branch.moves.length);
     setNotice('已保存为新棋局，后续落子计入新局主线');
   }
+  function playCandidate(candidate: Candidate) {
+    if (lock.current || scoring) return;
+    try {
+      if (candidate.pv.length && candidate.pv[0] !== candidate.move)
+        throw new Error('候选变化与首手不一致，请重新分析');
+      const moves = trialVariation(current, candidate.pv.length ? candidate.pv : [candidate.move]);
+      setTrial((previous) => extendTrial(previous, moves));
+      setAutoPlay(false);
+      setError('');
+      setNotice('');
+      setDead([]);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   function place(point: string) {
-    if (lock.current || pv) return;
+    if (lock.current) return;
     if (scoring) {
       const index = toIndex(point, game.size);
       if (!position.board[index]) return;
@@ -440,8 +455,8 @@ export default function App() {
     error || library.error || (status?.engine.phase === 'error' ? engineProgress : '');
   const workspaceStatus = workspaceError || busy || engineProgress || notice;
   const timelineTurn = current.moves.length;
-  const timelineTotal = Math.max(game.moves.length, timelineTurn, 1);
-  const timelineLimit = trialMoves.length ? timelineTurn : Math.max(game.moves.length, 1);
+  const timelineTotal = Math.max(game.moves.length, turn + (trial?.moves.length ?? 0));
+  const timelineLimit = trial ? turn + trial.moves.length : game.moves.length;
   return (
     <main className={`workspace${chatCollapsed ? ' chat-collapsed' : ''}`}>
       <section className="board-panel" aria-label="棋盘">
@@ -529,91 +544,57 @@ export default function App() {
           <div className="board-frame">
             <Board
               size={game.size}
-              position={preview.position}
-              lastPoint={preview.last}
+              position={position}
+              lastPoint={current.moves.at(-1)?.point}
               ownership={
-                scoring ? score.ownership : showOwnership && !pv ? analysis?.ownership : undefined
+                scoring ? score.ownership : showOwnership ? analysis?.ownership : undefined
               }
-              candidates={pv || scoring || !showCandidates ? [] : candidates}
+              candidates={scoring || !showCandidates ? [] : candidates}
               trialStones={trialStones}
               dead={dead}
-              disabled={locked || !!pv}
+              disabled={locked}
               scoring={scoring}
-              onPlay={place}
+              onPlay={(point) => {
+                const candidate =
+                  showCandidates && !showOwnership && !scoring
+                    ? candidates.find((candidate) => candidate.move === point)
+                    : undefined;
+                if (candidate) playCandidate(candidate);
+                else place(point);
+              }}
             />
           </div>
         </div>
         <div className="board-bottom">
-          {pv ? (
-            <div className="move-controls variation-bar">
-              <span>
-                变化 {pv.step} / {pv.moves.length}
-              </span>
-              <button
-                aria-label="变化上一手"
-                disabled={!pv.step}
-                onClick={() => setPv({ ...pv, step: pv.step - 1 })}
-              >
-                ←
-              </button>
-              <button
-                aria-label="变化下一手"
-                disabled={pv.step === pv.moves.length}
-                onClick={() => setPv({ ...pv, step: pv.step + 1 })}
-              >
-                →
-              </button>
-              <button onClick={() => setPv(null)}>返回实战</button>
-            </div>
-          ) : (
-            <div className="move-controls">
-              <button
-                aria-label="上一手"
-                disabled={locked || !timelineTurn}
-                onClick={() => navigate(timelineTurn - 1)}
-              >
-                ←
-              </button>
-              <span>
-                <b>{timelineTurn}</b> / {Math.max(game.moves.length, timelineTurn)} 手
-              </span>
-              <button
-                aria-label="下一手"
-                disabled={locked || !!trialMoves.length || turn === game.moves.length}
-                onClick={() => navigate(turn + 1)}
-              >
-                →
-              </button>
-              <div
-                className={`timeline-control${trialMoves.length ? ' trial' : ''}`}
-                style={
-                  {
-                    '--history-progress': `${(turn / timelineTotal) * 100}%`,
-                    '--trial-progress': `${(timelineTurn / timelineTotal) * 100}%`,
-                    '--timeline-reachable': timelineLimit / timelineTotal,
-                  } as CSSProperties
-                }
-              >
-                <input
-                  className="timeline"
-                  aria-label="复盘手数"
-                  aria-valuetext={
-                    trialMoves.length
-                      ? `第 ${timelineTurn} 手，试下 ${trialMoves.length} 手，起点第 ${turn} 手`
-                      : `第 ${turn} 手，共 ${game.moves.length} 手`
-                  }
-                  type="range"
-                  min="0"
-                  max={timelineLimit}
-                  value={timelineTurn}
-                  disabled={locked}
-                  onChange={(e) => navigate(+e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+          <div className="move-controls">
+            <button
+              aria-label="上一手"
+              disabled={locked || !timelineTurn}
+              onClick={() => navigate(timelineTurn - 1)}
+            >
+              ←
+            </button>
+            <span className="move-count">
+              <b>{timelineTurn}</b> / {timelineTotal} 手
+            </span>
+            <button
+              aria-label="下一手"
+              disabled={locked || timelineTurn >= timelineLimit}
+              onClick={() => navigate(timelineTurn + 1)}
+            >
+              →
+            </button>
+            <MoveTimeline
+              turn={timelineTurn}
+              historyTurn={turn}
+              historyLength={game.moves.length}
+              trialLength={trial?.moves.length}
+              disabled={locked}
+              navigate={navigate}
+            />
+          </div>
           <div className="board-tools">
-            <button disabled={locked || !!pv || scoring} onClick={() => place('pass')}>
+            <button disabled={locked || scoring} onClick={() => place('pass')}>
               停一手
             </button>
             <div className="board-tools-right">
@@ -626,7 +607,7 @@ export default function App() {
               </button>
               <button
                 className={showOwnership ? 'selected' : ''}
-                disabled={locked || !!pv || scoring || (!analysis && !status?.engine.ready)}
+                disabled={locked || scoring || (!analysis && !status?.engine.ready)}
                 aria-pressed={showOwnership}
                 onClick={() => setShowOwnership((value) => !value)}
               >
@@ -634,7 +615,7 @@ export default function App() {
               </button>
               <button
                 className={scoring ? 'selected' : ''}
-                disabled={locked || !!pv || game.rules === 'japanese'}
+                disabled={locked || game.rules === 'japanese'}
                 title={game.rules === 'japanese' ? '日本规则数目未实现' : '中国规则面积计分'}
                 onClick={() => {
                   setScoring(!scoring);
@@ -649,26 +630,24 @@ export default function App() {
             <div className="board-meta">
               {game.size} 路 · {game.rules === 'chinese' ? '中国' : '日本'} · 贴 {game.komi}
             </div>
-            <div
-              className="trial-bar"
-              aria-hidden={turn === game.moves.length && !trialMoves.length}
-            >
+            <div className="trial-bar" aria-hidden={turn === game.moves.length && !trial}>
               <span>
-                {trialMoves.length ? `试下 · 第 ${turn} 手起 +${trialMoves.length} 手` : '复盘中'}
+                {trial
+                  ? `试下 · 第 ${turn} 手起 ${trial.cursor} / ${trial.moves.length} 手`
+                  : '复盘中'}
               </span>
               <button
-                disabled={locked || !trialMoves.length}
+                disabled={locked || !trial}
                 onClick={() => {
-                  setTrialMoves([]);
-                  setPv(null);
+                  setTrial(null);
                   setDead([]);
                   setScoring(false);
                 }}
               >
                 清空试下
               </button>
-              <button disabled={locked || !!pv} onClick={forkGame}>
-                {trialMoves.length ? '保存试下为新棋局' : '分支新棋局'}
+              <button disabled={locked} onClick={forkGame}>
+                {trial ? '保存试下为新棋局' : '分支新棋局'}
               </button>
             </div>
           </div>
@@ -747,8 +726,8 @@ export default function App() {
           <EvaluationPanel
             history={evaluations.points}
             turn={current.moves.length}
-            total={trialMoves.length ? current.moves.length : game.moves.length}
-            disabled={locked || !!pv || scoring || !!trialMoves.length}
+            total={analysisGame.moves.length}
+            disabled={locked || scoring || !!trial}
             ready={!!status?.engine.ready}
             completing={evaluations.completing}
             pendingTurn={evaluations.pendingTurn}
@@ -758,13 +737,13 @@ export default function App() {
             stop={evaluations.stop}
             retry={evaluations.retry}
           >
-            {!pv && !scoring && candidates.length > 0 && (
+            {!scoring && candidates.length > 0 && (
               <div className="candidates">
                 {candidates.map((candidate, i) => (
                   <button
                     key={candidate.move}
                     disabled={locked || scoring}
-                    onClick={() => setPv({ moves: candidate.pv, step: 0 })}
+                    onClick={() => playCandidate(candidate)}
                     title={candidate.pv.join(' → ')}
                   >
                     <b>{String.fromCharCode(65 + i)}</b> {candidate.move}{' '}
@@ -862,7 +841,7 @@ export default function App() {
                 <button
                   type="button"
                   key={action}
-                  disabled={locked || !!pv || (action === 'move' && !current.moves.length)}
+                  disabled={locked || (action === 'move' && !current.moves.length)}
                   onClick={() => {
                     setQuestion(labels[action]);
                     questionInput.current?.focus();
@@ -878,7 +857,7 @@ export default function App() {
               maxLength={4000}
               placeholder="输入问题"
               value={question}
-              disabled={locked || !!pv}
+              disabled={locked}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -910,10 +889,7 @@ export default function App() {
                   停止
                 </button>
               ) : (
-                <button
-                  className="primary"
-                  disabled={locked || !llmReady || !!pv || !question.trim()}
-                >
+                <button className="primary" disabled={locked || !llmReady || !question.trim()}>
                   发送
                 </button>
               )}
@@ -1041,7 +1017,6 @@ export default function App() {
                   setStatus((value) => (value ? { ...value, engine } : value));
                   activeStream.current?.abort();
                   evaluations.reset();
-                  setPv(null);
                   setBotFailed(false);
                   void refreshStatus();
                 }}

@@ -30,6 +30,11 @@ export const chatStatus = {
   },
 };
 export const chatAnswer = '先观察棋块的联络。';
+export const captureTrialGame = {
+  ...newGame(9),
+  initialStones: [{ color: 'W' as const, point: 'A2' }],
+  moves: [{ color: 'B' as const, point: 'C3' }],
+};
 
 export function libraryBotMove(game: import('../../shared/types').Game) {
   const occupied = new Set([...game.initialStones, ...game.moves].map((move) => move.point));
@@ -38,4 +43,14 @@ export function libraryBotMove(game: import('../../shared/types').Game) {
     method: '测试落子',
     analysis: evaluation(game.moves.length),
   };
+}
+
+export function libraryCandidateAnalysis(game: import('../../shared/types').Game, invalid = false) {
+  const occupied = new Set([...game.initialStones, ...game.moves].map((move) => move.point));
+  const pv = ['D4', 'E4', 'F4', 'G4', 'H4'].filter((point) => !occupied.has(point)).slice(0, 2);
+  const analysis = evaluation(game.moves.length);
+  analysis.moveInfos = [
+    { ...analysis.moveInfos[0], move: pv[0], pv: invalid ? [pv[0], 'C3'] : pv },
+  ];
+  return analysis;
 }

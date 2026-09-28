@@ -161,6 +161,32 @@ async function checkLayout() {
     throw new Error('History, trial, and future timeline segments are missing');
   await seek(6);
   if (timeline.value !== '3') throw new Error('Trial slider entered future history');
+  document
+    .querySelector('[aria-label="E4 空点"]')
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await until(() => timeline.value === '4');
+  const beforeRewind = timeline.getBoundingClientRect();
+  document.querySelector('[aria-label="上一手"]').click();
+  await until(() => timeline.value === '3');
+  const afterRewind = timeline.getBoundingClientRect();
+  if (timeline.max !== '4' || Math.abs(beforeRewind.width - afterRewind.width) > 0.1)
+    throw new Error('Rewinding changed the recoverable trial scale');
+  const segments = getComputedStyle(track);
+  for (const [name, expected] of [
+    ['--history-progress', 100 / 3],
+    ['--trial-progress', 50],
+    ['--trial-end', 200 / 3],
+  ]) {
+    if (Math.abs(parseFloat(segments.getPropertyValue(name)) - expected) > 0.1)
+      throw new Error(`Incorrect four-segment boundary: ${name}`);
+  }
+  if (!getComputedStyle(track, '::before').backgroundImage.includes('203, 167, 161'))
+    throw new Error('Recoverable trial segment is missing');
+  document.querySelector('[aria-label="下一手"]').click();
+  await until(() => timeline.value === '4');
+  if (!document.querySelector('[aria-label="E4 试下"]'))
+    throw new Error('Next did not restore the trial move');
+  await seek(3);
   for (const point of ['E4', 'F4', 'G4', 'H4']) {
     document
       .querySelector(`[aria-label="${point} 空点"]`)
@@ -179,10 +205,96 @@ async function checkLayout() {
   await seek(3);
   if (document.querySelectorAll('.trial-stone').length !== 1)
     throw new Error('Slider did not rewind the trial');
+  if (timeline.max !== '7') throw new Error('Rewinding beyond history shortened the trial');
+  await seek(7);
+  if (document.querySelectorAll('.trial-stone').length !== 5)
+    throw new Error('Could not restore the full trial');
   await seek(1);
   if (document.querySelector('.trial-stone') || timeline.max !== '6')
     throw new Error('Seeking into history did not exit the trial');
+  await seek(6);
+  await until(() => document.querySelector('.candidates button')?.textContent.includes('C4'));
+  document.querySelector('.candidates button').click();
+  await until(() => timeline.value === '8');
+  function checkNumber(point, number, fill) {
+    const label = document.querySelector(`[aria-label="${point} 试下"]`);
+    if (!label || label.tagName !== 'text' || label.textContent !== String(number))
+      throw new Error(`Missing centered trial number ${number} at ${point}`);
+    if (fill && label.getAttribute('fill') !== fill)
+      throw new Error(`Trial number at ${point} is not in the opposite stone color`);
+  }
+  checkNumber('C4', 1, '#fffefa');
+  checkNumber('D5', 2, '#222620');
+  if (document.querySelector('[aria-label="变化下一手"]'))
+    throw new Error('Candidate still uses the separate variation preview');
+  document
+    .querySelector('[aria-label="E3 空点"]')
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await until(() => timeline.value === '9');
+  checkNumber('E3', 3);
+  await until(() => document.querySelector('.candidates button')?.textContent.includes('E4'));
+  document.querySelector('.candidates button').click();
+  await until(() => timeline.value === '11');
+  checkNumber('E4', 4);
+  checkNumber('F4', 5);
+  document.querySelector('[aria-label="上一手"]').click();
+  await until(() => timeline.value === '10');
+  if (document.querySelector('[aria-label="F4 试下"]'))
+    throw new Error('Could not undo a move from the candidate continuation');
+  await seek(6);
+  if (document.querySelector('.trial-stone') || timeline.max !== '11')
+    throw new Error('Trial origin did not preserve the recoverable continuation');
   return { viewport: [innerWidth, innerHeight], board: initial.width, samples };
+}
+
+async function checkTimelinePointer(win) {
+  const read = () =>
+    win.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.timeline');
+    const rect = input.getBoundingClientRect();
+    return { value: +input.value, max: +input.max, x: rect.x, width: rect.width, y: rect.y + rect.height / 2 };
+  })()`);
+  const settle = () =>
+    win.webContents.executeJavaScript(
+      'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+    );
+  const initial = await read();
+  const x = (value) => Math.round(initial.x + 8 + ((initial.width - 16) * value) / initial.max);
+  const y = Math.round(initial.y);
+  const mouse = async (type, value) => {
+    win.webContents.sendInputEvent({
+      type,
+      x: x(value),
+      y,
+      button: 'left',
+      clickCount: 1,
+      modifiers: type === 'mouseUp' ? [] : ['leftButtonDown'],
+    });
+    await settle();
+  };
+  // A native track click used to shrink max on pointer-down and jump again on pointer-up.
+  await mouse('mouseDown', 8);
+  await mouse('mouseUp', 8);
+  let state = await read();
+  if (state.value !== 8 || state.max !== 11 || Math.abs(state.width - initial.width) > 0.1)
+    throw new Error(`Native trial click changed its scale: ${JSON.stringify(state)}`);
+  await mouse('mouseDown', 8);
+  for (const value of [7, 9, 11, 8]) {
+    await mouse('mouseMove', value);
+    state = await read();
+    if (state.value !== value || state.max !== 11 || Math.abs(state.width - initial.width) > 0.1)
+      throw new Error(`Native trial drag jumped at ${value}: ${JSON.stringify(state)}`);
+  }
+  // Exiting into original history must retain the pointer scale until the gesture ends.
+  await mouse('mouseMove', 5);
+  state = await read();
+  if (state.value !== 5 || state.max !== 11)
+    throw new Error('Crossing into history changed the scale during a drag');
+  await mouse('mouseUp', 5);
+  state = await read();
+  if (state.value !== 5 || state.max !== 6)
+    throw new Error('Releasing in history did not restore the original timeline');
+  return 'native trial click/drag/restore passed';
 }
 
 app.whenReady().then(async () => {
@@ -222,7 +334,8 @@ app.whenReady().then(async () => {
       });
       try {
         await win.loadURL(`http://127.0.0.1:${server.address().port}`);
-        console.log(await win.webContents.executeJavaScript(`(${checkLayout.toString()})()`));
+        const result = await win.webContents.executeJavaScript(`(${checkLayout.toString()})()`);
+        console.log({ ...result, pointer: await checkTimelinePointer(win) });
       } finally {
         win.destroy();
       }

@@ -39,12 +39,16 @@ module.exports = function layoutApi() {
     }),
   );
   function analysis(game) {
+    const occupied = new Set(game.moves.map((move) => move.point));
+    const pv = ['C4', 'D5', 'E4', 'F4'].filter((point) => !occupied.has(point)).slice(0, 2);
     return {
       id: 'layout-fixture',
       perspective: 'B',
       turnNumber: game.moves.length,
       rootInfo: { visits: 100, winrate: 0.5, scoreLead: 0 },
-      moveInfos: [{ move: 'C4', order: 0, visits: 100, winrate: 0.5, scoreLead: 0, pv: ['C4'] }],
+      moveInfos: pv.length
+        ? [{ move: pv[0], order: 0, visits: 100, winrate: 0.5, scoreLead: 0, pv }]
+        : [],
     };
   }
   router.post('/analyze', (req, res) => {
