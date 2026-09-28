@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { os: windows-2022, name: windows-x64 }
+          - { os: macos-15, name: mac-arm64 }
+        variant: [with-models, no-models]
+    runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Cache verified model downloads
+        if: matrix.variant == 'with-models'
+        uses: actions/cache@v4
+        with:
+          path: .local/katago/downloads
+          key: release-models-${{ runner.os }}-${{ hashFiles('config/katago/artifacts.json') }}
+      - run: npm run package:desktop -- ${{ matrix.variant }}
+      - name: Verify packaged resources
+        run: node --import tsx scripts/verify-package.ts ${{ matrix.variant }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.name }}-${{ matrix.variant }}
+          path: |
+            release/${{ matrix.variant }}/*.exe
+            release/${{ matrix.variant }}/*.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish all four installers together
+        run: node scripts/publish-release.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

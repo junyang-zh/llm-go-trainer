@@ -1,12 +1,13 @@
 import { createServer, type Server } from 'node:http';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { downloadArtifact } from '../server/download';
 import { runtimePlatform } from '../server/installer';
 import { safeArchivePath } from '../server/archive';
+import { ensureModel } from '../server/model-files';
 let server: Server,
   base: string,
   directory: string,
@@ -44,6 +45,63 @@ it('atomically installs verified bytes, reuses valid cache, and replaces a corru
   await downloadArtifact(artifact, directory, new AbortController().signal, () => {});
   expect(requests).toBe(count + 1);
   expect(await readFile(file)).toEqual(data);
+});
+it('installs bundled weights without network, repairs corruption, and reuses installed weights', async () => {
+  const bundle = join(directory, 'bundle');
+  const runtime = join(directory, 'bundled-runtime');
+  const artifact = { name: 'model', url: base + '/model', sha256 };
+  await mkdir(bundle);
+  await writeFile(join(bundle, `${sha256}.bin.gz`), data);
+  const count = requests;
+  const model = await ensureModel(
+    artifact,
+    runtime,
+    bundle,
+    new AbortController().signal,
+    () => {},
+  );
+  expect(await readFile(model)).toEqual(data);
+  await writeFile(model, 'corrupt installed model');
+  await ensureModel(artifact, runtime, bundle, new AbortController().signal, () => {});
+  expect(await readFile(model)).toEqual(data);
+  await rm(bundle, { recursive: true });
+  await ensureModel(artifact, runtime, undefined, new AbortController().signal, () => {});
+  expect(requests).toBe(count);
+  expect((await readdir(join(runtime, 'models'))).filter((name) => name.endsWith('.tmp'))).toEqual(
+    [],
+  );
+});
+it.each(['missing', 'corrupt'])(
+  'downloads verified weights when bundled weights are %s',
+  async (kind) => {
+    const runtime = join(directory, `fallback-${kind}`);
+    const bundle = join(runtime, 'bundle');
+    await mkdir(bundle, { recursive: true });
+    if (kind === 'corrupt') await writeFile(join(bundle, `${sha256}.bin.gz`), 'corrupt bundle');
+    const count = requests;
+    const model = await ensureModel(
+      { name: 'model', url: base + '/model', sha256 },
+      runtime,
+      bundle,
+      new AbortController().signal,
+      () => {},
+    );
+    expect(await readFile(model)).toEqual(data);
+    expect(requests).toBe(count + 1);
+  },
+);
+it('does not install bundled weights after cancellation', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    ensureModel(
+      { name: 'model', url: base + '/model', sha256 },
+      join(directory, 'cancelled-model'),
+      undefined,
+      controller.signal,
+      () => {},
+    ),
+  ).rejects.toThrow();
 });
 it('rejects checksum mismatch and removes interrupted partial downloads', async () => {
   await expect(

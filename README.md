@@ -2,6 +2,10 @@
 
 围棋训练工具，支持 KataGo 对战、棋谱复盘和 LLM 讲解。默认以 Electron 桌面应用运行，可打包为 macOS / Windows 应用。
 
+## 下载安装包
+
+前往 [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/releases)，选择 Windows 10/11 x64 的 `.exe` 或 macOS 15+ Apple Silicon 的 `.dmg`。每个平台提供 `with-models`（含主模型与 HumanSL 权重）和 `no-models`（首次运行下载权重）两种版本，功能相同。两种版本首次运行都需要联网安装 KataGo 引擎及依赖。安装包目前未使用开发者证书签名或 Apple 公证。
+
 ## 启动 Electron 桌面应用
 
 需要 Node.js 22.12+（建议 24 LTS）、npm。macOS、Windows PowerShell 均可使用：
@@ -50,7 +54,7 @@ Web 模式需在终端按 `Ctrl+C` 关闭服务；关闭浏览器标签页不会
 | 棋谱     | 野狐/星阵导出的标准 SGF；UTF-8 / GB18030；根摆子与主线；SGF 导出                |
 | 教练     | Markdown 流式对话、工具搜索与执行记录；解释选点、局势和变化；停止分析、导出证据 |
 | LLM      | DeepSeek API、Codex CLI、Claude Code CLI 适配器                                 |
-| 桌面     | Electron 外壳与 `.dmg` / NSIS `.exe` 打包配置，尚未签名发布                     |
+| 桌面     | Electron；tag 触发 CI 发布四种 `.dmg` / NSIS `.exe` 安装包，尚未签名            |
 
 SGF 有多个变体时只导入第一条主线；原注释与分支不写入训练记录。中途摆子/修改行棋方的特殊 SGF 会明确拒绝。日本规则可以对战与引擎分析，正式终局数目尚未实现。HumanSL 等级不等于野狐/星阵认证等级。当前没有平台账号直连、整局自动批量讲解、读秒、认输、持久化分析缓存。
 
@@ -189,10 +193,11 @@ npm run desktop
 在目标操作系统打包（默认不发布）：
 
 ```sh
-npm run package:desktop
+npm run package:desktop -- no-models
+npm run package:desktop -- with-models
 ```
 
-桌面发布需在 macOS / Windows 分别构建；Apple Silicon 使用 `--arm64`。打包后 `.env` 放到 Electron userData 目录，通常为 macOS `~/Library/Application Support/llm-go-trainer/.env` 或 Windows `%APPDATA%/llm-go-trainer/.env`；自定义 KataGo/模型路径请使用绝对路径。应用标识/命名变更时以 `app.getPath('userData')` 为准。引擎与模型下载到 userData 的 `katago/`，首次启动需联网。
+桌面发布需在 Apple Silicon macOS / x64 Windows 分别构建，也可推送版本 tag 由 CI 自动构建并上传四个安装包，详见[发布步骤](docs/releases.md)。打包后 `.env` 放到 Electron userData 目录，通常为 macOS `~/Library/Application Support/llm-go-trainer/.env` 或 Windows `%APPDATA%/llm-go-trainer/.env`；自定义 KataGo/模型路径请使用绝对路径。应用标识/命名变更时以 `app.getPath('userData')` 为准。引擎与模型缓存到 userData 的 `katago/`，首次启动需联网。
 
 CI 配置覆盖 Ubuntu、macOS 和 Windows 的测试与构建。
 

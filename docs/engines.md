@@ -31,7 +31,7 @@ katago/
 - HumanSL `b18c384nbt-humanv0.bin.gz` 来自 [KataGo 1.15.0 官方资产](https://github.com/lightvector/KataGo/releases/tag/v1.15.0)。清单摘要由该官方 HTTPS 资产计算；参考[人类模型说明](https://katagotraining.org/extra_networks/)。
 - Homebrew 资源的完整 blob SHA-256 也在下载 URL 内；Windows 摘要对照 GitHub release asset digest。
 
-KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；依赖有各自许可。安装器保留归档内 LICENSE / COPYING / COPYRIGHT / NOTICE。当前分发的是源码和下载清单，不将第三方二进制提交到仓库；制作完整离线安装包时需要一并收集上游完整许可、模型声明并验证目标系统。
+KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；依赖有各自许可。安装器保留归档内 LICENSE / COPYING / COPYRIGHT / NOTICE。不将第三方二进制或权重提交到仓库。含权重安装包携带两个官方模型及[模型许可](../config/katago/MODEL-LICENSE.txt)，启动时校验并复制到用户缓存；引擎及依赖仍首次联网安装。详见[发布说明](releases.md)。
 
 ## 控制与进程退出
 

@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:layout": "npm run build && electron tests/board-layout.cjs",
     "desktop": "npm run build && electron desktop/main.cjs",
-    "package:desktop": "npm run build && electron-builder --publish never",
+    "package:desktop": "npm run build && tsx scripts/package-desktop.ts",
     "doctor": "node --import tsx scripts/doctor.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -73,12 +73,17 @@
       "target": [
         "dmg"
       ],
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "minimumSystemVersion": "15.0.0"
     },
     "win": {
       "target": [
         "nsis"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "author": "junyang-zh"

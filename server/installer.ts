@@ -18,6 +18,7 @@ import type { EngineStatus } from '../shared/types';
 import type { EngineConfig } from './katago';
 import { downloadArtifact, fileHash, verified } from './download';
 import { safeArchivePath, unpackBottle, unpackZip } from './archive';
+import { ensureModel } from './model-files';
 import artifacts from '../config/katago/artifacts.json';
 import bottles from '../config/katago/macos-bottles.json';
 
@@ -211,16 +212,14 @@ export async function ensureRuntime(
       await rename(staging, target);
       staging = undefined;
     }
-    await mkdir(models, { recursive: true });
     for (const artifact of [artifacts.main, artifacts.human]) {
-      const source = await downloadArtifact(artifact, cache, signal, (value) =>
-        progress({ phase: 'downloading', progress: value }),
+      await ensureModel(
+        artifact,
+        directory,
+        process.env.GO_TRAINER_BUNDLED_MODELS,
+        signal,
+        (value) => progress({ phase: 'downloading', progress: value }),
       );
-      const model = join(models, `${artifact.sha256}.bin.gz`);
-      if (!(await verified(model, artifact.sha256))) {
-        await copyFile(source, model + '.tmp');
-        await rename(model + '.tmp', model);
-      }
     }
     signal.throwIfAborted();
     return runtime();
