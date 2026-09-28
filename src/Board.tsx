@@ -7,6 +7,7 @@ interface Props {
   lastPoint?: string;
   ownership?: number[];
   candidates?: Candidate[];
+  trialStones?: number[];
   dead: number[];
   disabled: boolean;
   scoring: boolean;
@@ -18,6 +19,7 @@ export function Board({
   lastPoint,
   ownership,
   candidates = [],
+  trialStones = [],
   dead,
   disabled,
   scoring,
@@ -88,6 +90,7 @@ export function Board({
           y = margin + Math.floor(i / size) * step;
         const candidate = candidates.findIndex((c) => c.move === toPoint(i, size));
         const own = ownership?.[i] ?? 0;
+        const trial = trialStones.includes(i);
         return (
           <g key={i}>
             {color && (
@@ -95,10 +98,34 @@ export function Board({
                 cx={x}
                 cy={y}
                 r="14.5"
-                fill={`url(#${color === 'B' ? 'black' : 'white'}-stone)`}
+                fill={
+                  trial
+                    ? color === 'B'
+                      ? '#30352e'
+                      : '#eeeadd'
+                    : `url(#${color === 'B' ? 'black' : 'white'}-stone)`
+                }
+                stroke={trial ? (color === 'B' ? '#b8b9a8' : '#666e59') : undefined}
+                strokeWidth={trial ? 2 : undefined}
                 filter="url(#stone-shadow)"
                 opacity={dead.includes(i) ? 0.3 : 1}
               />
+            )}
+            {color && trial && (
+              <g className="trial-stone" aria-label={`${toPoint(i, size)} 试下`}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="10.8"
+                  fill="none"
+                  stroke={color === 'B' ? '#777e6e' : '#b5b3a4'}
+                  strokeWidth="1"
+                />
+                <rect x={x + 4} y={y - 17} width="14" height="14" rx="3" fill="#a44e27" />
+                <text x={x + 11} y={y - 6} textAnchor="middle" fontSize="10" fill="white">
+                  试
+                </text>
+              </g>
             )}
             {Math.abs(own) > 0.15 && (
               <rect

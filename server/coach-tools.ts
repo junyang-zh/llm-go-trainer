@@ -1,3 +1,5 @@
+import type { BoardContext } from '../shared/library';
+import type { HistoryLibrary } from './library';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { groupAt, other, play, replay, toIndex, toPoint } from '../shared/go';
@@ -15,6 +17,20 @@ const context = {
   point: z.string().max(4).optional().describe('需要重点观察的棋块坐标'),
 };
 export const coachToolSchemas = {
+  query_game_history: z
+    .object({
+      gameId: z.uuid().optional().describe('省略时列出历史棋局；提供 ID 时读取该棋局'),
+      turn: z
+        .number()
+        .int()
+        .min(0)
+        .max(1500)
+        .optional()
+        .describe('读取棋局的指定手数局面；省略时读取全局'),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(100).default(20),
+    })
+    .strict(),
   inspect_position: z.object(context).strict(),
   analyze_variation: z
     .object({
@@ -31,6 +47,8 @@ export const coachToolSchemas = {
     .strict(),
 };
 const descriptions = {
+  query_game_history:
+    '查询本地历史棋局列表或按棋局 ID 读取完整棋谱及指定手数的棋盘。返回当前选中的棋局 ID、原局手数及用户试下手顺；历史棋局和对话独立。',
   inspect_position:
     '查看当前或试下后的棋盘、棋块和气。可指定 point 检查一块棋；试下只作用于本次查询，不改变实战棋谱。',
   analyze_variation:
@@ -61,6 +79,7 @@ export class CoachTools {
     private training: Training,
     private onActivity?: (activity: ToolActivity) => void,
     signal?: AbortSignal,
+    private session?: { library: HistoryLibrary; context?: BoardContext },
   ) {
     this.signal = AbortSignal.any([this.controller.signal, ...(signal ? [signal] : [])]);
   }
@@ -92,7 +111,12 @@ export class CoachTools {
     let activity: ToolActivity = {
       id,
       name,
-      label: name === 'inspect_position' ? '检查棋块' : '搜索变化',
+      label:
+        name === 'query_game_history'
+          ? '查询棋局历史'
+          : name === 'inspect_position'
+            ? '检查棋块'
+            : '搜索变化',
       state: 'running',
     };
     const emit = (patch: Partial<ToolActivity>) => {
@@ -102,6 +126,41 @@ export class CoachTools {
     let result: CoachToolResult;
     try {
       if (++this.calls > 12) throw new Error('本次工具调用额度已用完，请依据已有结果完成讲解');
+      if (name === 'query_game_history') {
+        const args = coachToolSchemas.query_game_history.parse(raw);
+        if (!this.session) throw new Error('历史棋局库不可用');
+        let data: Record<string, unknown>;
+        if (args.gameId) {
+          const saved = this.session.library.getGame(args.gameId);
+          const turn = args.turn ?? saved.game.moves.length;
+          if (turn > saved.game.moves.length) throw new Error('手数超出棋局范围');
+          data = {
+            ...saved,
+            turn,
+            position: positionFacts({ ...saved.game, moves: saved.game.moves.slice(0, turn) }),
+          };
+        } else {
+          const games = this.session.library
+            .snapshot()
+            .games.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+          data = {
+            total: games.length,
+            games: games
+              .slice(args.offset, args.offset + args.limit)
+              .map(({ game, ...item }) => ({ ...item, size: game.size, moves: game.moves.length })),
+          };
+        }
+        result = {
+          data: {
+            ...data,
+            currentContext: this.session.context,
+            remainingCalls: Math.max(0, 12 - this.calls),
+          },
+        };
+        emit({ state: 'done' });
+        this.results.push({ name, arguments: raw, result });
+        return result;
+      }
       if (name !== 'inspect_position' && name !== 'analyze_variation')
         throw new Error('未知围棋工具');
       const search =
@@ -186,6 +245,7 @@ export class CoachTools {
           baseTurn,
           moves,
           position: positionFacts(game),
+          currentContext: this.session?.context,
           focus,
           ...(analysis
             ? {

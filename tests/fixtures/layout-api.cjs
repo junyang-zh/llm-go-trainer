@@ -3,6 +3,18 @@ const express = require('express');
 module.exports = function layoutApi() {
   const router = express.Router();
   router.use(express.json());
+  const library = { games: [], conversations: [] };
+  router.post('/fixture/reset', (_req, res) => {
+    library.games = [];
+    library.conversations = [];
+    res.json({ ok: true });
+  });
+  router.get('/library', (_req, res) => res.json(library));
+  for (const kind of ['games', 'conversations'])
+    router.post(`/library/${kind}`, (req, res) => {
+      library[kind] = [req.body, ...library[kind].filter((item) => item.id !== req.body.id)];
+      res.json(req.body);
+    });
   router.get('/status', (_req, res) =>
     res.json({
       engine: {

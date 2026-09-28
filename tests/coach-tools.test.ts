@@ -135,3 +135,40 @@ it('cancels in-flight search and queued calls and rejects late engine progress',
   expect(events.map((event) => event.state)).toEqual(['running', 'stopped']);
   expect(engine.analyze).toHaveBeenCalledOnce();
 });
+
+it('queries another historical game and reports the current user trial separately', async () => {
+  const { HistoryLibrary } = await import('../server/library');
+  const { libraryFixture, firstGameId, secondGameId } = await import('./fixtures/library');
+  const library = new HistoryLibrary();
+  libraryFixture.games.forEach((item) => library.saveGame(item));
+  const context = {
+    gameId: firstGameId,
+    gameTitle: '第一局',
+    turn: 1,
+    trialMoves: [{ color: 'W' as const, point: 'D4' }],
+  };
+  const game = {
+    ...libraryFixture.games[0].game,
+    moves: [...recordedGame.moves.slice(0, 1), ...context.trialMoves],
+  };
+  const { engine } = harness(game);
+  const tools = new CoachTools(engine, game, trainingForRank('5k'), undefined, undefined, {
+    library,
+    context,
+  });
+  const list = await tools.run('query_game_history', { limit: 1 });
+  expect(list.data.total).toBe(2);
+  expect(list.data.games).toHaveLength(1);
+  expect(list.data.currentContext).toEqual(context);
+  const previous = await tools.run('query_game_history', { gameId: firstGameId, turn: 1 });
+  expect(previous.data.game).toEqual(libraryFixture.games[0].game);
+  expect(previous.data.turn).toBe(1);
+  expect((await tools.run('query_game_history', { gameId: secondGameId })).data.turn).toBe(0);
+  expect((await tools.run('query_game_history', { gameId: secondGameId, turn: 1 })).isError).toBe(
+    true,
+  );
+  const current = await tools.run('inspect_position', { point: 'D4' });
+  expect(current.data.focus).toMatchObject({ color: 'W', point: 'D4' });
+  expect(current.data.currentContext).toEqual(context);
+  expect(engine.analyze).not.toHaveBeenCalled();
+});

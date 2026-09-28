@@ -986,3 +986,74 @@ h2 {
   gap: 10px;
   padding-top: 8px;
 }
+
+.conversation-toolbar,
+.trial-bar,
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.conversation-toolbar {
+  padding: 8px 0;
+}
+.conversation-toolbar > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trial-bar {
+  color: #8b4728;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.message-context {
+  color: #697565;
+  font-size: 11px;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+.history-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.history-list article {
+  display: flex;
+  gap: 8px;
+}
+.history-list article > button:first-child {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.history-list b,
+.history-list small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.history-list small {
+  color: #697565;
+  margin-top: 4px;
+}
+.history-list [aria-pressed='true'] {
+  border-color: #294d40;
+  background: #e4eadf;
+}
+
+.auto-play-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.auto-play-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: #294d40;
+}

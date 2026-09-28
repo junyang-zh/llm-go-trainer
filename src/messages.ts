@@ -1,14 +1,7 @@
-import type { Analysis, AnalysisPhase, StreamEvent, ToolActivity } from '../shared/types';
+import type { StreamEvent } from '../shared/types';
+import type { AnalysisMessage } from '../shared/library';
+export type { AnalysisMessage } from '../shared/library';
 
-export interface AnalysisMessage {
-  id: string;
-  question: string;
-  text: string;
-  status: string;
-  state: 'running' | 'done' | 'stopped' | 'error';
-  evaluations: Partial<Record<AnalysisPhase, { analysis: Analysis; final: boolean }>>;
-  tools?: ToolActivity[];
-}
 export function finishMessage(
   message: AnalysisMessage,
   state: 'done' | 'error' | 'stopped',

@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { HistoryLibrary } from './library';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +58,9 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
     resolve(root, 'dist'),
     engine,
     llm,
+    new HistoryLibrary(
+      resolve(process.env.GO_TRAINER_HISTORY_DIR || resolve(root, '.local/history')),
+    ),
   );
   return new Promise<{ port: number; close: () => Promise<void> }>((done, reject) => {
     let closing: Promise<void> | undefined;

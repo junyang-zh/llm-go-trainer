@@ -1,4 +1,5 @@
 import express from 'express';
+import { HistoryLibrary } from './library';
 import { CoachTools } from './coach-tools';
 import { join } from 'node:path';
 import { LlmSettings } from './llm-settings';
@@ -21,6 +22,7 @@ export function createApp(
   webRoot: string,
   controller?: EngineController,
   llm = new LlmSettings(providers),
+  library = new HistoryLibrary(),
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -55,11 +57,17 @@ export function createApp(
     );
     next();
   });
+  app.use('/api/library', express.json({ limit: '32mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
+  app.get('/api/library', (_req, res) => res.json(library.snapshot()));
+  app.post('/api/library/games', (req, res) => res.json(library.saveGame(req.body)));
+  app.post('/api/library/conversations', (req, res) =>
+    res.json(library.saveConversation(req.body)),
+  );
   app.get('/api/status', async (_req, res) => {
     const current = await llm.status();
     res.json({
@@ -143,8 +151,24 @@ export function createApp(
       action,
       question,
       history,
+      context,
     } = coachRequest.parse(req.body);
     replay(game);
+    if (context) {
+      const saved = library.getGame(context.gameId);
+      const expected = {
+        ...saved.game,
+        moves: [...saved.game.moves.slice(0, context.turn), ...context.trialMoves],
+      };
+      if (
+        context.turn > saved.game.moves.length ||
+        JSON.stringify(expected) !== JSON.stringify(game)
+      ) {
+        res.status(400).json({ error: '棋局上下文与当前局面不一致' });
+        return;
+      }
+      context.gameTitle = saved.title;
+    }
     if (coaching) {
       res.status(429).json({ error: '已有分析进行中' });
       return;
@@ -180,6 +204,7 @@ export function createApp(
       training,
       (activity) => stream?.send({ type: 'tool', activity }),
       signal,
+      { library, context },
     );
     try {
       const analyze = async (phase: AnalysisPhase) => {
@@ -227,7 +252,7 @@ export function createApp(
         provider,
         config,
         prompt,
-        evidence,
+        { ...evidence, boardContext: context },
         `${action}: ${tasks[action]}${action !== 'chat' && question ? '\n' + question : ''}`,
         history,
         {
@@ -237,7 +262,7 @@ export function createApp(
           onStatus: stream ? (text) => stream.send({ type: 'status', text }) : undefined,
         },
       );
-      const fullEvidence = { ...evidence, toolResults: tools.results };
+      const fullEvidence = { ...evidence, boardContext: context, toolResults: tools.results };
       if (stream) stream.send({ type: 'done', answer, evidence: fullEvidence, analysis: after });
       else res.json({ answer, evidence: fullEvidence, analysis: after });
     } catch (error) {

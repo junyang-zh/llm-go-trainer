@@ -198,3 +198,33 @@ it('cancels on client disconnect and releases the coach for another request', as
   expect(next?.status).toBe(200);
   expect((await next!.json()).answer).toContain('讲解');
 });
+
+it('saves independent library records and validates the coach board context against the saved game', async () => {
+  const { libraryFixture, firstGameId } = await import('./fixtures/library');
+  const saved = libraryFixture.games[0];
+  expect((await post('/api/library/games', saved)).status).toBe(200);
+  const snapshot = await fetch(base + '/api/library').then((response) => response.json());
+  expect(snapshot.games).toContainEqual(saved);
+  expect(snapshot.conversations).toEqual([]);
+  const context = {
+    gameId: firstGameId,
+    gameTitle: saved.title,
+    turn: 1,
+    trialMoves: [{ color: 'W', point: 'D4' }],
+  };
+  const game = { ...saved.game, moves: [...saved.game.moves.slice(0, 1), ...context.trialMoves] };
+  const body = {
+    game,
+    training: trainingForRank('5k'),
+    action: 'position',
+    provider: 'codex',
+    context,
+  };
+  const response = await post('/api/coach', body);
+  expect(response.status).toBe(200);
+  expect((await response.json()).evidence.boardContext).toEqual(context);
+  expect((await post('/api/coach', { ...body, context: { ...context, turn: 0 } })).status).toBe(
+    400,
+  );
+  expect((await post('/api/library/games', { ...saved, id: '../bad' })).status).toBe(400);
+});

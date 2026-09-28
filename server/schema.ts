@@ -23,7 +23,14 @@ export const trainingSchema = z.object({
   visits: z.number().int().min(50).max(10000),
 });
 export const analysisRequest = z.object({ game: gameSchema, training: trainingSchema });
+export const boardContextSchema = z.object({
+  gameId: z.uuid(),
+  gameTitle: z.string().max(200),
+  turn: z.number().int().min(0).max(1500),
+  trialMoves: z.array(move).max(1500),
+});
 export const coachRequest = analysisRequest.extend({
+  context: boardContextSchema.optional(),
   provider: z.enum(['deepseek', 'codex', 'claude']).optional(),
   action: z.enum(['move', 'position', 'variation', 'chat']),
   question: z.string().max(4000).default(''),

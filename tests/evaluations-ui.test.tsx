@@ -166,7 +166,9 @@ it('stops curve completion, preserves finished points and rejects late partial-q
   expect(latest.error).toBe('');
 });
 it('toggles board candidates and the candidate list together while keeping the graph panel visible', async () => {
-  vi.mocked(api).mockResolvedValue(testStatus);
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === 'library' ? { games: [], conversations: [] } : testStatus,
+  );
   await act(async () => root.render(<App />));
   await tick();
   const toggle = Array.from(host.querySelectorAll('button')).find(

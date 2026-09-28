@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLibrary } from './useLibrary';
+import { gameTitle, type BoardContext } from '../shared/library';
+import { trialStoneIndices } from '../shared/trial';
 import { EngineSettings, engineLabel } from './EngineSettings';
 import { LlmSettings } from './LlmSettings';
 import { availabilityLabel, providerNames } from '../shared/llm';
@@ -13,15 +16,7 @@ import { api, streamApi } from './api';
 import { areaScore, groupAt, newGame, play, replay, toIndex } from '../shared/go';
 import { decodeSgf, exportSgf, importSgf } from '../shared/sgf';
 import { RANKS, trainingForRank } from '../shared/training';
-import type {
-  Analysis,
-  ChatMessage,
-  CoachAction,
-  Color,
-  Game,
-  Status,
-  Training,
-} from '../shared/types';
+import type { Analysis, CoachAction, Color, Game, Move, Status, Training } from '../shared/types';
 
 const labels: Record<CoachAction, string> = {
   move: '解释这一手',
@@ -49,10 +44,15 @@ function download(name: string, text: string, type = 'text/plain') {
 }
 
 export default function App() {
-  const [game, setGame] = useState(restoredGame);
+  const [initialGame] = useState(restoredGame);
+  const library = useLibrary(initialGame);
+  const { game, setGame } = library;
+  const [trialMoves, setTrialMoves] = useState<Move[]>([]);
+  const [showGames, setShowGames] = useState(false);
+  const [showConversations, setShowConversations] = useState(false);
   const [turn, setTurn] = useState(game.moves.length);
-  const [mode, setMode] = useState<'review' | 'play'>('review');
-  const [human, setHuman] = useState<Color>('B');
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [aiColor, setAiColor] = useState<Color>('W');
   const [training, setTraining] = useState<Training>(trainingForRank('5k'));
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState('');
@@ -62,10 +62,13 @@ export default function App() {
   const [showCandidates, setShowCandidates] = useState(true);
   const [scoring, setScoring] = useState(false);
   const [dead, setDead] = useState<number[]>([]);
-  const [messages, setMessages] = useState<AnalysisMessage[]>([]);
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [question, setQuestion] = useState('');
-  const [evidence, setEvidence] = useState<unknown>();
+  const { messages, history, draft: question, evidence } = library.activeConversation;
+  const setMessages = (value: React.SetStateAction<AnalysisMessage[]>) =>
+    library.update('messages', value);
+  const setHistory = (value: React.SetStateAction<typeof history>) =>
+    library.update('history', value);
+  const setQuestion = (value: string) => library.update('draft', value);
+  const setEvidence = (value: unknown) => library.update('evidence', value);
   const [settings, setSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'training' | 'connections'>('training');
   const [setup, setSetup] = useState(false);
@@ -81,7 +84,27 @@ export default function App() {
     chatLog = useRef<HTMLDivElement>(null),
     followChat = useRef(true),
     activeStream = useRef<AbortController | null>(null);
-  const current = useMemo(() => ({ ...game, moves: game.moves.slice(0, turn) }), [game, turn]);
+  const current = useMemo(
+    () => ({ ...game, moves: [...game.moves.slice(0, turn), ...trialMoves] }),
+    [game, turn, trialMoves],
+  );
+  const trialStones = useMemo(
+    () => trialStoneIndices(game, turn, trialMoves),
+    [game, turn, trialMoves],
+  );
+  const boardContext: BoardContext = {
+    gameId: library.gameId,
+    gameTitle: gameTitle(game),
+    turn,
+    trialMoves,
+  };
+  useEffect(() => {
+    setTurn(game.moves.length);
+    setTrialMoves([]);
+  }, [library.gameId]);
+  useEffect(() => {
+    if (library.ready) setTurn(game.moves.length);
+  }, [library.ready]);
   const position = useMemo(() => replay(current), [current]);
   const preview = useMemo(() => {
     if (!pv) return { position, last: current.moves.at(-1)?.point };
@@ -108,18 +131,16 @@ export default function App() {
     [position, game.size, game.komi, handicapBonus, dead],
   );
   const evaluations = useEvaluations(
-    game,
-    turn,
+    trialMoves.length ? current : game,
+    current.moves.length,
     training,
     status?.engine,
-    !!busy ||
+    !library.ready ||
+      !!busy ||
       !!pv ||
       setup ||
       scoring ||
-      (mode === 'play' &&
-        turn === game.moves.length &&
-        position.toPlay !== human &&
-        position.passes < 2),
+      (autoPlay && position.toPlay === aiColor && position.passes < 2),
   );
   const analysis = evaluations.analysis;
   const candidates =
@@ -155,11 +176,9 @@ export default function App() {
   }, [messages]);
   useEffect(() => () => activeStream.current?.abort(), []);
   function invalidate() {
-    setMessages([]);
-    setHistory([]);
     setNotice('');
-    setEvidence(undefined);
     setPv(null);
+    setTrialMoves([]);
     setDead([]);
     setScoring(false);
     setError('');
@@ -199,11 +218,7 @@ export default function App() {
           training,
         });
         evaluations.record(current, result.analysis, true);
-        play(position, { color: position.toPlay, point: result.move }, game.size, game.rules);
-        changeGame({
-          ...current,
-          moves: [...current.moves, { color: position.toPlay, point: result.move }],
-        });
+        appendMove({ color: position.toPlay, point: result.move });
         setNotice(result.method);
       } catch (e) {
         setBotFailed(true);
@@ -213,12 +228,14 @@ export default function App() {
   }
   useEffect(() => {
     if (
-      mode === 'play' &&
+      library.ready &&
+      autoPlay &&
       !scoring &&
       !pv &&
       !setup &&
-      turn === game.moves.length &&
-      position.toPlay !== human &&
+      !showGames &&
+      !showConversations &&
+      position.toPlay === aiColor &&
       position.passes < 2 &&
       !busy &&
       !botFailed &&
@@ -227,7 +244,42 @@ export default function App() {
       void botMove();
     // A turn transition, not a background status refresh, schedules the opponent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, turn, game, human, busy, botFailed, scoring, pv, setup, status?.engine.ready]);
+  }, [
+    autoPlay,
+    turn,
+    trialMoves,
+    game,
+    aiColor,
+    showGames,
+    showConversations,
+    busy,
+    botFailed,
+    scoring,
+    pv,
+    setup,
+    status?.engine.ready,
+    library.ready,
+  ]);
+  function appendMove(move: Move) {
+    play(position, move, game.size, game.rules);
+    if (turn < game.moves.length || trialMoves.length) {
+      setTrialMoves((moves) => [...moves, move]);
+      setError('');
+      setDead([]);
+    } else changeGame({ ...current, moves: [...current.moves, move] });
+  }
+  function forkGame() {
+    const branch: Game = {
+      ...current,
+      metadata: { ...current.metadata, GN: `${gameTitle(game).slice(0, 150)} · 第${turn}手分支` },
+    };
+    delete branch.metadata.RE;
+    invalidate();
+    evaluations.reset();
+    library.newGame(branch);
+    setTurn(branch.moves.length);
+    setNotice('已保存为新棋局，后续落子计入新局主线');
+  }
   function place(point: string) {
     if (lock.current || pv) return;
     if (scoring) {
@@ -245,17 +297,12 @@ export default function App() {
       setError('双方已停一手');
       return;
     }
-    if (mode === 'play' && position.toPlay !== human) {
+    if (autoPlay && position.toPlay === aiColor) {
       setError('轮到 AI 行棋');
       return;
     }
-    if (turn !== game.moves.length) {
-      setError('当前为历史局面');
-      return;
-    }
     try {
-      play(position, { color: position.toPlay, point }, game.size, game.rules);
-      changeGame({ ...current, moves: [...current.moves, { color: position.toPlay, point }] });
+      appendMove({ color: position.toPlay, point });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -273,10 +320,20 @@ export default function App() {
       const id = crypto.randomUUID();
       setMessages((previous) => [
         ...previous,
-        { id, question: title, text: '', status: '连接中', state: 'running', evaluations: {} },
+        {
+          id,
+          question: title,
+          text: '',
+          status: '连接中',
+          state: 'running',
+          evaluations: {},
+          context: structuredClone(boardContext),
+          createdAt: new Date().toISOString(),
+        },
       ]);
       if (endpoint === 'coach') setQuestion('');
       try {
+        await library.flush();
         await streamApi(
           endpoint,
           payload,
@@ -296,7 +353,10 @@ export default function App() {
               if (event.answer)
                 setHistory((previous) => [
                   ...previous,
-                  { role: 'user', content: title },
+                  {
+                    role: 'user',
+                    content: `${title}\n[棋局上下文 ${JSON.stringify(boardContext)}]`,
+                  },
                   { role: 'assistant', content: event.answer! },
                 ]);
             }
@@ -339,6 +399,7 @@ export default function App() {
     const text = action === 'chat' ? question.trim() : labels[action];
     await requestAnalysis(text, 'coach', {
       game: current,
+      context: boardContext,
       training,
       action,
       question: action === 'chat' ? text : '',
@@ -354,8 +415,11 @@ export default function App() {
     }
     try {
       const imported = importSgf(decodeSgf(await file.arrayBuffer()));
-      setMode('review');
-      changeGame(imported.game, true);
+      invalidate();
+      evaluations.reset();
+      library.newGame(imported.game);
+      setTurn(imported.game.moves.length);
+      setShowGames(false);
       setNotice(
         [`已导入 ${file.name} · ${imported.game.moves.length} 手`, ...imported.warnings].join(' '),
       );
@@ -363,7 +427,7 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  const locked = !!busy;
+  const locked = !!busy || !library.ready;
   const selectedLlm = status?.llm?.selected;
   const llmReady = !!selectedLlm && !!status?.llm?.providers[selectedLlm].available;
   const llmLabel = selectedLlm
@@ -372,7 +436,7 @@ export default function App() {
       ? 'LLM · 未连接'
       : 'LLM · 检测中';
   const engineStatus = engineLabel(status?.engine);
-  const boardStatus = error || busy || notice;
+  const boardStatus = error || library.error || busy || notice;
   return (
     <main className="workspace">
       <section className="board-panel" aria-label="棋盘">
@@ -407,30 +471,38 @@ export default function App() {
               <circle cx="12" cy="12" r="3.2" />
             </svg>
           </button>
+          <label className="auto-play-toggle">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="AI 自动落子"
+              checked={autoPlay}
+              disabled={locked}
+              onChange={(e) => {
+                setAutoPlay(e.target.checked);
+                setBotFailed(false);
+              }}
+            />
+            AI 自动落子
+          </label>
           <select
-            className="mode-select"
-            aria-label="对局模式"
+            className="ai-color-select"
+            aria-label="AI 执子"
+            value={aiColor}
             disabled={locked}
-            value={mode}
             onChange={(e) => {
+              setAiColor(e.target.value as Color);
               setBotFailed(false);
-              setMode(e.target.value as typeof mode);
             }}
           >
-            <option value="review">自由复盘</option>
-            <option value="play">人机对战</option>
+            <option value="W">AI 执白</option>
+            <option value="B">AI 执黑</option>
           </select>
           <button disabled={locked} onClick={() => setSetup(true)}>
             新对局
           </button>
-          <button disabled={locked} onClick={() => fileInput.current?.click()}>
-            导入
-          </button>
-          <button
-            disabled={locked}
-            onClick={() => download('training.sgf', exportSgf(game), 'application/x-go-sgf')}
-          >
-            导出
+          <button disabled={locked} onClick={() => setShowGames(true)}>
+            历史棋局
           </button>
           <input
             ref={fileInput}
@@ -469,6 +541,7 @@ export default function App() {
                 scoring ? score.ownership : showOwnership && !pv ? analysis?.ownership : undefined
               }
               candidates={pv || scoring || !showCandidates ? [] : candidates}
+              trialStones={trialStones}
               dead={dead}
               disabled={locked || !!pv}
               scoring={scoring}
@@ -539,6 +612,27 @@ export default function App() {
               />
             </div>
           )}
+          {trialMoves.length > 0 && (
+            <div className="trial-bar">
+              <span>
+                试下 · 第 {turn} 手起 +{trialMoves.length} 手
+              </span>
+              <button
+                disabled={locked}
+                onClick={() => {
+                  setTrialMoves([]);
+                  setPv(null);
+                  setDead([]);
+                  setScoring(false);
+                }}
+              >
+                清空试下
+              </button>
+              <button disabled={locked} onClick={forkGame}>
+                保存试下为新棋局
+              </button>
+            </div>
+          )}
           <div className="board-tools">
             <button disabled={locked || !!pv || scoring} onClick={() => place('pass')}>
               停一手
@@ -575,14 +669,8 @@ export default function App() {
               数目
             </button>
             {turn < game.moves.length && !pv && (
-              <button
-                disabled={locked}
-                onClick={() => {
-                  download('before-variation.sgf', exportSgf(game), 'application/x-go-sgf');
-                  changeGame(current);
-                }}
-              >
-                从这里继续
+              <button disabled={locked} onClick={forkGame}>
+                分支新棋局
               </button>
             )}
             <span className="board-meta">
@@ -597,12 +685,13 @@ export default function App() {
             </div>
           )}
           <div
-            className={`board-status ${error ? 'error' : ''}`}
-            role={error ? 'alert' : 'status'}
+            className={`board-status ${error || library.error ? 'error' : ''}`}
+            role={error || library.error ? 'alert' : 'status'}
             aria-hidden={!boardStatus}
             title={boardStatus}
           >
             <span>{boardStatus}</span>
+            {library.error && <button onClick={library.retry}>重试</button>}
             {botFailed && (
               <button
                 onClick={() => {
@@ -654,20 +743,22 @@ export default function App() {
             {engineStatus}
           </div>
         )}
-        <EvaluationPanel
-          history={evaluations.points}
-          turn={turn}
-          total={game.moves.length}
-          disabled={locked || !!pv || scoring}
-          ready={!!status?.engine.ready}
-          completing={evaluations.completing}
-          pendingTurn={evaluations.pendingTurn}
-          error={evaluations.error}
-          navigate={navigate}
-          complete={evaluations.complete}
-          stop={evaluations.stop}
-          retry={evaluations.retry}
-        />
+        {!trialMoves.length && (
+          <EvaluationPanel
+            history={evaluations.points}
+            turn={turn}
+            total={game.moves.length}
+            disabled={locked || !!pv || scoring}
+            ready={!!status?.engine.ready}
+            completing={evaluations.completing}
+            pendingTurn={evaluations.pendingTurn}
+            error={evaluations.error}
+            navigate={navigate}
+            complete={evaluations.complete}
+            stop={evaluations.stop}
+            retry={evaluations.retry}
+          />
+        )}
         {showCandidates && !pv && !scoring && candidates.length > 0 && (
           <div className="candidates">
             {candidates.map((candidate, i) => (
@@ -686,11 +777,20 @@ export default function App() {
             ))}
           </div>
         )}
+        <div className="conversation-toolbar">
+          <span title={library.activeConversation.title}>{library.activeConversation.title}</span>
+          <button disabled={locked} onClick={() => library.newConversation()}>
+            新对话
+          </button>
+          <button disabled={locked} onClick={() => setShowConversations(true)}>
+            历史对话
+          </button>
+        </div>
         <div className="quick-actions">
           {(['move', 'position', 'variation'] as const).map((action) => (
             <button
               key={action}
-              disabled={locked || !llmReady || !!pv || (action === 'move' && !turn)}
+              disabled={locked || !llmReady || !!pv || (action === 'move' && !current.moves.length)}
               onClick={() => void ask(action)}
             >
               {labels[action]}
@@ -710,6 +810,17 @@ export default function App() {
         >
           {messages.map((message) => (
             <article className="chat-message" key={message.id}>
+              {message.context && (
+                <div className="message-context">
+                  {message.context.gameTitle} · 第 {message.context.turn} 手
+                  {message.context.trialMoves.length > 0 &&
+                    ` · 试下 +${message.context.trialMoves.length} 手`}
+                  <small title={message.context.gameId}>
+                    {' '}
+                    · {message.context.gameId.slice(0, 8)}
+                  </small>
+                </div>
+              )}
               <div className="chat-question">
                 <MarkdownText>{message.question}</MarkdownText>
               </div>
@@ -759,6 +870,7 @@ export default function App() {
         >
           <textarea
             aria-label="问题"
+            maxLength={4000}
             placeholder="输入问题"
             value={question}
             disabled={locked || !!pv}
@@ -825,19 +937,6 @@ export default function App() {
           </div>
           {settingsTab === 'training' ? (
             <fieldset disabled={locked}>
-              <label>
-                执子
-                <select
-                  value={human}
-                  onChange={(e) => {
-                    setHuman(e.target.value as Color);
-                    setBotFailed(false);
-                  }}
-                >
-                  <option value="B">黑</option>
-                  <option value="W">白</option>
-                </select>
-              </label>
               <label>
                 对手级位 / 段位
                 <select
@@ -953,15 +1052,79 @@ export default function App() {
           )}
         </Dialog>
       )}
+      {showGames && (
+        <Dialog title="历史棋局" onClose={() => setShowGames(false)}>
+          <div className="history-actions">
+            <button disabled={locked} onClick={() => fileInput.current?.click()}>
+              导入 SGF
+            </button>
+            <span>棋局自动保存 · {library.games.length} 局</span>
+          </div>
+          <div className="history-list">
+            {library.games.map((item) => (
+              <article key={item.id}>
+                <button
+                  disabled={locked}
+                  aria-pressed={item.id === library.gameId}
+                  onClick={() => {
+                    invalidate();
+                    evaluations.reset();
+                    library.selectGame(item);
+                    setTurn(item.game.moves.length);
+                    setShowGames(false);
+                  }}
+                >
+                  <b>{item.title}</b>
+                  <small>
+                    {item.game.moves.length} 手 · {new Date(item.updatedAt).toLocaleString()} ·{' '}
+                    {item.id.slice(0, 8)}
+                  </small>
+                </button>
+                <button
+                  onClick={() =>
+                    download(`${item.id}.sgf`, exportSgf(item.game), 'application/x-go-sgf')
+                  }
+                >
+                  导出 SGF
+                </button>
+              </article>
+            ))}
+          </div>
+        </Dialog>
+      )}
+      {showConversations && (
+        <Dialog title="历史对话" onClose={() => setShowConversations(false)}>
+          <div className="history-list">
+            {library.conversations.map((item) => (
+              <article key={item.id}>
+                <button
+                  disabled={locked}
+                  aria-pressed={item.id === library.conversationId}
+                  onClick={() => {
+                    library.selectConversation(item.id);
+                    setShowConversations(false);
+                  }}
+                >
+                  <b>{item.title}</b>
+                  <small>
+                    {item.messages.length} 轮 · {new Date(item.updatedAt).toLocaleString()}
+                  </small>
+                </button>
+              </article>
+            ))}
+          </div>
+        </Dialog>
+      )}
       {setup && (
         <Dialog title="新对局" onClose={() => setSetup(false)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (!Number.isFinite(komi) || Math.abs(komi) > 100) return;
-              if (game.moves.length)
-                download('previous-game.sgf', exportSgf(game), 'application/x-go-sgf');
-              changeGame(newGame(size, handicap, komi, rules), true);
+              invalidate();
+              evaluations.reset();
+              library.newGame(newGame(size, handicap, komi, rules));
+              setTurn(0);
               setSetup(false);
             }}
           >

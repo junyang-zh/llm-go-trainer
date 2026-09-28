@@ -50,9 +50,7 @@ async function checkLayout() {
   }
   animation = requestAnimationFrame(sample);
   try {
-    const mode = document.querySelector('[aria-label="对局模式"]');
-    mode.value = 'play';
-    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[aria-label="AI 自动落子"]').click();
     for (const [index, point] of ['D4', 'Q4', 'C3'].entries()) {
       document
         .querySelector(`[aria-label="${point} 空点"]`)
@@ -117,6 +115,9 @@ app.whenReady().then(async () => {
       [760, 480],
       [640, 800],
     ]) {
+      await fetch(`http://127.0.0.1:${server.address().port}/api/fixture/reset`, {
+        method: 'POST',
+      });
       const win = new BrowserWindow({
         width,
         height,

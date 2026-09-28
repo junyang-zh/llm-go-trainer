@@ -31,6 +31,7 @@ it('serves scoped MCP tools, rejects unauthenticated/cross-origin calls and clos
       }),
     );
     expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([
+      'query_game_history',
       'inspect_position',
       'analyze_variation',
     ]);

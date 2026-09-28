@@ -8,6 +8,7 @@ process.env.GO_TRAINER_EMBEDDED = '1';
 app
   .whenReady()
   .then(async () => {
+    process.env.GO_TRAINER_HISTORY_DIR ||= join(app.getPath('userData'), 'history');
     // Packaged app reads user configuration from its private application-data folder.
     if (app.isPackaged) {
       process.env.GO_TRAINER_ENV = join(app.getPath('userData'), '.env');
