@@ -110,6 +110,7 @@ export async function ensureRuntime(
     const manifestPath = join(target, 'installed.json');
     const env = { ...process.env };
     delete env.DEEPSEEK_API_KEY;
+    const startupTimeout = Number(process.env.KATAGO_STARTUP_TIMEOUT_MS);
     const runtime = (): Runtime => ({
       backend: platform.backend,
       config: {
@@ -123,6 +124,8 @@ export async function ensureRuntime(
             ? { ...env, DYLD_LIBRARY_PATH: join(target, 'lib') }
             : env,
         timeout: Number(process.env.KATAGO_TIMEOUT_MS) || 180000,
+        startupTimeout:
+          Number.isFinite(startupTimeout) && startupTimeout >= 1000 ? startupTimeout : undefined,
       },
     });
     // Verify cached models too. A completed manifest alone is not proof of valid files.

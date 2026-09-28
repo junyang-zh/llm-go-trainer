@@ -28,6 +28,10 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
             ? resolve(process.env.KATAGO_HUMAN_MODEL)
             : undefined,
           timeout: duration(process.env.KATAGO_TIMEOUT_MS, 180000),
+          startupTimeout: duration(
+            process.env.KATAGO_STARTUP_TIMEOUT_MS,
+            Math.max(duration(process.env.KATAGO_TIMEOUT_MS, 180000), 600000),
+          ),
         }
       : undefined,
   });

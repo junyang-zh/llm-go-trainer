@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { KataGo } from '../server/katago';
+import { KataGo, type EngineConfig } from '../server/katago';
 import { newGame } from '../shared/go';
 import { trainingForRank } from '../shared/training';
 const engines: KataGo[] = [];
-function engine(timeout = 5000) {
+function engine(timeout = 5000, overrides: Partial<EngineConfig> = {}) {
   const script = resolve('tests/fixtures/fake-katago.mjs');
   const instance = new KataGo({
     executable: process.execPath,
@@ -12,12 +12,48 @@ function engine(timeout = 5000) {
     model: script,
     config: script,
     timeout,
+    ...overrides,
   });
   engines.push(instance);
   return instance;
 }
 afterEach(() => engines.forEach((e) => e.close()));
 describe('KataGo JSONL transport', () => {
+  it('allows GPU initialization longer than the normal analysis timeout and reports tuning', async () => {
+    const e = engine(100, {
+      prefixArgs: [resolve('tests/fixtures/slow-start-katago.mjs')],
+    });
+    const progress: string[] = [];
+    await e.initialize(undefined, (message) => progress.push(message));
+    expect(progress.some((message) => message.includes('正在进行 OpenCL 调优'))).toBe(true);
+    expect(progress.at(-1)).toContain('正在验证首次分析');
+    expect(e.status().running).toBe(true);
+    await expect(e.analyze(newGame(9, 0, 99), trainingForRank('5k'))).rejects.toThrow('分析超时');
+    expect(e.status().running).toBe(false);
+  });
+  it('bounds startup and preserves the engine diagnostics in timeout errors', async () => {
+    const e = engine(100, {
+      prefixArgs: [resolve('tests/fixtures/slow-start-katago.mjs')],
+      startupTimeout: 1000,
+      env: { ...process.env, FAKE_KATAGO_STARTUP_DELAY_MS: '5000' },
+    });
+    await expect(e.initialize()).rejects.toThrow(/KATAGO_STARTUP_TIMEOUT_MS[\s\S]*OpenCL tuning/);
+    expect(e.status().running).toBe(false);
+  });
+  it('can cancel initialization while the GPU is still tuning', async () => {
+    const e = engine(100, {
+      prefixArgs: [resolve('tests/fixtures/slow-start-katago.mjs')],
+      env: { ...process.env, FAKE_KATAGO_STARTUP_DELAY_MS: '5000' },
+    });
+    const controller = new AbortController();
+    await expect(
+      e.initialize(controller.signal, (message) => {
+        if (message.includes('正在进行 OpenCL 调优')) controller.abort();
+      }),
+    ).rejects.toThrow('停止');
+    await e.close();
+    expect(e.status().running).toBe(false);
+  });
   it('correlates out-of-order queries and ignores partial search results', async () => {
     const e = engine();
     const [a, b] = await Promise.all([

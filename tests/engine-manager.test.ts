@@ -41,6 +41,22 @@ function alive(pid: number) {
   }
 }
 describe('managed engine lifecycle', () => {
+  it('publishes initialization progress and clears it once the engine is ready', async () => {
+    const manager = await create(async () => ({
+      config: {
+        ...config,
+        prefixArgs: [resolve('tests/fixtures/slow-start-katago.mjs')],
+      },
+      backend: 'OpenCL',
+    }));
+    await manager.load();
+    await vi.waitFor(() =>
+      expect(manager.status().progress?.label).toContain('正在进行 OpenCL 调优'),
+    );
+    expect(manager.status().ready).toBe(false);
+    await ready(manager);
+    expect(manager.status().progress).toBeUndefined();
+  });
   it('does not restart an active engine when selecting the same connection again', async () => {
     const manager = await create();
     await manager.load();

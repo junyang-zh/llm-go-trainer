@@ -148,7 +148,9 @@ export class EngineManager implements AnalysisEngine, EngineController {
           };
           const engine = (this.options.factory ?? ((config) => new KataGo(config)))(runtime.config);
           this.engine = engine;
-          await engine.initialize(controller.signal);
+          await engine.initialize(controller.signal, (label) => {
+            if (!controller.signal.aborted) this.state.progress = { label, received: 0 };
+          });
         }
         controller.signal.throwIfAborted();
         this.state = {

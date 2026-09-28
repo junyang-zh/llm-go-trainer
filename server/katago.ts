@@ -15,6 +15,7 @@ export interface EngineConfig {
   config: string;
   humanModel?: string;
   timeout: number;
+  startupTimeout?: number;
   prefixArgs?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
@@ -34,14 +35,27 @@ export class KataGo {
   private diagnostics = '';
   private lastError?: string;
   private stopped = false;
+  private startupProgress?: (message: string) => void;
   private children = new Map<ChildProcessWithoutNullStreams, Promise<void>>();
   private terminating = new WeakSet<ChildProcessWithoutNullStreams>();
   private onExit = () => {
     for (const child of this.children.keys()) child.kill('SIGKILL');
   };
-  async initialize(signal?: AbortSignal) {
+  async initialize(signal?: AbortSignal, onProgress?: (message: string) => void) {
     this.stopped = false;
-    await this.analyze(newGame(19), { ...trainingForRank('5k'), visits: 1 }, { signal });
+    this.startupProgress = onProgress;
+    onProgress?.('正在加载模型和初始化 GPU；首次 OpenCL 调优可能需要数分钟');
+    try {
+      await this.request(
+        newGame(19),
+        { ...trainingForRank('5k'), visits: 1 },
+        { signal },
+        this.config.startupTimeout ?? Math.max(this.config.timeout, 600000),
+        true,
+      );
+    } finally {
+      this.startupProgress = undefined;
+    }
   }
   constructor(private config: EngineConfig) {}
   status() {
@@ -93,6 +107,15 @@ export class KataGo {
     );
     child.stderr.on('data', (chunk) => {
       this.diagnostics = (this.diagnostics + chunk.toString()).slice(-4000);
+    });
+    const diagnosticLines = createInterface({ input: child.stderr });
+    diagnosticLines.on('line', (line) => {
+      if (/Loaded tuning parameters/i.test(line))
+        this.startupProgress?.('已读取 OpenCL 调优缓存，正在加载模型');
+      else if (/tuning|tuner/i.test(line))
+        this.startupProgress?.('正在进行 OpenCL 调优；首次启动可能需要数分钟，请稍候');
+      else if (/Started, ready to begin handling requests/i.test(line))
+        this.startupProgress?.('GPU 初始化完成，正在验证首次分析');
     });
     child.stdin.on('error', (error) =>
       this.fail(child, new Error(`KataGo 输入流关闭：${error.message}`)),
@@ -162,6 +185,15 @@ export class KataGo {
     child.once('close', () => clearTimeout(timer));
   }
   async analyze(game: Game, training: Training, options: AnalysisOptions = {}): Promise<Analysis> {
+    return this.request(game, training, options, this.config.timeout);
+  }
+  private async request(
+    game: Game,
+    training: Training,
+    options: AnalysisOptions,
+    timeout: number,
+    initializing = false,
+  ): Promise<Analysis> {
     options.signal?.throwIfAborted();
     replay(game);
     if (this.pending.size >= 4) throw new Error('分析队列已满，请等待当前分析完成');
@@ -196,9 +228,14 @@ export class KataGo {
         () =>
           this.fail(
             child,
-            new Error('KataGo 分析超时；引擎已重置，可增加 KATAGO_TIMEOUT_MS 后重试。'),
+            new Error(
+              (initializing
+                ? 'KataGo 初始化超时；首次 OpenCL 调优可能需要数分钟。可增加 KATAGO_STARTUP_TIMEOUT_MS 后重试。'
+                : 'KataGo 分析超时；引擎已重置，可增加 KATAGO_TIMEOUT_MS 后重试。') +
+                (this.diagnostics.trim() ? `\n${this.diagnostics.trim().slice(-1500)}` : ''),
+            ),
           ),
-        this.config.timeout,
+        timeout,
       );
       const abort = () => {
         this.finish(id, new Error('分析已停止'));
