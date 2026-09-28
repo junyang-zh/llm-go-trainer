@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
-    "build": "npm run build:icons && tsc --noEmit && vite build && tsup server/index.ts --format esm --platform node --target node22 --out-dir dist-server --clean",
+    "build": "npm run build:icons && tsc --noEmit && vite build && tsup server/index.ts --format esm --platform node --target node22 --out-dir dist-server --clean && tsup desktop/updater.ts --format cjs --platform node --target node22 --out-dir dist-desktop --clean",
     "build:icons": "node scripts/generate-icons.mjs",
     "start": "node dist-server/index.js",
     "check": "tsc --noEmit",
@@ -25,7 +25,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",
     "dotenv": "^16.6.1",
+    "electron-updater": "^6.8.9",
     "express": "^5.1.0",
+    "js-yaml": "^5.4.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
@@ -69,15 +71,19 @@
       "desktop/**/*",
       "prompts/**/*",
       "config/**/*",
-      "package.json"
+      "package.json",
+      "dist-desktop/**/*"
     ],
     "mac": {
       "icon": ".local/icons/icon.icns",
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.education",
-      "minimumSystemVersion": "15.0.0"
+      "minimumSystemVersion": "15.0.0",
+      "hardenedRuntime": true,
+      "notarize": true
     },
     "win": {
       "icon": ".local/icons/icon.ico",

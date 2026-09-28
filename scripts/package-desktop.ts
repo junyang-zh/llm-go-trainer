@@ -62,10 +62,22 @@ if (variant === 'standard') {
 await build({
   projectDir: root,
   targets: mac
-    ? Platform.MAC.createTarget(['dmg'], Arch.arm64)
+    ? Platform.MAC.createTarget(['dmg', 'zip'], Arch.arm64)
     : Platform.WINDOWS.createTarget(['nsis'], Arch.x64),
   publish: 'never',
   config: {
+    extraMetadata: { goTrainerEdition: variant },
+    forceCodeSigning: mac && process.env.GO_TRAINER_REQUIRE_SIGNING === '1',
+    generateUpdatesFilesForAllChannels: false,
+    detectUpdateChannel: false,
+    publish: [
+      {
+        provider: 'github',
+        owner: 'junyang-zh',
+        repo: 'llm-go-trainer',
+        channel: variant === 'minimal' ? 'minimal' : 'latest',
+      },
+    ],
     directories: { output: `release/${variant}` },
     artifactName: `LLM-Go-Trainer-\${version}-${mac ? 'mac-arm64' : 'windows-x64'}${variant === 'minimal' ? '-minimal' : ''}.\${ext}`,
     extraResources: [

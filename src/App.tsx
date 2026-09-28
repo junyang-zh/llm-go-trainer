@@ -5,6 +5,7 @@ import { extendTrial, trialStoneNumbers, trialVariation, type TrialBranch } from
 import { MoveTimeline } from './MoveTimeline';
 import { EngineSettings, engineLabel } from './EngineSettings';
 import { LlmSettings } from './LlmSettings';
+import { GeneralSettings } from './GeneralSettings';
 import { availabilityLabel, providerNames } from '../shared/llm';
 import { Dialog } from './Dialog';
 import { type AnalysisMessage, updateMessage, finishMessage } from './messages';
@@ -82,7 +83,7 @@ export default function App() {
   const setQuestion = (value: string) => library.update('draft', value);
   const setEvidence = (value: unknown) => library.update('evidence', value);
   const [settings, setSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'training' | 'connections'>('training');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'training' | 'connections'>('general');
   const [setup, setSetup] = useState(false);
   const [size, setSize] = useState(19),
     [handicap, setHandicap] = useState(0),
@@ -893,6 +894,14 @@ export default function App() {
           <div className="settings-tabs" role="tablist" aria-label="设置类别">
             <button
               role="tab"
+              aria-selected={settingsTab === 'general'}
+              className={settingsTab === 'general' ? 'selected' : ''}
+              onClick={() => setSettingsTab('general')}
+            >
+              通用
+            </button>
+            <button
+              role="tab"
               aria-selected={settingsTab === 'training'}
               className={settingsTab === 'training' ? 'selected' : ''}
               onClick={() => setSettingsTab('training')}
@@ -908,7 +917,9 @@ export default function App() {
               连接
             </button>
           </div>
-          {settingsTab === 'training' ? (
+          {settingsTab === 'general' ? (
+            <GeneralSettings beforeInstall={library.flush} busy={locked} />
+          ) : settingsTab === 'training' ? (
             <fieldset disabled={locked}>
               <label>
                 对手级位 / 段位

@@ -1,34 +1,15 @@
-import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { verifyReleaseAssets } from './release-assets.mjs';
 
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));
 const tag = process.env.GITHUB_REF_NAME;
 if (process.env.GITHUB_REF_TYPE !== 'tag' || tag !== `v${version}`)
   throw new Error('Tag must match package.json version');
 const directory = 'release-assets';
-const expected = ['windows-x64', 'mac-arm64']
-  .flatMap((platform) =>
-    ['standard', 'minimal'].map(
-      (variant) =>
-        `LLM-Go-Trainer-${version}-${platform}${variant === 'minimal' ? '-minimal' : ''}.${platform.startsWith('mac') ? 'dmg' : 'exe'}`,
-    ),
-  )
-  .sort();
-const actual = (await readdir(directory)).sort();
-if (JSON.stringify(actual) !== JSON.stringify(expected))
-  throw new Error(`Expected exactly four installers: ${expected.join(', ')}`);
-const checksums = [];
-for (const name of expected) {
-  const path = join(directory, name);
-  if ((await stat(path)).size === 0) throw new Error(`Empty installer: ${name}`);
-  const hash = createHash('sha256');
-  for await (const chunk of createReadStream(path)) hash.update(chunk);
-  checksums.push(`${hash.digest('hex')}  ${name}`);
-}
-await writeFile(join(directory, 'SHA256SUMS.txt'), checksums.join('\n') + '\n');
+const { files: expected, checksums } = await verifyReleaseAssets(directory, version);
+await writeFile(join(directory, 'SHA256SUMS.txt'), checksums);
 
 const gh = (args) => execFileSync('gh', args, { stdio: 'inherit' });
 const existing = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft'], {

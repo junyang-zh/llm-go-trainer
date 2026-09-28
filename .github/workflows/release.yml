@@ -23,8 +23,6 @@ jobs:
         variant: [standard, minimal]
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +31,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Prepare macOS Developer ID signing and notarization
+        if: runner.os == 'macOS'
+        run: node scripts/prepare-macos-signing.mjs
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       - name: Cache verified engine and model downloads
         if: matrix.variant == 'standard'
         uses: actions/cache@v4
@@ -40,14 +47,30 @@ jobs:
           path: .local/katago/downloads
           key: release-artifacts-${{ runner.os }}-${{ matrix.variant }}-${{ hashFiles('config/katago/artifacts.json', 'config/katago/macos-bottles.json') }}
       - run: npm run package:desktop -- ${{ matrix.variant }}
+        env:
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       - name: Verify packaged resources
         run: node --import tsx scripts/verify-package.ts ${{ matrix.variant }}
+      - name: Verify macOS signature and notarization ticket
+        if: runner.os == 'macOS'
+        run: node scripts/verify-macos-signing.mjs ${{ matrix.variant }}
+      - name: Remove temporary macOS credentials
+        if: always() && runner.os == 'macOS'
+        run: |
+          node -e "require('node:fs').rmSync(require('node:path').join(process.env.RUNNER_TEMP, 'go-trainer-signing'), { recursive: true, force: true })"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.name }}-${{ matrix.variant }}
           path: |
             release/${{ matrix.variant }}/*.exe
             release/${{ matrix.variant }}/*.dmg
+            release/${{ matrix.variant }}/*.zip
+            release/${{ matrix.variant }}/latest.yml
+            release/${{ matrix.variant }}/minimal.yml
+            release/${{ matrix.variant }}/latest-mac.yml
+            release/${{ matrix.variant }}/minimal-mac.yml
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -67,7 +90,8 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
-      - name: Publish all four installers together
+      - run: npm ci --omit=dev --ignore-scripts
+      - name: Publish installers and update metadata together
         run: node scripts/publish-release.mjs
         env:
           GH_TOKEN: ${{ github.token }}

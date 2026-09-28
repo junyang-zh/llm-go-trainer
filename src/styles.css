@@ -936,6 +936,31 @@ h2 {
 .dialog-scroll output {
   float: right;
 }
+.general-settings h3 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+}
+.general-settings p {
+  line-height: 1.6;
+}
+.general-settings a {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #4b7056;
+}
+.general-settings .update-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.general-settings .update-checkbox input {
+  width: auto;
+  margin: 0;
+}
+.general-settings progress {
+  width: 80%;
+}
 .full {
   width: 100%;
   margin-top: 6px;

@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import { verified } from '../server/download';
 import artifacts from '../config/katago/artifacts.json';
 import bottles from '../config/katago/macos-bottles.json';
@@ -15,6 +16,28 @@ const resources = join(
     : 'win-unpacked/resources',
 );
 const models = join(resources, 'katago-models');
+const parseYaml = createRequire(import.meta.url)('js-yaml').load;
+const feed = parseYaml(await readFile(join(resources, 'app-update.yml'), 'utf8'));
+if (
+  feed.provider !== 'github' ||
+  feed.owner !== 'junyang-zh' ||
+  feed.repo !== 'llm-go-trainer' ||
+  feed.channel !== (variant === 'minimal' ? 'minimal' : 'latest')
+)
+  throw new Error('Packaged update feed does not match the edition');
+const channel = `${variant === 'minimal' ? 'minimal' : 'latest'}${process.platform === 'darwin' ? '-mac' : ''}.yml`;
+const update = parseYaml(await readFile(join('release', variant, channel), 'utf8'));
+const { version } = JSON.parse(await readFile('package.json', 'utf8'));
+const base = `LLM-Go-Trainer-${version}-${process.platform === 'darwin' ? 'mac-arm64' : 'windows-x64'}${variant === 'minimal' ? '-minimal' : ''}`;
+const expectedFiles =
+  process.platform === 'darwin' ? [`${base}.dmg`, `${base}.zip`] : [`${base}.exe`];
+if (
+  update.version !== version ||
+  !Array.isArray(update.files) ||
+  JSON.stringify(update.files.map((file: { url: string }) => file.url).sort()) !==
+    JSON.stringify(expectedFiles.sort())
+)
+  throw new Error('Packaged update manifest does not match the edition');
 if (variant === 'standard') {
   const runtime = join(resources, 'katago-runtime');
   for (const artifact of process.platform === 'darwin' ? bottles : [artifacts.windows])

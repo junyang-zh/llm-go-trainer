@@ -46,4 +46,4 @@ DeepSeek 使用原生 `tools` / `tool_calls` 多轮调用。流式参数需要�
 
 ## Web UI 到桌面
 
-React + SVG 棋盘共用纯 TypeScript 规则层；Node 本地服务持有 KataGo 与 LLM 进程。Electron 外壳可直接打包 `.app/.dmg` 或 Windows NSIS `.exe`，无须重写业务。当前已经提供外壳与打包入口，尚未签名、公证或做自动更新。将来改 SwiftUI / WinUI / Tauri 时，可保留同一 HTTP API 或替换为 IPC。[Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security)
+React + SVG 棋盘共用纯 TypeScript 规则层；Node 本地服务持有 KataGo 与 LLM 进程。Electron 外壳可直接打包 `.app/.dmg` 或 Windows NSIS `.exe`，无须重写业务。桌面应用通过 GitHub Release 检查并下载更新，普通版与 minimal 使用独立更新清单；macOS 发布流程配置 Developer ID 签名和 Apple 公证，签名材料通过仓库 Secrets 提供。将来改 SwiftUI / WinUI / Tauri 时，可保留同一 HTTP API 或替换为 IPC。[Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security)

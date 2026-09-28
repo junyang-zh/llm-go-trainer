@@ -33,6 +33,11 @@ async function checkLayout() {
   if (!settings.querySelector('.board-logo')) throw new Error('Logo is not the settings entry');
   settings.click();
   await until(() => document.querySelector('dialog[open]'));
+  if (
+    document.querySelector('[role="tab"][aria-selected="true"]')?.textContent !== '通用' ||
+    !document.querySelector('[aria-label="通用设置"]')
+  )
+    throw new Error('General settings are not the default tab');
   document.querySelector('.dialog-toolbar button').click();
   await until(() => !document.querySelector('dialog[open]'));
   const frame = document.querySelector('.board-frame');
