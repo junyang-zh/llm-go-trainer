@@ -60,11 +60,18 @@ export async function downloadArtifact(
   directory: string,
   signal: AbortSignal,
   progress: (value: DownloadProgress) => void,
+  bundledDirectory?: string,
 ) {
   signal.throwIfAborted();
   const target = join(directory, artifact.sha256);
   await mkdir(dirname(target), { recursive: true });
   if (await verified(target, artifact.sha256)) return target;
+  // Release archives live outside app.asar and are verified before extraction.
+  const bundled = bundledDirectory && join(bundledDirectory, artifact.sha256);
+  if (bundled && (await verified(bundled, artifact.sha256))) {
+    signal.throwIfAborted();
+    return bundled;
+  }
   const temp = target + '.part';
   if (await verified(temp, artifact.sha256)) {
     await rm(target, { force: true });
@@ -75,6 +82,7 @@ export async function downloadArtifact(
     try {
       signal.throwIfAborted();
       let offset = (await stat(temp).catch(() => undefined))?.size ?? 0;
+      progress({ label: artifact.name, received: offset });
       const response = await responseFor(
         artifact.url,
         AbortSignal.any([signal, AbortSignal.timeout(30 * 60 * 1000)]),
@@ -135,7 +143,14 @@ export async function downloadArtifact(
         await rm(temp, { force: true });
         signal.throwIfAborted();
       }
-      if (attempt === 2) throw error;
+      if (attempt === 2) {
+        const detail = error instanceof Error ? error.message : String(error);
+        const cause = error instanceof Error ? (error.cause as NodeJS.ErrnoException) : undefined;
+        throw new Error(
+          `${artifact.name} 下载失败（${new URL(artifact.url).hostname}）：${detail}${cause?.code ? ` [${cause.code}]` : ''}`,
+          { cause: error },
+        );
+      }
       try {
         await delay(300 * (attempt + 1), undefined, { signal });
       } catch (error) {

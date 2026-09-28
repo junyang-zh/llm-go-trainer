@@ -97,8 +97,8 @@ export async function ensureRuntime(
   directory: string,
   signal: AbortSignal,
   progress: (state: InstallProgress) => void,
+  platform = runtimePlatform(),
 ): Promise<Runtime> {
-  const platform = runtimePlatform();
   await mkdir(directory, { recursive: true });
   const unlock = await installLock(directory, signal);
   let staging: string | undefined;
@@ -153,8 +153,12 @@ export async function ensureRuntime(
       await mkdir(bin);
       await mkdir(lib);
       const download = async (artifact: typeof artifacts.main) =>
-        downloadArtifact(artifact, cache, signal, (value) =>
-          progress({ phase: 'downloading', progress: value }),
+        downloadArtifact(
+          artifact,
+          cache,
+          signal,
+          (value) => progress({ phase: 'downloading', progress: value }),
+          process.env.GO_TRAINER_BUNDLED_RUNTIME,
         );
       if (platform.key === 'darwin-arm64') {
         for (const bottle of bottles) {

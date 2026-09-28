@@ -16,9 +16,9 @@ katago/
   connection.json             选择的引擎连接（无密钥）
 ```
 
-服务先开始监听，再后台安装、下载、预热；页面不等待 GPU。首次启动需要网络和数百 MB 下载空间，解压和模型缓存额外占用空间。启动以一次分析成功作为 ready 条件。下载失败或平台不支持时显示错误，棋盘仍可用。
+服务先开始监听，再后台安装、下载、预热；页面不等待 GPU。源码启动和未内置所需资源的安装包首次启动需要网络和数百 MB 下载空间，解压和模型缓存额外占用空间。启动以一次分析成功作为 ready 条件。下载失败或平台不支持时显示错误，棋盘仍可用。
 
-下载采用 HTTPS、固定 SHA-256、临时文件、最终校验和重命名。网络错误自动重试最多 3 次，支持 HTTP Range 续传；服务端忽略 Range 时从头写入。中断后未通过验证的文件不会执行。手动停止删除未完成下载，意外断网留下的 partial 在下次启动尝试续传。文件损坏会重新下载。安装锁防止多个本地实例同时展开资源，失效锁可恢复。
+下载采用 HTTPS、固定 SHA-256、临时文件、最终校验和重命名。网络错误自动重试最多 3 次，支持 HTTP Range 续传；服务端忽略 Range 时从头写入。中断后未通过验证的文件不会执行。手动停止删除未完成下载，意外断网留下的 partial 在下次启动尝试续传。文件损坏时优先从安装包中已校验的资源修复，否则重新下载。下载失败时显示资源名称、来源主机及可用的底层网络错误代码。安装锁防止多个本地实例同时展开资源，失效锁可恢复。
 
 ## 版本与来源
 
@@ -31,7 +31,7 @@ katago/
 - HumanSL `b18c384nbt-humanv0.bin.gz` 来自 [KataGo 1.15.0 官方资产](https://github.com/lightvector/KataGo/releases/tag/v1.15.0)。清单摘要由该官方 HTTPS 资产计算；参考[人类模型说明](https://katagotraining.org/extra_networks/)。
 - Homebrew 资源的完整 blob SHA-256 也在下载 URL 内；Windows 摘要对照 GitHub release asset digest。
 
-KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；依赖有各自许可。安装器保留归档内 LICENSE / COPYING / COPYRIGHT / NOTICE。不将第三方二进制或权重提交到仓库。含权重安装包携带两个官方模型及[模型许可](../config/katago/MODEL-LICENSE.txt)，启动时校验并复制到用户缓存；引擎及依赖仍首次联网安装。详见[发布说明](releases.md)。
+KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；依赖有各自许可。安装器保留归档内 LICENSE / COPYING / COPYRIGHT / NOTICE。不将第三方二进制或权重提交到仓库。普通版安装包携带两个官方模型及[模型许可](../config/katago/MODEL-LICENSE.txt)，启动时校验并复制到用户缓存；普通版安装包还携带对应平台的引擎及依赖归档（Windows OpenCL ZIP 或 macOS Metal Homebrew bottles），启动时优先使用已校验的缓存或 `GO_TRAINER_BUNDLED_RUNTIME` 指向的内置归档，缺失/损坏时才下载。minimal 安装包不预置引擎、DLL 或动态库依赖，首次启动时联网下载引擎、依赖和模型。两种平台的普通版均可离线安装引擎、依赖和模型；Windows 仍需显卡 OpenCL 驱动，macOS 无需安装 Homebrew。详见[发布说明](releases.md)。
 
 ## 控制与进程退出
 

@@ -1,6 +1,6 @@
 # 发布桌面应用
 
-GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10/11 x64 × 含/不含权重、macOS 15+ Apple Silicon × 含/不含权重。无 32 位、Windows 7/8 或 Intel Mac 构建。安装包暂未使用开发者证书签名或 Apple 公证。
+GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10/11 x64 × 普通版/minimal 版、macOS 15+ Apple Silicon × 普通版/minimal 版。无 32 位、Windows 7/8 或 Intel Mac 构建。安装包暂未使用开发者证书签名或 Apple 公证。
 
 ## 发布步骤
 
@@ -16,7 +16,7 @@ git push origin main
 git push origin v0.1.0
 ```
 
-在仓库 Actions 的 `release` 工作流查看进度。构建使用 `windows-2022` x64 和 `macos-15` ARM64 runner；每个构建执行测试、TypeScript/Vite/服务构建、electron-builder 打包和权重内容校验。含权重版从固定清单下载主模型与 HumanSL，经 SHA-256 验证后才打包。模型缓存损坏时重新下载；不提交模型或二进制到 Git。
+在仓库 Actions 的 `release` 工作流查看进度。构建使用 `windows-2022` x64 和 `macos-15` ARM64 runner；每个构建执行测试、TypeScript/Vite/服务构建、electron-builder 打包、权重及各平台引擎、依赖归档内容校验。普通版从固定清单下载平台引擎、依赖、主模型与 HumanSL，经 SHA-256 验证后才打包。模型缓存损坏时重新下载；不提交模型或二进制到 Git。
 
 四个构建全部成功后，发布 job 检查文件名、数量与非空内容，生成 `SHA256SUMS.txt`，上传到草稿 Release，最后公开。仅发布 job 获得 `contents: write`，使用仓库自动提供的 `GITHUB_TOKEN`，无需配置个人 token。失败时可在 Actions 重跑；未公开的草稿可以继续上传，已公开的版本不被重写，应发布新版本。含 `-` 的版本（如 `0.2.0-beta.1`）标记为 prerelease。
 
@@ -28,16 +28,16 @@ git push origin v0.1.0
 
 ```sh
 npm ci
-npm run package:desktop -- no-models
-npm run package:desktop -- with-models
+npm run package:desktop
+npm run package:desktop -- minimal
 ```
 
-输出位于 `release/no-models/` 和 `release/with-models/`。macOS 只在 Apple Silicon 构建 arm64 DMG；Windows 只在 x64 构建 NSIS EXE。两个版本共享应用标识和用户数据目录，可相互覆盖升级。
+不带参数时构建普通版，也可显式指定 `-- standard`；`-- minimal` 构建 minimal 版。输出分别位于 `release/standard/` 和 `release/minimal/`。普通版安装包不带版本类型后缀，minimal 版带 `-minimal` 后缀。macOS 只在 Apple Silicon 构建 arm64 DMG；Windows 只在 x64 构建 NSIS EXE。两个版本共享应用标识和用户数据目录，可相互覆盖升级。
 
 应用图标和界面共用 `public/logo.svg`。构建时自动生成多分辨率 Windows ICO、macOS ICNS 和窗口 PNG，输出到忽略提交的 `.local/icons/`；修改 logo 后重新构建即可。
 
-`with-models` 在 `Resources/katago-models/` 携带主模型、HumanSL、来源摘要及上游模型许可。启动时优先复用用户数据目录内校验通过的权重，再从安装包复制，缺失/损坏时才联网下载。`no-models` 不携带这部分资源。两者都在首次运行联网安装 KataGo 可执行文件及依赖，因此含权重版不是完整离线包。
+普通版在 `Resources/katago-models/` 携带主模型、HumanSL、来源摘要及上游模型许可。启动时优先复用用户数据目录内校验通过的权重，再从安装包复制，缺失/损坏时才联网下载。普通版还在资源目录的 `katago-runtime/` 携带固定 SHA-256 校验的引擎归档：Windows 使用官方 OpenCL ZIP（含可执行文件及 DLL），macOS 使用 Metal 引擎及全部动态库依赖的 Homebrew bottles，并保留上游声明。首次启动从内置归档安装，无需联网下载引擎、依赖或模型；Windows 需要系统已安装显卡 OpenCL 驱动，macOS 无需安装 Homebrew。`minimal` 不预置模型、KataGo 引擎或随附依赖，首次启动时联网下载。
 
-当前 CI 校验安装包内权重，但不具备目标显卡驱动，不能代替真实 Windows OpenCL、macOS Metal 和安装流程的验证。公开发布前后应在目标系统检查安装、启动、引擎分析及退出。
+当前 CI 校验安装包内权重和各平台引擎、依赖归档，但不具备目标显卡驱动，不能代替真实 Windows OpenCL、macOS Metal 和安装流程的验证。公开发布前后应在目标系统检查安装、启动、引擎分析及退出。
 
 配置依据：[GitHub runner 平台](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)、[electron-builder v26 配置](https://www.electron.build/v26/docs/configuration/)、[KataGo 模型许可](https://katagotraining.org/network_license/)。

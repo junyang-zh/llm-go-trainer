@@ -19,6 +19,7 @@ app
       process.env.GO_TRAINER_DATA_DIR = join(app.getPath('userData'), 'katago');
       process.env.GO_TRAINER_SETTINGS_DIR = join(app.getPath('userData'), 'settings');
       process.env.GO_TRAINER_BUNDLED_MODELS = join(process.resourcesPath, 'katago-models');
+      process.env.GO_TRAINER_BUNDLED_RUNTIME = join(process.resourcesPath, 'katago-runtime');
     }
     const { startServer } = await import(
       pathToFileURL(join(__dirname, '../dist-server/index.js')).href

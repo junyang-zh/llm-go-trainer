@@ -11,9 +11,9 @@ if (process.env.GITHUB_REF_TYPE !== 'tag' || tag !== `v${version}`)
 const directory = 'release-assets';
 const expected = ['windows-x64', 'mac-arm64']
   .flatMap((platform) =>
-    ['with-models', 'no-models'].map(
+    ['standard', 'minimal'].map(
       (variant) =>
-        `LLM-Go-Trainer-${version}-${platform}-${variant}.${platform.startsWith('mac') ? 'dmg' : 'exe'}`,
+        `LLM-Go-Trainer-${version}-${platform}${variant === 'minimal' ? '-minimal' : ''}.${platform.startsWith('mac') ? 'dmg' : 'exe'}`,
     ),
   )
   .sort();

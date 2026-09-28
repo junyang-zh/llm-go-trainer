@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { downloadArtifact } from '../server/download';
 import { runtimePlatform } from '../server/installer';
 import { safeArchivePath } from '../server/archive';
@@ -174,4 +174,49 @@ it('restarts a partial download when the server ignores Range', async () => {
     () => {},
   );
   expect(await readFile(result)).toEqual(data);
+});
+
+it.each(['valid', 'missing', 'corrupt'])(
+  'verifies a %s bundled runtime archive before deciding whether to download',
+  async (kind) => {
+    const cache = join(directory, `runtime-cache-${kind}`);
+    const bundle = join(directory, `runtime-bundle-${kind}`);
+    await mkdir(bundle);
+    if (kind !== 'missing') await writeFile(join(bundle, sha256), kind === 'valid' ? data : 'bad');
+    const count = requests;
+    const result = await downloadArtifact(
+      { name: 'KataGo', url: base + '/runtime', sha256 },
+      cache,
+      new AbortController().signal,
+      () => {},
+      bundle,
+    );
+    expect(await readFile(result)).toEqual(data);
+    expect(requests - count).toBe(kind === 'valid' ? 0 : 1);
+  },
+);
+
+it('reports the failed artifact, host and network cause after retries', async () => {
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }),
+      }),
+    );
+  const progress = vi.fn();
+  try {
+    await expect(
+      downloadArtifact(
+        { name: 'KataGo OpenCL', url: 'https://example.invalid/runtime', sha256 },
+        join(directory, 'failed-runtime'),
+        new AbortController().signal,
+        progress,
+      ),
+    ).rejects.toThrow('KataGo OpenCL 下载失败（example.invalid）：fetch failed [ETIMEDOUT]');
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(progress).toHaveBeenCalledWith({ label: 'KataGo OpenCL', received: 0 });
+  } finally {
+    fetch.mockRestore();
+  }
 });
