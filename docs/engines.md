@@ -28,6 +28,20 @@ Windows OpenCL 首次启动会分别为主模型和 HumanSL 模型进行 GPU 调
 
 性能复测命令：`node --import tsx scripts/benchmark-backends.ts <缓存目录> [轮数]`。读取该目录选中的真实主模型和 HumanSL，交替测试两个后端，分别输出安装检查、进程初始化和 19 路两种局面在 400 / 4000 visits 下的耗时。使用应用的分析配置，结果输出到终端；保存测量记录时请放在仓库外。运行时避免其他 GPU 负载，启动测试和分析吞吐不可混为一个指标。
 
+## 自定义引擎路径
+
+可选：已有自定义安装时设置 `KATAGO_MODEL` 启用路径覆盖，支持 CUDA/TensorRT 版本。Windows 路径使用正斜杠：
+
+```dotenv
+KATAGO_PATH=/absolute/path/to/katago
+KATAGO_MODEL=/absolute/path/to/main-model.bin.gz
+KATAGO_CONFIG=./config/katago/analysis.cfg
+KATAGO_HUMAN_MODEL=/absolute/path/to/b18c384nbt-humanv0.bin.gz
+KATAGO_TIMEOUT_MS=180000
+```
+
+主程序强制 `reportAnalysisWinratesAs=BLACK`，所有分析使用黑方视角。`.env` 文件位置见[环境配置](development.md#环境配置)。
+
 ## 模型库与选择
 
 设置中的「围棋模型」替代原有的引擎连接面板；引擎启停、外部连接仍可用，AI 教练凭据独立放在「连接 LLM」页。模型库提供推荐、已下载、全部和名称 / 网络结构搜索；显示下载大小、适用棋盘、来源与 SHA-256，并支持后台排队下载、进度、取消、失败重试及删除未选用的模型。网络中断留下的 partial 可在重试时续传；主动取消会清理正在下载的 partial。
@@ -64,6 +78,8 @@ KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；�
 `POST /api/bot-move` 继续支持 JSON，并在 `Accept: application/x-ndjson` 时发送中间 `analysis` 事件及含 `move`、`method`、`analysis` 的最终 `done` 事件。断开流会取消对应搜索。
 
 ## 控制与进程退出
+
+在「设置 → 围棋模型」启动、停止、重启引擎或配置外部 HTTP 围棋 AI。手动停止后，引擎保持停止，直到再次启动引擎或重启应用；切换引擎会先释放旧进程。外部服务由用户独立管理启停，接入方式见[适配契约](#其他围棋-ai-适配契约)。
 
 `GET /api/status` 的 `engine` 包含 `phase`、`ready`、`running`、`pid`、`backend`、下载 `progress` 和诊断 `error`。`phase` 有 idle / downloading / installing / starting / ready / stopping / stopped / error。
 
