@@ -31,7 +31,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Prepare macOS Developer ID signing and notarization
+      - name: Configure optional macOS signing and notarization
         if: runner.os == 'macOS'
         run: node scripts/prepare-macos-signing.mjs
         env:
@@ -54,7 +54,7 @@ jobs:
       - name: Verify packaged resources
         run: node --import tsx scripts/verify-package.ts ${{ matrix.variant }}
       - name: Verify macOS signature and notarization ticket
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.GO_TRAINER_REQUIRE_SIGNING == '1'
         run: node scripts/verify-macos-signing.mjs ${{ matrix.variant }}
       - name: Remove temporary macOS credentials
         if: always() && runner.os == 'macOS'

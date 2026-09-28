@@ -10,6 +10,7 @@ if (!['standard', 'minimal'].includes(variant) || process.argv.length > 3)
   throw new Error('Usage: npm run package:desktop -- [standard|minimal]');
 const mac = process.platform === 'darwin' && process.arch === 'arm64';
 const win = process.platform === 'win32' && process.arch === 'x64';
+const requireSigning = mac && process.env.GO_TRAINER_REQUIRE_SIGNING === '1';
 if (!mac && !win) throw new Error('Build on Apple Silicon macOS or Windows x64');
 const bundleRuntime = variant === 'standard';
 const root = resolve(import.meta.dirname, '..');
@@ -67,7 +68,11 @@ await build({
   publish: 'never',
   config: {
     extraMetadata: { goTrainerEdition: variant },
-    forceCodeSigning: mac && process.env.GO_TRAINER_REQUIRE_SIGNING === '1',
+    forceCodeSigning: requireSigning,
+    mac: {
+      notarize: requireSigning,
+      ...(requireSigning ? {} : { identity: null }),
+    },
     generateUpdatesFilesForAllChannels: false,
     detectUpdateChannel: false,
     publish: [

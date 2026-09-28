@@ -55,7 +55,8 @@ app
       canInstall =
         signature.status === 0 && /^Authority=Developer ID Application:/m.test(signature.stderr);
       if (!canInstall)
-        reason = '此 macOS 安装包未使用 Developer ID 签名，请从 GitHub 安装签名版本后启用自动安装';
+        reason =
+          '此 macOS 安装包未使用 Developer ID 签名，请打开 GitHub Release 下载并手动安装更新';
     }
     const { autoUpdater } = supported ? require('electron-updater') : {};
     updates = new DesktopUpdates({

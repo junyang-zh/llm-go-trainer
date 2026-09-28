@@ -4,7 +4,7 @@
 
 ## 下载安装包
 
-前往 [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/releases)，选择 Windows 10/11 x64 的 `.exe` 或 macOS 15+ Apple Silicon 的 `.dmg`。每个平台提供普通版（含引擎、依赖、主模型与 HumanSL 权重）和 `minimal`（首次运行下载引擎、DLL/依赖和权重）两种版本，功能相同。普通版可离线准备引擎和模型：Windows 内置 OpenCL 引擎及随附 DLL（仍需显卡 OpenCL 驱动），macOS 内置 Metal 引擎及动态库依赖，无需安装 Homebrew。macOS 正式发布使用 Developer ID 签名和 Apple 公证；Windows 安装器尚未配置代码签名。
+前往 [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/releases)，选择 Windows 10/11 x64 的 `.exe` 或 macOS 15+ Apple Silicon 的 `.dmg`。每个平台提供普通版（含引擎、依赖、主模型与 HumanSL 权重）和 `minimal`（首次运行下载引擎、DLL/依赖和权重）两种版本，功能相同。普通版可离线准备引擎和模型：Windows 内置 OpenCL 引擎及随附 DLL（仍需显卡 OpenCL 驱动），macOS 内置 Metal 引擎及动态库依赖，无需安装 Homebrew。macOS 在发布凭据齐全时使用 Developer ID 签名和 Apple 公证，否则提供未签名、未公证的安装包；Windows 安装器尚未配置代码签名。
 
 ## 启动 Electron 桌面应用
 
@@ -54,7 +54,7 @@ Web 模式需在终端按 `Ctrl+C` 关闭服务；关闭浏览器标签页不会
 | 棋谱     | 野狐/星阵导出的标准 SGF；UTF-8 / GB18030；根摆子与主线；SGF 导出                |
 | 教练     | Markdown 流式对话、工具搜索与执行记录；解释选点、局势和变化；停止分析、导出证据 |
 | LLM      | DeepSeek API、Codex CLI、Claude Code CLI 适配器                                 |
-| 桌面     | Electron；GitHub Release 更新；macOS 发布签名及公证，Windows NSIS 安装器            |
+| 桌面     | Electron；GitHub Release 更新；macOS 可选签名及公证，Windows NSIS 安装器        |
 
 SGF 有多个变体时只导入第一条主线；原注释与分支不写入训练记录。中途摆子/修改行棋方的特殊 SGF 会明确拒绝。日本规则可以对战与引擎分析，正式终局数目尚未实现。HumanSL 等级不等于野狐/星阵认证等级。当前没有平台账号直连、整局自动批量讲解、读秒、认输、持久化分析缓存。
 

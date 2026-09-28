@@ -1,6 +1,6 @@
 # 发布桌面应用
 
-GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10/11 x64 × 普通版/minimal 版、macOS 15+ Apple Silicon × 普通版/minimal 版。无 32 位、Windows 7/8 或 Intel Mac 构建。macOS 正式发布要求 Developer ID 签名与 Apple 公证；Windows 安装器尚未配置代码签名。
+GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10/11 x64 × 普通版/minimal 版、macOS 15+ Apple Silicon × 普通版/minimal 版。无 32 位、Windows 7/8 或 Intel Mac 构建。macOS 在发布凭据齐全时启用 Developer ID 签名与 Apple 公证，否则构建未签名、未公证的安装包；Windows 安装器尚未配置代码签名。
 
 ## 发布步骤
 
@@ -46,7 +46,7 @@ npm run package:desktop -- minimal
 
 普通版使用 `latest.yml` / `latest-mac.yml`，minimal 使用 `minimal.yml` / `minimal-mac.yml`。这些文件由 electron-builder 生成；macOS 更新读取 ZIP，Windows 更新读取 NSIS EXE。更新器只检查稳定 Release，验证下载摘要并拒绝其他平台或版本类型的文件。更新配置保存到 Electron userData 的 `updates.json`，默认关闭自动更新；下载完成后由用户点击“重启并安装”。
 
-macOS 发布任务需要在仓库 **Settings → Secrets and variables → Actions** 配置以下 Secrets：
+如需启用 macOS 签名和公证，请在仓库 **Settings → Secrets and variables → Actions** 配齐以下 Secrets：
 
 | Secret                       | 内容                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------ |
@@ -56,8 +56,8 @@ macOS 发布任务需要在仓库 **Settings → Secrets and variables → Actio
 | `APPLE_API_KEY_ID`           | 对应 API Key ID                                                          |
 | `APPLE_API_ISSUER`           | 对应 Issuer ID                                                           |
 
-Developer ID Application 证书和 API 密钥需在 Apple Developer 账号中创建，并在后续发布中保持签名身份一致。不要将证书、私钥、密码提交到仓库或写入应用配置。CI 只将证书和公证密钥写入 runner 临时目录；electron-builder 导入证书、启用 Hardened Runtime、签名并提交 Apple 公证，随后校验签名和公证票据，最后清理临时文件。缺失配置或签名、公证失败会阻止 macOS 发布，也不会公开不完整 Release。
+Developer ID Application 证书和 API 密钥需在 Apple Developer 账号中创建，并在后续发布中保持签名身份一致。不要将证书、私钥、密码提交到仓库或写入应用配置。CI 检查上述五项凭据：未配置或配置不齐全时，在日志中列出缺失的配置名称，关闭签名身份自动发现并跳过签名、公证及票据校验，继续发布未签名安装包。凭据齐全时，CI 只将证书和公证密钥写入 runner 临时目录；electron-builder 导入证书、启用 Hardened Runtime、签名并提交 Apple 公证，随后校验签名和公证票据，最后清理临时文件。启用后的签名、公证或校验失败会阻止发布，不会回退为未签名包，也不会公开不完整 Release。
 
-本地未配置签名材料时可使用 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run package:desktop` 构建测试包；该包可测试界面及更新检查，不能用于验证 macOS 自动安装。完整验证需使用签名安装版，从已安装版本更新到更高版本，并分别验证普通版和 minimal 的数据保留、退出及重新启动。
+本地 `npm run package:desktop` 默认构建未签名、未公证的 macOS 包；该包可检查更新并打开 GitHub Release 手动下载安装，不能自动安装更新。首次运行可能受到 macOS 安全检查拦截。若要本地签名构建，需要配置 electron-builder 签名和公证凭据，并设置 `GO_TRAINER_REQUIRE_SIGNING=1`。完整验证需使用签名安装版，从已安装版本更新到更高版本，并分别验证普通版和 minimal 的数据保留、退出及重新启动。
 
 依据：[Electron macOS 自动更新签名要求](https://www.electronjs.org/docs/latest/api/auto-updater#macos)。

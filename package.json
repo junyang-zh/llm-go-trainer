@@ -83,7 +83,7 @@
       "category": "public.app-category.education",
       "minimumSystemVersion": "15.0.0",
       "hardenedRuntime": true,
-      "notarize": true
+      "notarize": false
     },
     "win": {
       "icon": ".local/icons/icon.ico",
