@@ -112,20 +112,14 @@ export function Board({
               />
             )}
             {color && trial && (
-              <g className="trial-stone" aria-label={`${toPoint(i, size)} 试下`}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="10.8"
-                  fill="none"
-                  stroke={color === 'B' ? '#777e6e' : '#b5b3a4'}
-                  strokeWidth="1"
-                />
-                <rect x={x + 4} y={y - 17} width="14" height="14" rx="3" fill="#a44e27" />
-                <text x={x + 11} y={y - 6} textAnchor="middle" fontSize="10" fill="white">
-                  试
-                </text>
-              </g>
+              <circle
+                className="trial-stone"
+                aria-label={`${toPoint(i, size)} 试下`}
+                cx={x + 10}
+                cy={y - 10}
+                r="3.2"
+                fill="#c44f43"
+              />
             )}
             {Math.abs(own) > 0.15 && (
               <rect

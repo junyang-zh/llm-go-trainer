@@ -132,6 +132,56 @@ async function checkLayout() {
     cancelAnimationFrame(animation);
   }
   if (issues.size) throw new Error([...issues].join('; '));
+  const timeline = document.querySelector('.timeline');
+  const track = document.querySelector('.timeline-control');
+  async function seek(value) {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(timeline, value);
+    timeline.dispatchEvent(new Event('input', { bubbles: true }));
+    await delay(30);
+  }
+  await seek(2);
+  document
+    .querySelector('[aria-label="C4 空点"]')
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await until(() => document.querySelector('[aria-label="C4 试下"]'));
+  if (timeline.value !== '3' || timeline.max !== '3')
+    throw new Error('Trial timeline does not end at the current trial move');
+  if (!document.querySelector('[aria-label="下一手"]').disabled)
+    throw new Error('Trial allows advancing into future history');
+  const trackWidth = track.getBoundingClientRect().width;
+  const trialWidth = timeline.getBoundingClientRect().width;
+  if (Math.abs(trialWidth - (16 + (trackWidth - 16) / 2)) > 1)
+    throw new Error('Trial thumb is not aligned with its position on the full history scale');
+  const trackBackground = getComputedStyle(track, '::before').backgroundImage;
+  if (
+    !['75, 112, 86', '196, 79, 67', '203, 209, 198'].every((color) =>
+      trackBackground.includes(color),
+    )
+  )
+    throw new Error('History, trial, and future timeline segments are missing');
+  await seek(6);
+  if (timeline.value !== '3') throw new Error('Trial slider entered future history');
+  for (const point of ['E4', 'F4', 'G4', 'H4']) {
+    document
+      .querySelector(`[aria-label="${point} 空点"]`)
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await until(() => document.querySelector(`[aria-label="${point} 试下"]`));
+  }
+  if (
+    timeline.value !== '7' ||
+    Math.abs(timeline.getBoundingClientRect().width - track.getBoundingClientRect().width) > 1
+  )
+    throw new Error('Trial beyond the original history does not extend the timeline');
+  document.querySelector('[aria-label="上一手"]').click();
+  await until(() => timeline.value === '6');
+  if (document.querySelector('[aria-label="H4 试下"]'))
+    throw new Error('Previous move did not undo the latest trial stone');
+  await seek(3);
+  if (document.querySelectorAll('.trial-stone').length !== 1)
+    throw new Error('Slider did not rewind the trial');
+  await seek(1);
+  if (document.querySelector('.trial-stone') || timeline.max !== '6')
+    throw new Error('Seeking into history did not exit the trial');
   return { viewport: [innerWidth, innerHeight], board: initial.width, samples };
 }
 

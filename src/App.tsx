@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useLibrary } from './useLibrary';
 import { gameTitle, type BoardContext } from '../shared/library';
 import { trialStoneIndices } from '../shared/trial';
@@ -188,8 +188,15 @@ export default function App() {
   }
   function navigate(value: number) {
     if (lock.current) return;
+    if (trialMoves.length && value >= current.moves.length) return;
+    // Rewinding a trial discards its suffix. Pause AI so it cannot replay the undone move.
+    if (trialMoves.length) setAutoPlay(false);
     invalidate();
-    setTurn(Math.max(0, Math.min(game.moves.length, value)));
+    if (trialMoves.length && value > turn) {
+      setTrialMoves(trialMoves.slice(0, value - turn));
+    } else {
+      setTurn(Math.max(0, Math.min(game.moves.length, value)));
+    }
   }
   function changeGame(next: Game, resetEvaluations = false) {
     if (resetEvaluations) evaluations.reset();
@@ -432,6 +439,9 @@ export default function App() {
   const workspaceError =
     error || library.error || (status?.engine.phase === 'error' ? engineProgress : '');
   const workspaceStatus = workspaceError || busy || engineProgress || notice;
+  const timelineTurn = current.moves.length;
+  const timelineTotal = Math.max(game.moves.length, timelineTurn, 1);
+  const timelineLimit = trialMoves.length ? timelineTurn : Math.max(game.moves.length, 1);
   return (
     <main className={`workspace${chatCollapsed ? ' chat-collapsed' : ''}`}>
       <section className="board-panel" aria-label="棋盘">
@@ -559,31 +569,47 @@ export default function App() {
             <div className="move-controls">
               <button
                 aria-label="上一手"
-                disabled={locked || !turn}
-                onClick={() => navigate(turn - 1)}
+                disabled={locked || !timelineTurn}
+                onClick={() => navigate(timelineTurn - 1)}
               >
                 ←
               </button>
               <span>
-                <b>{turn}</b> / {game.moves.length} 手
+                <b>{timelineTurn}</b> / {Math.max(game.moves.length, timelineTurn)} 手
               </span>
               <button
                 aria-label="下一手"
-                disabled={locked || turn === game.moves.length}
+                disabled={locked || !!trialMoves.length || turn === game.moves.length}
                 onClick={() => navigate(turn + 1)}
               >
                 →
               </button>
-              <input
-                className="timeline"
-                aria-label="复盘手数"
-                type="range"
-                min="0"
-                max={Math.max(game.moves.length, 1)}
-                value={turn}
-                disabled={locked}
-                onChange={(e) => navigate(+e.target.value)}
-              />
+              <div
+                className={`timeline-control${trialMoves.length ? ' trial' : ''}`}
+                style={
+                  {
+                    '--history-progress': `${(turn / timelineTotal) * 100}%`,
+                    '--trial-progress': `${(timelineTurn / timelineTotal) * 100}%`,
+                    '--timeline-reachable': timelineLimit / timelineTotal,
+                  } as CSSProperties
+                }
+              >
+                <input
+                  className="timeline"
+                  aria-label="复盘手数"
+                  aria-valuetext={
+                    trialMoves.length
+                      ? `第 ${timelineTurn} 手，试下 ${trialMoves.length} 手，起点第 ${turn} 手`
+                      : `第 ${turn} 手，共 ${game.moves.length} 手`
+                  }
+                  type="range"
+                  min="0"
+                  max={timelineLimit}
+                  value={timelineTurn}
+                  disabled={locked}
+                  onChange={(e) => navigate(+e.target.value)}
+                />
+              </div>
             </div>
           )}
           <div className="board-tools">

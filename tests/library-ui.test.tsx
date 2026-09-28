@@ -64,6 +64,83 @@ async function point(point: string) {
   expect(target).not.toBeNull();
   await act(async () => target.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
+async function seek(turn: number) {
+  const input = host.querySelector<HTMLInputElement>('.timeline')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, turn);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+async function previous() {
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="上一手"]')!;
+  expect(button.disabled).toBe(false);
+  await act(async () => button.click());
+}
+it('rewinds trial moves with buttons and the timeline without entering future history', async () => {
+  await act(async () => root.render(<App />));
+  await seek(1);
+  await point('D4');
+  await point('E4');
+  const timeline = () => host.querySelector<HTMLInputElement>('.timeline')!;
+  const next = () => host.querySelector<HTMLButtonElement>('[aria-label="下一手"]')!;
+  expect(timeline().value).toBe('3');
+  expect(next().disabled).toBe(true);
+  await previous();
+  expect(timeline().value).toBe('2');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="E4 空点"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="G7 空点"]')).not.toBeNull();
+  expect(timeline().max).toBe('2');
+  await seek(3);
+  await act(async () => next().click());
+  expect(timeline().value).toBe('2');
+  expect(host.querySelectorAll('.trial-stone')).toHaveLength(1);
+  await point('F4');
+  await point('G4');
+  expect(timeline().value).toBe('4');
+  expect(timeline().max).toBe('4');
+  await seek(3);
+  expect(host.querySelectorAll('.trial-stone')).toHaveLength(2);
+  expect(host.querySelector('[aria-label="G4 空点"]')).not.toBeNull();
+  await seek(1);
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(next().disabled).toBe(false);
+  expect(timeline().max).toBe('3');
+  await act(async () => next().click());
+  expect(host.querySelector('[aria-label="G7 白子"]')).not.toBeNull();
+  expect(saved.games.find((game) => game.id === firstGameId)!.game.moves).toEqual(
+    libraryFixture.games[0].game.moves,
+  );
+});
+it('can rewind a trial from move zero and jump directly back into earlier history', async () => {
+  await act(async () => root.render(<App />));
+  await seek(0);
+  await point('D4');
+  await previous();
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('0');
+  expect(host.querySelector<HTMLButtonElement>('[aria-label="上一手"]')!.disabled).toBe(true);
+  await seek(2);
+  await point('D4');
+  await point('E4');
+  await seek(1);
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector('[aria-label="G7 空点"]')).not.toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('1');
+});
+it('pauses automatic play when undoing its trial move so it does not replay the move', async () => {
+  engineReady = true;
+  await act(async () => root.render(<App />));
+  await seek(1);
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('[aria-label="AI 自动落子"]')!.click(),
+  );
+  expect(host.querySelector('[aria-label="E5 试下"]')).not.toBeNull();
+  await previous();
+  expect(host.querySelector<HTMLInputElement>('[aria-label="AI 自动落子"]')!.checked).toBe(false);
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
+});
 it('keeps a conversation across navigation and games, snapshots trial context, restores conversations and branches independently', async () => {
   await act(async () => root.render(<App />));
   await click('当前局势');

@@ -242,10 +242,71 @@ h2 {
   font-size: 12px;
   white-space: nowrap;
 }
-.move-controls .timeline {
+.timeline-control {
+  --timeline-thumb: #4b7056;
+  position: relative;
   flex: 1;
+  min-width: 0;
   max-width: 260px;
   margin: 0 6px;
+  height: 24px;
+}
+.timeline-control.trial {
+  --timeline-thumb: #c44f43;
+}
+.timeline-control::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 9px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    #4b7056 0 var(--history-progress),
+    #c44f43 var(--history-progress) var(--trial-progress),
+    #cbd1c6 var(--trial-progress) 100%
+  );
+  pointer-events: none;
+}
+.timeline-control .timeline {
+  position: relative;
+  display: block;
+  appearance: none;
+  /* Keep the thumb on the full history scale, but make future history unreachable in trials. */
+  width: calc(16px + (100% - 16px) * var(--timeline-reachable));
+  height: 24px;
+  margin: 0;
+  background: transparent;
+}
+.timeline::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+}
+.timeline::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--timeline-thumb);
+}
+.timeline::-moz-range-track {
+  height: 6px;
+  background: transparent;
+}
+.timeline::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--timeline-thumb);
+}
+.timeline:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 .variation-bar {
   background: #e4ecdf;
