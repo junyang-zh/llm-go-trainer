@@ -2,8 +2,20 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { AnalysisEngine, AnalysisOptions, EngineController } from './engine';
-import type { EngineConnection, EngineStatus, Game, Training } from '../shared/types';
-import { ensureRuntime, prepareConfig, type InstallProgress, type Runtime } from './installer';
+import type {
+  EngineConnection,
+  EngineStatus,
+  Game,
+  Training,
+  ManagedBackend,
+} from '../shared/types';
+import {
+  ensureRuntime,
+  prepareConfig,
+  runtimePlatform,
+  type InstallProgress,
+  type Runtime,
+} from './installer';
 import { KataGo, type EngineConfig } from './katago';
 import { ExternalEngine, validateEngineUrl } from './external-engine';
 import { newGame } from '../shared/go';
@@ -12,7 +24,7 @@ import type { KataGoModels } from './katago-models';
 import type { ModelSelection } from '../shared/models';
 
 export const connectionSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('managed') }),
+  z.object({ mode: z.literal('managed'), backend: z.enum(['opencl', 'cuda']).optional() }),
   z.object({
     mode: z.literal('external'),
     name: z.string().trim().min(1).max(60),
@@ -34,7 +46,11 @@ interface Options {
   root: string;
   directory: string;
   configured?: EngineConfig;
-  install?: (signal: AbortSignal, progress: (state: InstallProgress) => void) => Promise<Runtime>;
+  install?: (
+    signal: AbortSignal,
+    progress: (state: InstallProgress) => void,
+    backend?: ManagedBackend,
+  ) => Promise<Runtime>;
   factory?: (config: EngineConfig) => KataGo;
   models?: KataGoModels;
 }
@@ -66,6 +82,12 @@ export class EngineManager implements AnalysisEngine, EngineController {
       };
     return {
       ...this.state,
+      availableBackends:
+        !this.options.configured && process.platform === 'win32' && process.arch === 'x64'
+          ? ['opencl', 'cuda']
+          : undefined,
+      selectedBackend:
+        this.selected.mode === 'managed' ? (this.selected.backend ?? 'opencl') : undefined,
       running: live?.running ?? false,
       pid: live?.pid,
       humanModel: live?.humanModel ?? false,
@@ -132,15 +154,17 @@ export class EngineManager implements AnalysisEngine, EngineController {
                 },
                 backend: '自定义',
               }
-            : await (this.options.install?.(controller.signal, (value) =>
-                Object.assign(this.state, value),
+            : await (this.options.install?.(
+                controller.signal,
+                (value) => Object.assign(this.state, value),
+                this.selected.backend,
               ) ??
                 ensureRuntime(
                   this.options.root,
                   this.options.directory,
                   controller.signal,
                   (value) => Object.assign(this.state, value),
-                  undefined,
+                  runtimePlatform(undefined, undefined, undefined, this.selected.backend),
                   this.options.models?.artifacts(selection),
                 ));
           controller.signal.throwIfAborted();
@@ -241,6 +265,10 @@ export class EngineManager implements AnalysisEngine, EngineController {
   }
   connect(input: EngineConnection) {
     const connection = connectionSchema.parse(input);
+    if (connection.mode === 'managed' && connection.backend) {
+      if (this.options.configured) throw new Error('自定义引擎不支持切换内置后端');
+      runtimePlatform(undefined, undefined, undefined, connection.backend);
+    }
     return this.enqueue(async () => {
       // Selecting the current connection is idempotent. Only an explicit restart replaces it.
       if (JSON.stringify(connection) === JSON.stringify(this.selected)) {

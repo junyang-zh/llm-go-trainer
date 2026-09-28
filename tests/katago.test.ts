@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { KataGo, type EngineConfig } from '../server/katago';
 import { newGame } from '../shared/go';
 import { trainingForRank } from '../shared/training';
@@ -19,6 +22,39 @@ function engine(timeout = 5000, overrides: Partial<EngineConfig> = {}) {
 }
 afterEach(() => engines.forEach((e) => e.close()));
 describe('KataGo JSONL transport', () => {
+  it('sends native time limits independently of visits and reports measured throughput', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'go-search-limit-'));
+    const path = join(directory, 'requests.jsonl');
+    const e = engine(5000, { env: { ...process.env, FAKE_KATAGO_REQUEST_FILE: path } });
+    try {
+      const result = await e.analyze(newGame(9, 0, 1), {
+        ...trainingForRank('5k'),
+        searchLimit: 'time',
+        maxTime: 0.2,
+      });
+      expect(result.searchStats!.elapsedMs).toBeGreaterThan(0);
+      expect(result.searchStats!.visitsPerSecond).toBeCloseTo(
+        (result.rootInfo.visits * 1000) / result.searchStats!.elapsedMs,
+      );
+      await e.analyze(newGame(9), {
+        ...trainingForRank('5k'),
+        visits: 1234,
+        searchLimit: 'visits',
+        maxTime: 0.2,
+      });
+      const [timed, counted] = (await readFile(path, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      expect(timed.maxVisits).toBe(1000000000);
+      expect(timed.overrideSettings.maxTime).toBe(0.2);
+      expect(counted.maxVisits).toBe(1234);
+      expect(counted.overrideSettings.maxTime).toBeUndefined();
+    } finally {
+      await e.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
   it('allows GPU initialization longer than the normal analysis timeout and reports tuning', async () => {
     const e = engine(100, {
       prefixArgs: [resolve('tests/fixtures/slow-start-katago.mjs')],

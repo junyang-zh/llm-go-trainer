@@ -38,9 +38,11 @@ export function EngineSettings(props: {
 function EngineConnectionSettings({
   status,
   onChange,
+  busy,
 }: {
   status?: EngineStatus;
   onChange: (status: EngineStatus) => void;
+  busy?: boolean;
 }) {
   const [name, setName] = useState('外部围棋 AI');
   const [url, setUrl] = useState('');
@@ -132,6 +134,27 @@ function EngineConnectionSettings({
           </option>
         </select>
       </label>
+      {!external && !!status?.availableBackends?.length && (
+        <label>
+          计算后端
+          <select
+            value={status.selectedBackend ?? 'opencl'}
+            disabled={!!working || busy || status.phase === 'stopping'}
+            onChange={(event) =>
+              void control('connect', {
+                mode: 'managed',
+                backend: event.target.value as 'opencl' | 'cuda',
+              })
+            }
+          >
+            {status.availableBackends.map((backend) => (
+              <option key={backend} value={backend}>
+                {backend === 'cuda' ? 'CUDA（NVIDIA）' : 'OpenCL'}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {external && (
         <button
           className="engine-address"

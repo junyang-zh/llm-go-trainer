@@ -126,6 +126,8 @@ it('rejects checksum mismatch and removes interrupted partial downloads', async 
 it('selects the intended GPU distributions and rejects unsupported platforms explicitly', () => {
   expect(runtimePlatform('darwin', 'arm64', '24.0.0').backend).toBe('Metal');
   expect(runtimePlatform('win32', 'x64', '10.0').backend).toBe('OpenCL');
+  expect(runtimePlatform('win32', 'x64', '10.0', 'cuda').backend).toBe('CUDA');
+  expect(() => runtimePlatform('darwin', 'arm64', '24', 'cuda')).toThrow('Windows x64');
   expect(() => runtimePlatform('darwin', 'x64', '24')).toThrow('外部引擎');
 });
 it.each(['../escape', '/absolute', 'C:/absolute', 'nested/../escape', 'nested\\escape'])(
@@ -197,13 +199,11 @@ it.each(['valid', 'missing', 'corrupt'])(
 );
 
 it('reports the failed artifact, host and network cause after retries', async () => {
-  const fetch = vi
-    .spyOn(globalThis, 'fetch')
-    .mockRejectedValue(
-      new TypeError('fetch failed', {
-        cause: Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }),
-      }),
-    );
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+    new TypeError('fetch failed', {
+      cause: Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }),
+    }),
+  );
   const progress = vi.fn();
   try {
     await expect(

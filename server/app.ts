@@ -185,8 +185,24 @@ export function createApp(
       res.status(400).json({ error: '双方已停一手；请复盘或开始新对局。' });
       return;
     }
-    const analysis = await engine.analyze(game, training);
-    res.json({ ...selectMove(game, analysis, training), analysis });
+    if (!req.headers.accept?.includes('application/x-ndjson')) {
+      const analysis = await engine.analyze(game, training);
+      res.json({ ...selectMove(game, analysis, training), analysis });
+      return;
+    }
+    const stream = openStream(res);
+    try {
+      const analysis = await engine.analyze(game, training, {
+        signal: stream.signal,
+        onProgress: (value) =>
+          stream.send({ type: 'analysis', phase: 'after', analysis: value, final: false }),
+      });
+      stream.send({ type: 'done', ...selectMove(game, analysis, training), analysis });
+    } catch (error) {
+      stream.send({ type: 'error', error: error instanceof Error ? error.message : '分析失败' });
+    } finally {
+      stream.close();
+    }
   });
   let coaching = false;
   app.post('/api/coach', async (req, res) => {

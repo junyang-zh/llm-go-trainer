@@ -58,11 +58,14 @@ module.exports = function layoutApi() {
   router.post('/bot-move', (req, res) => {
     const { game } = req.body;
     setTimeout(() => {
-      res.json({
+      const result = {
         move: ['Q16', 'D16', 'Q17'][Math.floor(game.moves.length / 2)],
         method: '测试对手',
         analysis: analysis(game),
-      });
+      };
+      if (req.headers.accept?.includes('application/x-ndjson')) {
+        res.type('application/x-ndjson').end(JSON.stringify({ type: 'done', ...result }) + '\n');
+      } else res.json(result);
     }, 250);
   });
   router.post('/coach', (req, res) => {

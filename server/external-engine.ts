@@ -31,7 +31,11 @@ export class ExternalEngine implements AnalysisEngine {
     if (this.closed) throw new Error('外部引擎已断开');
     const signal = AbortSignal.any([
       this.controller.signal,
-      AbortSignal.timeout(this.timeout),
+      AbortSignal.timeout(
+        training.searchLimit === 'time'
+          ? Math.max(this.timeout, (training.maxTime ?? 5) * 1000 + 10000)
+          : this.timeout,
+      ),
       ...(options.signal ? [options.signal] : []),
     ]);
     const response = await fetch(this.connection.url, {

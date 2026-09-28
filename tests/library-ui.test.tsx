@@ -31,8 +31,6 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (path, body) => {
     if (path === 'status')
       return { ...chatStatus, engine: { ...chatStatus.engine, ready: engineReady } };
-    if (path === 'bot-move')
-      return libraryBotMove((body as { game: import('../shared/types').Game }).game);
     if (path === 'library') return structuredClone(saved);
     const kind = path === 'library/games' ? 'games' : 'conversations';
     const record = structuredClone(body) as Library[typeof kind][number];
@@ -42,7 +40,13 @@ beforeEach(() => {
     ];
     return record;
   });
-  vi.mocked(streamApi).mockImplementation(async (_path, _body, emit) => {
+  vi.mocked(streamApi).mockImplementation(async (path, body, emit) => {
+    if (path === 'bot-move') {
+      const result = libraryBotMove((body as { game: import('../shared/types').Game }).game);
+      emit({ type: 'analysis', phase: 'after', analysis: result.analysis, final: false });
+      emit({ type: 'done', ...result });
+      return;
+    }
     emit({ type: 'done', answer: chatAnswer, analysis: null });
   });
   host = document.createElement('div');
@@ -231,10 +235,10 @@ it('pauses automatic play when undoing its trial move so it does not replay the 
   await previous();
   expect(host.querySelector<HTMLInputElement>('[aria-label="AI 自动落子"]')!.checked).toBe(false);
   expect(host.querySelector('.trial-stone')).toBeNull();
-  expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
+  expect(vi.mocked(streamApi).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
   await next();
   expect(host.querySelector('[aria-label="E5 试下"]')).not.toBeNull();
-  expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
+  expect(vi.mocked(streamApi).mock.calls.filter(([path]) => path === 'bot-move')).toHaveLength(1);
 });
 it('restores captured stones when rewinding and replaces only the future when passing', async () => {
   saved.games[0].game = structuredClone(captureTrialGame);
@@ -411,7 +415,7 @@ it('AI and manual moves from history share a trial branch; forking makes followi
   await point('F5');
   expect(host.querySelectorAll('.trial-stone')).toHaveLength(3);
   expect(host.querySelector('[aria-label="G5 试下"]')).not.toBeNull();
-  const requests = vi.mocked(api).mock.calls.filter(([path]) => path === 'bot-move');
+  const requests = vi.mocked(streamApi).mock.calls.filter(([path]) => path === 'bot-move');
   expect(requests).toHaveLength(2);
   expect((requests[1][1] as { game: { moves: unknown[] } }).game.moves).toHaveLength(3);
   await act(async () =>

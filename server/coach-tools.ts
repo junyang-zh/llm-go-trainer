@@ -226,7 +226,7 @@ export class CoachTools {
           this.visits += search.visits;
           analysis = await this.engine.analyze(
             game,
-            { ...this.training, visits: search.visits },
+            { ...this.training, visits: search.visits, searchLimit: 'visits' },
             {
               signal,
               onProgress: (value) => {

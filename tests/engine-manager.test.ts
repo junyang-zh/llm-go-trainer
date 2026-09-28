@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { EngineManager } from '../server/engine-manager';
@@ -41,6 +41,63 @@ function alive(pid: number) {
   }
 }
 describe('managed engine lifecycle', () => {
+  it.runIf(process.platform === 'win32')(
+    'switches CUDA/OpenCL, persists the backend and reuses the model',
+    async () => {
+      const install = vi.fn(async (_signal, _progress, backend) => ({
+        config,
+        backend: backend === 'cuda' ? 'CUDA' : 'OpenCL',
+      }));
+      const manager = await create(install);
+      await manager.load();
+      await ready(manager);
+      const pid = manager.status().pid;
+      await manager.connect({ mode: 'managed', backend: 'cuda' });
+      await ready(manager);
+      expect(manager.status().backend).toBe('CUDA');
+      expect(manager.status().selectedBackend).toBe('cuda');
+      expect(manager.status().pid).not.toBe(pid);
+      expect(
+        JSON.parse(await readFile(join(directories.at(-1)!, 'connection.json'), 'utf8')),
+      ).toEqual({ mode: 'managed', backend: 'cuda' });
+      await manager.restart();
+      await ready(manager);
+      expect(manager.status().backend).toBe('CUDA');
+      await manager.close();
+      const reopened = new EngineManager({
+        root: process.cwd(),
+        directory: directories.at(-1)!,
+        install,
+      });
+      managers.push(reopened);
+      await reopened.load();
+      await ready(reopened);
+      expect(reopened.status().backend).toBe('CUDA');
+      await reopened.connect({ mode: 'managed', backend: 'opencl' });
+      await ready(reopened);
+      expect(reopened.status().backend).toBe('OpenCL');
+      expect((await reopened.analyze(newGame(19), trainingForRank('5k'))).perspective).toBe('B');
+    },
+  );
+  it.runIf(process.platform === 'win32')(
+    'can recover from a failed CUDA startup by selecting OpenCL',
+    async () => {
+      const manager = await create(async (_signal, _progress, backend) => ({
+        config:
+          backend === 'cuda'
+            ? { ...config, prefixArgs: [resolve('tests/fixtures/failed-start-katago.mjs')] }
+            : config,
+        backend: backend === 'cuda' ? 'CUDA' : 'OpenCL',
+      }));
+      await manager.connect({ mode: 'managed', backend: 'cuda' });
+      await vi.waitFor(() => expect(manager.status().phase).toBe('error'));
+      expect(manager.status().running).toBe(false);
+      await manager.connect({ mode: 'managed', backend: 'opencl' });
+      await ready(manager);
+      expect(manager.status().backend).toBe('OpenCL');
+      expect(manager.status().error).toBeUndefined();
+    },
+  );
   it('publishes initialization progress and clears it once the engine is ready', async () => {
     const manager = await create(async () => ({
       config: {

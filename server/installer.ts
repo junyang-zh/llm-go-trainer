@@ -21,6 +21,8 @@ import { safeArchivePath, unpackBottle, unpackZip } from './archive';
 import { ensureModel, modelFilename } from './model-files';
 import artifacts from '../config/katago/artifacts.json';
 import bottles from '../config/katago/macos-bottles.json';
+import cuda from '../config/katago/windows-cuda.json';
+import type { ManagedBackend } from '../shared/types';
 
 export type InstallProgress = Pick<EngineStatus, 'phase' | 'progress'>;
 export interface Runtime {
@@ -38,10 +40,14 @@ export function runtimePlatform(
   platform = process.platform,
   arch = process.arch,
   osRelease = release(),
+  backend: ManagedBackend = 'opencl',
 ) {
+  if (backend === 'cuda' && !(platform === 'win32' && arch === 'x64'))
+    throw new Error('CUDA 后端仅支持 Windows x64');
   if (platform === 'darwin' && arch === 'arm64' && Number(osRelease.split('.')[0]) >= 24)
     return { key: 'darwin-arm64', backend: 'Metal' };
-  if (platform === 'win32' && arch === 'x64') return { key: 'win32-x64', backend: 'OpenCL' };
+  if (platform === 'win32' && arch === 'x64')
+    return { key: 'win32-x64', backend: backend === 'cuda' ? 'CUDA' : 'OpenCL' };
   throw new Error('自动安装支持 macOS 15+ Apple Silicon 和 Windows x64；其他平台可接入外部引擎');
 }
 async function files(directory: string): Promise<string[]> {
@@ -110,7 +116,11 @@ export async function ensureRuntime(
     const config = await prepareConfig(join(root, 'config/katago/analysis.cfg'), directory);
     const cache = join(directory, 'downloads');
     const models = join(directory, 'models');
-    const target = join(directory, `${platform.key}-${artifacts.revision}`);
+    const useCuda = platform.key === 'win32-x64' && platform.backend === 'CUDA';
+    const target = join(
+      directory,
+      `${platform.key}-${useCuda ? cuda.revision : artifacts.revision}`,
+    );
     const manifestPath = join(target, 'installed.json');
     const env = { ...process.env };
     delete env.DEEPSEEK_API_KEY;
@@ -137,6 +147,7 @@ export async function ensureRuntime(
     try {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
         files: Record<string, string>;
+        sources?: string[];
       };
       const entries = Object.entries(manifest.files);
       installed = entries.some(
@@ -149,6 +160,11 @@ export async function ensureRuntime(
           break;
         }
       }
+      if (
+        useCuda &&
+        JSON.stringify(manifest.sources) !== JSON.stringify(cuda.artifacts.map((a) => a.sha256))
+      )
+        installed = false;
     } catch {
       /* first run or incomplete installation */
     }
@@ -196,9 +212,11 @@ export async function ensureRuntime(
             await copyFile(path, join(cache, artifacts.main.sha256));
         }
       } else {
-        const archive = await download(artifacts.windows);
-        progress({ phase: 'installing', progress: { label: 'KataGo', received: 0 } });
-        await unpackZip(archive, extracted, signal);
+        for (const artifact of useCuda ? cuda.artifacts : [artifacts.windows]) {
+          const archive = await download(artifact);
+          progress({ phase: 'installing', progress: { label: artifact.name, received: 0 } });
+          await unpackZip(archive, extracted, signal);
+        }
         for (const path of await files(extracted))
           if (/\.(exe|dll)$/i.test(path)) await copyFile(path, join(bin, basename(path)));
       }
@@ -217,7 +235,13 @@ export async function ensureRuntime(
       const checksums: Record<string, string> = {};
       for (const path of list)
         checksums[path.replace(/\\/g, '/')] = await fileHash(join(staging, path));
-      await writeFile(join(staging, 'installed.json'), JSON.stringify({ files: checksums }));
+      await writeFile(
+        join(staging, 'installed.json'),
+        JSON.stringify({
+          files: checksums,
+          ...(useCuda ? { sources: cuda.artifacts.map((a) => a.sha256) } : {}),
+        }),
+      );
       signal.throwIfAborted();
       await rm(target, { recursive: true, force: true });
       await rename(staging, target);

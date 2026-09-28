@@ -20,7 +20,9 @@ export const trainingSchema = z.object({
   randomness: z.number().min(0).max(1),
   aggression: z.number().min(0).max(1),
   maxLoss: z.number().min(0).max(30),
-  visits: z.number().int().min(50).max(10000),
+  visits: z.number().int().min(50).max(1000000),
+  searchLimit: z.enum(['visits', 'time']).optional(),
+  maxTime: z.number().min(0.1).max(120).optional(),
 });
 export const analysisRequest = z.object({ game: gameSchema, training: trainingSchema });
 export const boardContextSchema = z.object({
@@ -51,6 +53,9 @@ const candidate = z.object({
   humanPrior: z.number().optional(),
 });
 export const engineResponse = z.object({
+  searchStats: z
+    .object({ elapsedMs: z.number().positive(), visitsPerSecond: z.number().nonnegative() })
+    .optional(),
   id: z.string(),
   turnNumber: z.number().int(),
   rootInfo: z.object({

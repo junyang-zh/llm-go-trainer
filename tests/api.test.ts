@@ -60,6 +60,26 @@ const post = (route: string, body: unknown, extra: Record<string, string> = {}) 
     body: JSON.stringify(body),
   });
 describe('local API contracts', () => {
+  it('streams bot search counts and returns a legal move with final throughput', async () => {
+    const response = await post('/api/bot-move', payload(), { Accept: 'application/x-ndjson' });
+    const events: StreamEvent[] = [];
+    for await (const line of readLines(response.body!))
+      if (line.trim()) events.push(JSON.parse(line));
+    const progress = events.find((event) => event.type === 'analysis');
+    expect(progress?.type === 'analysis' && progress.analysis.rootInfo.visits).toBe(10);
+    const done = events.at(-1);
+    expect(done?.type === 'done' && done.move).toBe('D4');
+    expect(done?.type === 'done' && done.analysis?.searchStats?.visitsPerSecond).toBeGreaterThan(0);
+  });
+  it.each([{ searchLimit: 'invalid' }, { maxTime: 0 }, { maxTime: 121 }, { visits: 1000001 }])(
+    'rejects invalid search limits %j',
+    async (patch) => {
+      const body = payload();
+      expect(
+        (await post('/api/bot-move', { ...body, training: { ...body.training, ...patch } })).status,
+      ).toBe(400);
+    },
+  );
   it('rejects hostile origins, DNS rebinding, missing app headers and invalid inputs', async () => {
     expect((await post('/api/analyze', payload(), { Origin: 'https://evil.example' })).status).toBe(
       403,

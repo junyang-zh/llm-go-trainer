@@ -1,0 +1,30 @@
+{
+  "revision": "cuda-1.18.2-12.8-9.8",
+  "artifacts": [
+    {
+      "name": "KataGo 1.18.2 CUDA",
+      "url": "https://github.com/lightvector/KataGo/releases/download/v1.18.2/katago-v1.18.2-cuda12.8-cudnn9.8.0-windows-x64.zip",
+      "sha256": "69a94227afaaf268634134805b9469f9f482760ee6c986d315d89525de0eefa2"
+    },
+    {
+      "name": "CUDA Runtime 12.8.90",
+      "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/windows-x86_64/cuda_cudart-windows-x86_64-12.8.90-archive.zip",
+      "sha256": "4a39058fd8519444a81cfc7ae055d136f48d1a31ffa41ae255b35b2edd61e13b"
+    },
+    {
+      "name": "NVRTC 12.8.93",
+      "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/windows-x86_64/cuda_nvrtc-windows-x86_64-12.8.93-archive.zip",
+      "sha256": "a63302a077f0248a743a1a7caa7dbd80d0fac56c6cfa9c41fa05fac9b7e5eda5"
+    },
+    {
+      "name": "cuBLAS 12.8.4.1",
+      "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-12.8.4.1-archive.zip",
+      "sha256": "57a470112cec7e112c95253dde8b3c7184d795dbd92b0bde77a4cb7f8c94c8aa"
+    },
+    {
+      "name": "cuDNN 9.8.0.87",
+      "url": "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.8.0.87_cuda12-archive.zip",
+      "sha256": "d8a23705e3884b137b7e05449fb2b61bfa524e7cfc3fda80743d633f423c6ce4"
+    }
+  ]
+}

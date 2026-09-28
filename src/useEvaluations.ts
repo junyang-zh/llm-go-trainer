@@ -35,6 +35,7 @@ export function useEvaluations(
   }>();
   const [completing, setCompleting] = useState(false);
   const [pendingTurn, setPendingTurn] = useState<number | null>(null);
+  const [progress, setProgress] = useState<Analysis | null>(null);
   const [failure, setFailure] = useState<{ request: string; message: string }>();
   const [retry, setRetry] = useState(0);
   const active = useRef<AbortController | null>(null);
@@ -118,13 +119,17 @@ export function useEvaluations(
               )
                 continue;
               setPendingTurn(index);
+              setProgress(null);
               const position = { ...game, moves: game.moves.slice(0, index) };
               await streamApi(
                 'analyze',
-                { game: position, training: { ...training, visits } },
+                { game: position, training: { ...training, visits, searchLimit: 'visits' } },
                 (event) => {
                   if (controller.signal.aborted) return;
-                  if (event.type === 'analysis') record(position, event.analysis, event.final);
+                  if (event.type === 'analysis') {
+                    setProgress(event.analysis);
+                    record(position, event.analysis, event.final);
+                  }
                   if (event.type === 'done' && event.analysis)
                     record(position, event.analysis, true);
                 },
@@ -177,6 +182,7 @@ export function useEvaluations(
     reset,
     completing,
     pendingTurn,
+    progress,
     error,
     complete() {
       setFailure(undefined);

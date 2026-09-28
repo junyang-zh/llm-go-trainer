@@ -1,8 +1,11 @@
 import { createInterface } from 'node:readline';
+import { appendFileSync } from 'node:fs';
 const timers = new Map();
 const input = createInterface({ input: process.stdin });
 input.on('line', (line) => {
   const request = JSON.parse(line);
+  if (process.env.FAKE_KATAGO_REQUEST_FILE)
+    appendFileSync(process.env.FAKE_KATAGO_REQUEST_FILE, line + '\n');
   if (request.action === 'terminate') {
     clearTimeout(timers.get(request.terminateId));
     timers.delete(request.terminateId);

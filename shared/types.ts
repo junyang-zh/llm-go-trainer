@@ -25,6 +25,7 @@ export interface Candidate {
   humanPrior?: number;
 }
 export interface Analysis {
+  searchStats?: { elapsedMs: number; visitsPerSecond: number };
   id: string;
   turnNumber: number;
   perspective: 'B';
@@ -35,6 +36,8 @@ export interface Analysis {
   humanPolicy?: number[];
 }
 export interface Training {
+  searchLimit?: 'visits' | 'time';
+  maxTime?: number;
   rank: string;
   mode: 'human' | 'balanced' | 'strong';
   randomness: number;
@@ -89,12 +92,20 @@ export type StreamEvent =
   | { type: 'tool'; activity: ToolActivity }
   | { type: 'analysis'; phase: AnalysisPhase; analysis: Analysis; final: boolean }
   | { type: 'text'; text: string }
-  | { type: 'done'; answer?: string; evidence?: unknown; analysis: Analysis | null }
+  | {
+      type: 'done';
+      answer?: string;
+      evidence?: unknown;
+      analysis: Analysis | null;
+      move?: string;
+      method?: string;
+    }
   | { type: 'error'; error: string };
 export type EnginePhase =
   'idle' | 'downloading' | 'installing' | 'starting' | 'ready' | 'stopping' | 'stopped' | 'error';
+export type ManagedBackend = 'opencl' | 'cuda';
 export type EngineConnection =
-  { mode: 'managed' } | { mode: 'external'; name: string; url: string };
+  { mode: 'managed'; backend?: ManagedBackend } | { mode: 'external'; name: string; url: string };
 export interface EngineStatus {
   configured: boolean;
   running: boolean;
@@ -104,6 +115,8 @@ export interface EngineStatus {
   mode?: EngineConnection['mode'];
   name?: string;
   backend?: string;
+  availableBackends?: ManagedBackend[];
+  selectedBackend?: ManagedBackend;
   modelName?: string;
   pid?: number;
   error?: string;

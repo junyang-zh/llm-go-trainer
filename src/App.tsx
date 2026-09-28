@@ -14,6 +14,8 @@ import { Board } from './Board';
 import { MarkdownText } from './MarkdownText';
 import { EvaluationPanel } from './EvaluationPanel';
 import { useEvaluations } from './useEvaluations';
+import { SearchLimitSettings } from './SearchLimitSettings';
+import { restoreSearchSettings, searchSettingsKey, searchStatsLabel } from './search-stats';
 import { api, streamApi } from './api';
 import { areaScore, groupAt, newGame, play, replay, toIndex } from '../shared/go';
 import { decodeSgf, exportSgf, importSgf } from '../shared/sgf';
@@ -66,7 +68,25 @@ export default function App() {
   const [turn, setTurn] = useState(game.moves.length);
   const [autoPlay, setAutoPlay] = useState(false);
   const [aiColor, setAiColor] = useState<Color>('W');
-  const [training, setTraining] = useState<Training>(trainingForRank('5k'));
+  const [training, setTraining] = useState<Training>(() => ({
+    ...trainingForRank('5k'),
+    ...restoreSearchSettings(),
+  }));
+  const [searchProgress, setSearchProgress] = useState<Analysis | null>(null);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        searchSettingsKey,
+        JSON.stringify({
+          visits: training.visits,
+          searchLimit: training.searchLimit,
+          maxTime: training.maxTime,
+        }),
+      );
+    } catch {
+      /* storage unavailable */
+    }
+  }, [training.visits, training.searchLimit, training.maxTime]);
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -213,6 +233,7 @@ export default function App() {
     if (lock.current) return;
     lock.current = true;
     setBusy(label);
+    setSearchProgress(null);
     setError('');
     try {
       await work();
@@ -227,13 +248,29 @@ export default function App() {
   async function botMove() {
     await run(`${status?.engine.name || 'KataGo'} 搜索中`, async () => {
       try {
-        const result = await api<{ move: string; method: string; analysis: Analysis }>('bot-move', {
-          game: current,
-          training,
-        });
+        let result: { move: string; method: string; analysis: Analysis } | undefined;
+        const controller = new AbortController();
+        activeStream.current = controller;
+        try {
+          await streamApi(
+            'bot-move',
+            { game: current, training },
+            (event) => {
+              if (event.type === 'analysis') setSearchProgress(event.analysis);
+              if (event.type === 'done' && event.analysis && event.move && event.method) {
+                result = { move: event.move, method: event.method, analysis: event.analysis };
+                setSearchProgress(event.analysis);
+              }
+            },
+            controller.signal,
+          );
+        } finally {
+          if (activeStream.current === controller) activeStream.current = null;
+        }
+        if (!result) throw new Error('引擎未返回落子结果');
         evaluations.record(current, result.analysis, true);
         appendMove({ color: position.toPlay, point: result.move });
-        setNotice(result.method);
+        setNotice(`${result.method} · ${searchStatsLabel(result.analysis)}`);
       } catch (e) {
         setBotFailed(true);
         throw e;
@@ -366,10 +403,14 @@ export default function App() {
               ),
             );
             if (event.type === 'analysis') {
+              setSearchProgress(event.analysis);
               evaluations.record(current, event.analysis, event.final);
             }
             if (event.type === 'done') {
-              if (event.analysis) evaluations.record(current, event.analysis, true);
+              if (event.analysis) {
+                evaluations.record(current, event.analysis, true);
+                setSearchProgress(event.analysis);
+              }
               if (event.evidence) setEvidence(event.evidence);
               if (event.answer)
                 setHistory((previous) => [
@@ -456,7 +497,19 @@ export default function App() {
     status?.engine.phase && !['ready', 'stopped'].includes(status.engine.phase) ? engineStatus : '';
   const workspaceError =
     error || library.error || (status?.engine.phase === 'error' ? engineProgress : '');
-  const workspaceStatus = workspaceError || busy || engineProgress || notice;
+  const liveSearch = searchStatsLabel(searchProgress);
+  const backgroundSearch =
+    evaluations.pendingTurn !== null
+      ? [`分析第 ${evaluations.pendingTurn} 手`, searchStatsLabel(evaluations.progress)]
+          .filter(Boolean)
+          .join(' · ')
+      : '';
+  const workspaceStatus =
+    workspaceError ||
+    (busy ? [busy, liveSearch].filter(Boolean).join(' · ') : '') ||
+    engineProgress ||
+    notice ||
+    backgroundSearch;
   const timelineTurn = current.moves.length;
   const timelineTotal = Math.max(game.moves.length, turn + (trial?.moves.length ?? 0));
   const timelineLimit = trial ? turn + trial.moves.length : game.moves.length;
@@ -731,6 +784,7 @@ export default function App() {
             stop={evaluations.stop}
             retry={evaluations.retry}
           >
+            {analysis && <small>{searchStatsLabel(analysis)}</small>}
             {!scoring && candidates.length > 0 && (
               <div className="candidates">
                 {candidates.map((candidate, i) => (
@@ -796,7 +850,7 @@ export default function App() {
                       <span>
                         {phase === 'before' ? '落子前' : '当前局面'} ·{' '}
                         {final ? '搜索完成' : message.state === 'running' ? '搜索中' : '搜索未完成'}{' '}
-                        · {value.rootInfo.visits.toLocaleString()} visits
+                        · {searchStatsLabel(value)}
                       </span>
                       <div>
                         黑胜率 {(value.rootInfo.winrate * 100).toFixed(1)}% · 黑目差{' '}
@@ -935,7 +989,14 @@ export default function App() {
                 对手级位 / 段位
                 <select
                   value={training.rank}
-                  onChange={(e) => setTraining(trainingForRank(e.target.value))}
+                  onChange={(e) =>
+                    setTraining((t) => ({
+                      ...trainingForRank(e.target.value),
+                      visits: t.visits,
+                      searchLimit: t.searchLimit,
+                      maxTime: t.maxTime,
+                    }))
+                  }
                 >
                   {RANKS.map((rank) => (
                     <option key={rank} value={rank}>
@@ -1006,19 +1067,10 @@ export default function App() {
                   />
                 </label>
               </fieldset>
-              <label>
-                搜索量
-                <select
-                  value={training.visits}
-                  onChange={(e) => setTraining((t) => ({ ...t, visits: +e.target.value }))}
-                >
-                  {[100, 400, 1000, 3000].map((n) => (
-                    <option key={n} value={n}>
-                      {n.toLocaleString()} visits
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SearchLimitSettings
+                training={training}
+                onChange={(value) => setTraining((t) => ({ ...t, ...value }))}
+              />
             </fieldset>
           ) : settingsTab === 'models' ? (
             <div className="connections">

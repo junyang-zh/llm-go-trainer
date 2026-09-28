@@ -21,6 +21,7 @@ export interface EngineConfig {
   env?: NodeJS.ProcessEnv;
 }
 type Pending = {
+  started: number;
   resolve: (value: Analysis) => void;
   reject: (reason: Error) => void;
   timer: NodeJS.Timeout;
@@ -48,7 +49,7 @@ export class KataGo {
   ) {
     this.stopped = false;
     this.startupProgress = onProgress;
-    onProgress?.('正在加载模型和初始化 GPU；首次 OpenCL 调优可能需要数分钟');
+    onProgress?.('正在加载模型和初始化 GPU');
     try {
       await this.request(
         newGame(size),
@@ -125,9 +126,16 @@ export class KataGo {
       this.fail(child, new Error(`KataGo 输入流关闭：${error.message}`)),
     );
     child.on('error', (error) => this.fail(child, new Error(`无法启动 KataGo：${error.message}`)));
-    child.on('exit', (code) =>
-      this.fail(child, new Error(`KataGo 已退出 (${code})。${this.diagnostics.slice(-1500)}`)),
-    );
+    child.on('exit', (code) => {
+      const hint =
+        code !== null && code >>> 0 === 0xc0000135
+          ? '缺少运行库 DLL，请重新安装后端或检查 NVIDIA 驱动。'
+          : '';
+      this.fail(
+        child,
+        new Error(`KataGo 已退出 (${code})。${hint}${this.diagnostics.slice(-1500)}`),
+      );
+    });
     const lines = createInterface({ input: child.stdout });
     lines.on('line', (line) => {
       let raw;
@@ -157,7 +165,12 @@ export class KataGo {
         this.finish(raw.id, new Error('KataGo 响应的手数或棋盘大小不匹配'));
         return;
       }
-      const analysis: Analysis = { ...value, perspective: 'B' };
+      const elapsedMs = Math.max(1, performance.now() - pending.started);
+      const analysis: Analysis = {
+        ...value,
+        perspective: 'B',
+        searchStats: { elapsedMs, visitsPerSecond: (value.rootInfo.visits * 1000) / elapsedMs },
+      };
       if (raw.isDuringSearch) pending.onProgress?.(analysis);
       else this.finish(raw.id, undefined, analysis);
     });
@@ -189,7 +202,11 @@ export class KataGo {
     child.once('close', () => clearTimeout(timer));
   }
   async analyze(game: Game, training: Training, options: AnalysisOptions = {}): Promise<Analysis> {
-    return this.request(game, training, options, this.config.timeout);
+    const timeout =
+      training.searchLimit === 'time'
+        ? Math.max(this.config.timeout, (training.maxTime ?? 5) * 1000 + 10000)
+        : this.config.timeout;
+    return this.request(game, training, options, timeout);
   }
   private async request(
     game: Game,
@@ -213,7 +230,7 @@ export class KataGo {
       boardXSize: game.size,
       boardYSize: game.size,
       analyzeTurns: [game.moves.length],
-      maxVisits: training.visits,
+      maxVisits: training.searchLimit === 'time' ? 1_000_000_000 : training.visits,
       includeOwnership: true,
       includePolicy: true,
       analysisPVLen: 12,
@@ -221,6 +238,7 @@ export class KataGo {
         ? { reportDuringSearchEvery: 0.5, firstReportDuringSearchAfter: 0.1 }
         : {}),
       overrideSettings: {
+        ...(training.searchLimit === 'time' ? { maxTime: training.maxTime ?? 5 } : {}),
         reportAnalysisWinratesAs: 'BLACK',
         ...(this.config.humanModel
           ? { humanSLProfile: `rank_${training.rank}`, ignorePreRootHistory: false }
@@ -250,6 +268,7 @@ export class KataGo {
           );
       };
       this.pending.set(id, {
+        started: performance.now(),
         resolve,
         reject,
         timer,
