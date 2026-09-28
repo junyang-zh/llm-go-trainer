@@ -85,6 +85,7 @@ h2 {
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(310px, 34vw, 520px);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   padding: 12px;
   overflow: hidden;
@@ -166,6 +167,8 @@ h2 {
   border: 1px solid #d2d8c8;
 }
 .board-stage {
+  /* Isolate the available space from the board's intrinsic SVG dimensions. */
+  container-type: size;
   min-height: 0;
   min-width: 0;
   display: flex;
@@ -174,6 +177,8 @@ h2 {
   overflow: hidden;
 }
 .board-frame {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
   flex-shrink: 0;
   padding: 6px;
   background: #e4d6ba;
@@ -269,12 +274,17 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 24px;
+  flex-shrink: 0;
   padding: 4px 7px;
   color: #6e7e64;
   min-width: 0;
   font-size: 11px;
   background: #e8ede2;
   border-radius: 4px;
+}
+.board-status[aria-hidden='true'] {
+  visibility: hidden;
 }
 .board-status > span {
   flex: 1;

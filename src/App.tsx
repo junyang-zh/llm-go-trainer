@@ -67,7 +67,6 @@ export default function App() {
   const [evidence, setEvidence] = useState<unknown>();
   const [settings, setSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'training' | 'connections'>('training');
-  const [boardSize, setBoardSize] = useState(0);
   const [setup, setSetup] = useState(false);
   const [size, setSize] = useState(19),
     [handicap, setHandicap] = useState(0),
@@ -79,7 +78,6 @@ export default function App() {
     statusRequest = useRef(0),
     fileInput = useRef<HTMLInputElement>(null),
     chatLog = useRef<HTMLDivElement>(null),
-    boardStage = useRef<HTMLDivElement>(null),
     followChat = useRef(true),
     activeStream = useRef<AbortController | null>(null);
   const current = useMemo(() => ({ ...game, moves: game.moves.slice(0, turn) }), [game, turn]);
@@ -154,17 +152,6 @@ export default function App() {
     const log = chatLog.current;
     if (log && followChat.current) log.scrollTop = log.scrollHeight;
   }, [messages]);
-  useEffect(() => {
-    const stage = boardStage.current;
-    if (!stage) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setBoardSize(
-        Math.max(0, Math.floor(Math.min(entry.contentRect.width, entry.contentRect.height))),
-      );
-    });
-    observer.observe(stage);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => () => activeStream.current?.abort(), []);
   function invalidate() {
     setMessages([]);
@@ -384,6 +371,7 @@ export default function App() {
       ? 'LLM · 未连接'
       : 'LLM · 检测中';
   const engineStatus = engineLabel(status?.engine);
+  const boardStatus = error || busy || notice;
   return (
     <main className="workspace">
       <section className="board-panel" aria-label="棋盘">
@@ -470,8 +458,8 @@ export default function App() {
             <i className="stone-dot white" />
           </span>
         </div>
-        <div className="board-stage" ref={boardStage}>
-          <div className="board-frame" style={{ width: boardSize, height: boardSize }}>
+        <div className="board-stage">
+          <div className="board-frame">
             <Board
               size={game.size}
               position={preview.position}
@@ -607,36 +595,35 @@ export default function App() {
               <span>标记死子 {dead.length}</span>
             </div>
           )}
-          {(busy || error || notice) && (
-            <div
-              className={`board-status ${error ? 'error' : ''}`}
-              role={error ? 'alert' : 'status'}
-              title={error || busy || notice}
-            >
-              <span>{error || busy || notice}</span>
-              {botFailed && (
-                <button
-                  onClick={() => {
-                    setBotFailed(false);
-                    setError('');
-                  }}
-                >
-                  重试
-                </button>
-              )}
-              {!busy && (
-                <button
-                  aria-label="关闭通知"
-                  onClick={() => {
-                    setError('');
-                    setNotice('');
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
+          <div
+            className={`board-status ${error ? 'error' : ''}`}
+            role={error ? 'alert' : 'status'}
+            aria-hidden={!boardStatus}
+            title={boardStatus}
+          >
+            <span>{boardStatus}</span>
+            {botFailed && (
+              <button
+                onClick={() => {
+                  setBotFailed(false);
+                  setError('');
+                }}
+              >
+                重试
+              </button>
+            )}
+            {boardStatus && !busy && (
+              <button
+                aria-label="关闭通知"
+                onClick={() => {
+                  setError('');
+                  setNotice('');
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
       </section>
       <aside className="chat-panel" aria-label="分析对话">

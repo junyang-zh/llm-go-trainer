@@ -166,13 +166,6 @@ it('stops curve completion, preserves finished points and rejects late partial-q
   expect(latest.error).toBe('');
 });
 it('toggles board candidates and the candidate list together while keeping the graph panel visible', async () => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
   vi.mocked(api).mockResolvedValue(testStatus);
   await act(async () => root.render(<App />));
   await tick();
