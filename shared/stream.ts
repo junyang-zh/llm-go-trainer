@@ -1,5 +1,9 @@
 // Decode UTF-8 incrementally: network chunks need not align with characters or lines.
-export async function* readLines(body: ReadableStream<Uint8Array>, signal?: AbortSignal) {
+export async function* readLines(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+  maxLineLength = 1_000_000,
+) {
   signal?.throwIfAborted();
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -16,12 +20,12 @@ export async function* readLines(body: ReadableStream<Uint8Array>, signal?: Abor
       pending += done ? decoder.decode() : decoder.decode(value, { stream: true });
       let end: number;
       while ((end = pending.indexOf('\n')) >= 0) {
-        if (end > 1_000_000) throw new Error('流式数据超出限制');
+        if (end > maxLineLength) throw new Error('流式数据超出限制');
         const line = pending.slice(0, end).replace(/\r$/, '');
         pending = pending.slice(end + 1);
         yield line;
       }
-      if (pending.length > 1_000_000) throw new Error('流式数据超出限制');
+      if (pending.length > maxLineLength) throw new Error('流式数据超出限制');
       if (done) break;
     }
     if (pending) yield pending.replace(/\r$/, '');

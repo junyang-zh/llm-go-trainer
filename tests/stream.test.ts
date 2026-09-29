@@ -5,6 +5,28 @@ import { type AnalysisMessage, updateMessage } from '../src/messages';
 import type { StreamEvent } from '../shared/types';
 afterEach(() => vi.unstubAllGlobals());
 
+it('delivers large local answer and evidence events intact across split chunks', async () => {
+  const answer = '棋'.repeat(1_050_000);
+  const event: StreamEvent = { type: 'done', answer, evidence: { note: answer }, analysis: null };
+  const bytes = new TextEncoder().encode(JSON.stringify(event) + '\n');
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let offset = 0; offset < bytes.length; offset += 65536)
+        controller.enqueue(bytes.slice(offset, offset + 65536));
+      controller.close();
+    },
+  });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)));
+  const events: StreamEvent[] = [];
+  await streamApi('coach', {}, (event) => events.push(event));
+  expect(events).toEqual([event]);
+});
+
+it('retains the default per-line bound for external provider streams', async () => {
+  const reader = readLines(new Response('x'.repeat(1_000_001)).body!);
+  await expect(reader.next()).rejects.toThrow('流式数据超出限制');
+});
+
 it('updates the conversation before HTTP closes and preserves partial text on a broken connection', async () => {
   let source!: ReadableStreamDefaultController<Uint8Array>;
   const body = new ReadableStream<Uint8Array>({

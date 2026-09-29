@@ -4,11 +4,35 @@ for await (const chunk of process.stdin) prompt += chunk;
 const args = process.argv.slice(2);
 if (prompt === 'timeout') await new Promise((resolve) => setTimeout(resolve, 10000));
 if (prompt === 'fail') process.exit(2);
-const answer = `讲解：${prompt}`;
+const answer = prompt === 'large-answer' ? '棋'.repeat(1_050_000) : `讲解：${prompt}`;
 const output = args.indexOf('--output-last-message');
 const stream = args.includes('--json') || args.includes('stream-json');
 const emit = (event) => process.stdout.write(JSON.stringify(event) + '\n');
 if (stream) {
+  if (prompt === 'verbose-output') {
+    // Real CLI streams include repeated reasoning and large tool results, even
+    // when the public answer is short. These records exceed the former total cap.
+    for (let i = 0; i < 24; i++) {
+      const payload = 'private-tool-result'.repeat(8000);
+      emit(
+        output >= 0
+          ? {
+              type: 'item.completed',
+              item: {
+                id: `tool-${i}`,
+                type: 'mcp_tool_call',
+                result: { content: [{ type: 'text', text: payload }] },
+              },
+            }
+          : {
+              type: 'user',
+              message: {
+                content: [{ type: 'tool_result', tool_use_id: `tool-${i}`, content: payload }],
+              },
+            },
+      );
+    }
+  }
   if (prompt === 'web-search') {
     if (output >= 0) {
       const item = { id: 'web', type: 'web_search', query: '围棋规则' };

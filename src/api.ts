@@ -35,7 +35,9 @@ export async function streamApi(
   }
   if (!response.body) throw new Error(t('noResponseStreamReceived'));
   let complete = false;
-  for await (const line of readLines(response.body, signal)) {
+  // Local events include the full accumulated answer and tool evidence. Their size
+  // must not impose a second, hidden work limit on a long-running coach request.
+  for await (const line of readLines(response.body, signal, Infinity)) {
     if (!line.trim()) continue;
     const event = JSON.parse(line) as StreamEvent;
     if (event.type === 'error') throw new Error(event.error);

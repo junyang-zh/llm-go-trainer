@@ -124,6 +124,43 @@ describe('LLM adapters', () => {
 
 describe('live provider output', () => {
   it.each(['codex', 'claude'] as const)(
+    '%s accepts multiple megabytes of tool events without limiting cumulative CLI output',
+    async (provider) => {
+      const text: string[] = [];
+      expect(
+        await callCli(provider, { ...config, timeout: 0 }, 'verbose-output', {
+          onText: (value) => text.push(value),
+        }),
+      ).toBe('讲解：verbose-output');
+      expect(text.join('')).not.toContain('private-tool-result');
+    },
+  );
+  it.each([
+    { provider: 'codex' as const, stream: false },
+    { provider: 'codex' as const, stream: true },
+    { provider: 'claude' as const, stream: false },
+    { provider: 'claude' as const, stream: true },
+  ])(
+    'returns a large $provider answer intact with streaming=$stream',
+    async ({ provider, stream }) => {
+      let latest = '';
+      const answer = await callCli(
+        provider,
+        { ...config, timeout: 0 },
+        'large-answer',
+        stream
+          ? {
+              onText: (value) => {
+                latest = value;
+              },
+            }
+          : {},
+      );
+      expect(answer).toBe('棋'.repeat(1_050_000));
+      if (stream) expect(latest).toBe(answer);
+    },
+  );
+  it.each(['codex', 'claude'] as const)(
     '%s reports native web activity separately from Go tools',
     async (provider) => {
       const statuses: string[] = [];

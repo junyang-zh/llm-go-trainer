@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, Provider } from '../shared/types';
@@ -151,7 +151,6 @@ export async function callCli(
       });
       let text = '',
         buffer = '',
-        bytes = 0,
         settled = false,
         completed = false;
       let failure: Error | undefined;
@@ -245,11 +244,6 @@ export async function callCli(
       child.stderr.resume();
       child.stdout.on('data', (chunk: string) => {
         if (failure) return;
-        bytes += chunk.length;
-        if (bytes > 1_000_000) {
-          stop(new Error('CLI 输出超出限制'));
-          return;
-        }
         if (!streaming) {
           text += chunk;
           return;
@@ -280,8 +274,6 @@ export async function callCli(
       if (options.signal?.aborted) abort();
       else child.stdin.end(prompt);
     });
-    if (provider === 'codex' && (await stat(output)).size > 1_000_000)
-      throw new Error('CLI 输出超出限制');
     const answer = provider === 'codex' ? await readFile(output, 'utf8') : result;
     if (!answer.trim()) throw new Error(`${provider} 没有返回内容`);
     options.onText?.(answer.trim());
