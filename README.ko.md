@@ -1,5 +1,8 @@
 # LLM Go Trainer
 
+[![CI](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml/badge.svg)](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml)
+[![최신 릴리스](https://img.shields.io/github/v/release/junyang-zh/llm-go-trainer)](https://github.com/junyang-zh/llm-go-trainer/releases/latest)
+
 [English](README.en.md) · [简体中文](README.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 로컬 [KataGo](https://github.com/lightvector/katago) 대국, 기보 복기, LLM 에이전트 해설을 제공하는 바둑 훈련 앱입니다. macOS와 Windows를 지원합니다.

@@ -1,5 +1,8 @@
 # LLM Go Trainer
 
+[![CI](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml/badge.svg)](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml)
+[![最新リリース](https://img.shields.io/github/v/release/junyang-zh/llm-go-trainer)](https://github.com/junyang-zh/llm-go-trainer/releases/latest)
+
 [English](README.en.md) · [简体中文](README.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 ローカルの [KataGo](https://github.com/lightvector/katago) との対局、棋譜の検討、LLM エージェントによる解説を提供する囲碁トレーニングアプリです。macOS / Windows に対応しています。

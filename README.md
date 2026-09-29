@@ -1,5 +1,8 @@
 # LLM Go Trainer
 
+[![CI](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml/badge.svg)](https://github.com/junyang-zh/llm-go-trainer/actions/workflows/ci.yml)
+[![最新版本](https://img.shields.io/github/v/release/junyang-zh/llm-go-trainer)](https://github.com/junyang-zh/llm-go-trainer/releases/latest)
+
 [English](README.en.md) · [简体中文](README.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 围棋训练工具，支持本地部署 [KataGo](https://github.com/lightvector/katago) 对战、棋谱复盘和接入 LLM agent 讲解。支持 macOS / Windows。
