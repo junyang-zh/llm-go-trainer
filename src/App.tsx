@@ -880,9 +880,9 @@ export default function App() {
             complete={evaluations.complete}
             stop={evaluations.stop}
             retry={evaluations.retry}
+            searchStats={searchStatsLabel(evaluations.progress ?? analysis)}
           >
-            {analysis && <small>{searchStatsLabel(analysis)}</small>}
-            {!scoring && candidates.length > 0 && (
+            {!scoring && candidates.length > 0 ? (
               <div className="candidates">
                 {candidates.map((candidate, i) => (
                   <button
@@ -899,6 +899,8 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            ) : (
+              <span className="evaluation-empty">暂无候选变化</span>
             )}
           </EvaluationPanel>
           <div className="conversation-toolbar">

@@ -135,6 +135,7 @@ export function EvaluationPanel({
   stop,
   retry,
   children,
+  searchStats,
 }: {
   history: EvaluationHistory;
   turn: number;
@@ -149,6 +150,7 @@ export function EvaluationPanel({
   stop: () => void;
   retry: () => void;
   children?: ReactNode;
+  searchStats?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const current = history[turn];
@@ -163,9 +165,7 @@ export function EvaluationPanel({
         onClick={() => setExpanded((value) => !value)}
       >
         <span>{expanded ? '⌄' : '›'} 目差 / 胜率</span>
-      </button>
-      {expanded && (
-        <div id="evaluation-plot" className="evaluation-body">
+        {expanded && (
           <span className="evaluation-current">
             {current
               ? `黑 ${signed(current.scoreLead)} · ${(current.winrate * 100).toFixed(1)}%${current.final ? '' : pendingTurn === turn ? ' · 搜索中' : ' · 未完成'}`
@@ -177,7 +177,11 @@ export function EvaluationPanel({
                     ? '未分析'
                     : '引擎未就绪'}
           </span>
-          {children}
+        )}
+      </button>
+      {expanded && (
+        <div id="evaluation-plot" className="evaluation-body">
+          <div className="evaluation-candidates">{children}</div>
           <EvaluationChart
             history={history}
             turn={turn}
@@ -186,10 +190,13 @@ export function EvaluationPanel({
             navigate={navigate}
           />
           <div className="evaluation-actions">
-            <span>
-              {pendingTurn !== null
-                ? `分析第 ${pendingTurn} 手`
-                : `已分析 ${completed} / ${total + 1}`}
+            <span className="evaluation-progress">
+              <span>
+                {pendingTurn !== null
+                  ? `分析第 ${pendingTurn} 手`
+                  : `已分析 ${completed} / ${total + 1}`}
+              </span>
+              <span className="evaluation-search">{searchStats || '搜索 — 次 · — 次/秒'}</span>
             </span>
             {completing ? (
               <button onClick={stop}>停止补全</button>

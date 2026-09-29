@@ -505,7 +505,7 @@ h2 {
   display: flex;
   width: 100%;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px 8px;
   align-items: baseline;
   font-size: 11px;
@@ -513,16 +513,37 @@ h2 {
   background: transparent;
   padding: 7px 8px;
 }
+.evaluation-toggle > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .evaluation-current {
+  margin-left: auto;
+  text-align: right;
   color: #58714f;
   font-variant-numeric: tabular-nums;
 }
 .evaluation-body {
   min-height: 0;
   padding: 2px 8px 8px;
-  max-height: min(32dvh, 255px);
+  height: min(32dvh, 255px);
   overflow: auto;
   overscroll-behavior: contain;
+}
+.evaluation-empty {
+  display: block;
+  padding-top: 6px;
+  color: #7b8b71;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.evaluation-candidates {
+  height: 36px;
+  overflow: hidden;
 }
 .evaluation-chart {
   display: block;
@@ -578,8 +599,17 @@ h2 {
   font-size: 10px;
   color: #7b8b71;
 }
-.evaluation-actions > span {
-  margin-right: auto;
+.evaluation-progress {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.evaluation-progress > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .evaluation-actions button {
   padding: 3px 6px;
