@@ -1,3 +1,4 @@
+import { t, localizeDiagnostic } from './i18n';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Dialog } from './Dialog';
@@ -5,23 +6,23 @@ import type { EngineConnection, EngineStatus } from '../shared/types';
 import { ModelSettings } from './ModelSettings';
 
 export function engineLabel(status?: EngineStatus) {
-  if (!status) return '引擎状态读取中';
+  if (!status) return t('readingEngineStatus');
   const external = status.mode === 'external';
   const labels = {
-    idle: '准备中',
-    downloading: '下载中',
-    installing: '安装中',
-    starting: external ? '连接中' : '启动中',
-    ready: external ? '已连接' : '运行中',
-    stopping: external ? '断开中' : '停止中',
-    stopped: external ? '已断开' : '已停止',
-    error: '错误',
+    idle: t('preparing'),
+    downloading: t('downloading'),
+    installing: t('installing'),
+    starting: external ? t('connecting') : t('starting'),
+    ready: external ? t('connected') : t('engineRunning'),
+    stopping: external ? t('disconnecting') : t('stopping'),
+    stopped: external ? t('disconnected') : t('stopped'),
+    error: t('error'),
   };
   const progress = status.progress;
   const percentage = progress?.total
     ? ` ${Math.round((progress.received / progress.total) * 100)}%`
     : '';
-  return `${status.name || 'KataGo'} · ${status.phase ? labels[status.phase] : status.running ? '运行中' : '未启动'}${progress ? ` · ${progress.label}${percentage}` : ''}`;
+  return `${status.name || 'KataGo'} · ${status.phase ? labels[status.phase] : status.running ? t('engineRunning') : t('notStarted')}${progress ? ` · ${localizeDiagnostic(progress.label)}${percentage}` : ''}`;
 }
 type Action = 'start' | 'stop' | 'restart' | 'connect';
 export function EngineSettings(props: {
@@ -44,7 +45,7 @@ function EngineConnectionSettings({
   onChange: (status: EngineStatus) => void;
   busy?: boolean;
 }) {
-  const [name, setName] = useState('外部围棋 AI');
+  const [name, setName] = useState(t('externalGoAi'));
   const [url, setUrl] = useState('');
   const [editing, setEditing] = useState(false);
   const [working, setWorking] = useState<Action>();
@@ -88,18 +89,18 @@ function EngineConnectionSettings({
         <progress
           max={status.progress.total}
           value={status.progress.received}
-          aria-label="下载进度"
+          aria-label={t('downloadProgress')}
         />
       )}
       {status?.backend && (
         <div className="engine-detail">
-          {status.backend}
+          {localizeDiagnostic(status.backend)}
           {status.pid ? ` · PID ${status.pid}` : ''}
         </div>
       )}
       {!editing && (error || status?.error) && (
         <p className="error" role="alert">
-          {error || status?.error}
+          {localizeDiagnostic(error || status?.error || '')}
         </p>
       )}
       <div className="engine-actions">
@@ -107,16 +108,22 @@ function EngineConnectionSettings({
           disabled={!!working || !status || status.phase === 'stopping'}
           onClick={() => void control(active ? 'stop' : 'start')}
         >
-          {active ? (external ? '断开' : '停止') : external ? '连接' : '启动'}
+          {active
+            ? external
+              ? t('disconnect')
+              : t('stop')
+            : external
+              ? t('connect')
+              : t('startEngine')}
         </button>
         {status?.ready && (
           <button disabled={!!working} onClick={() => void control('restart')}>
-            {external ? '重新连接' : '重启'}
+            {external ? t('reconnect') : t('restart')}
           </button>
         )}
       </div>
       <label>
-        当前引擎
+        {t('currentEngine')}
         <select
           disabled={!!working || !status}
           value={mode}
@@ -130,13 +137,13 @@ function EngineConnectionSettings({
         >
           <option value="managed">KataGo</option>
           <option value="external">
-            {external ? status?.name || '外部围棋 AI' : '外部围棋 AI…'}
+            {external ? status?.name || t('externalGoAi') : t('externalGoAiOption')}
           </option>
         </select>
       </label>
       {!external && !!status?.availableBackends?.length && (
         <label>
-          计算后端
+          {t('computeBackend')}
           <select
             value={status.selectedBackend ?? 'opencl'}
             disabled={!!working || busy || status.phase === 'stopping'}
@@ -164,12 +171,12 @@ function EngineConnectionSettings({
           }}
           disabled={!!working}
         >
-          修改地址
+          {t('editAddress')}
         </button>
       )}
       {editing && (
         <Dialog
-          title="连接外部引擎"
+          title={t('connectExternalEngine')}
           onClose={() => {
             if (!working) {
               setEditing(false);
@@ -184,7 +191,7 @@ function EngineConnectionSettings({
             }}
           >
             <label>
-              名称
+              {t('name')}
               <input
                 required
                 maxLength={60}
@@ -194,11 +201,11 @@ function EngineConnectionSettings({
               />
             </label>
             <label>
-              分析接口地址
+              {t('analysisEndpoint')}
               <input
                 type="url"
                 required
-                placeholder="http://127.0.0.1:端口/api/analyze"
+                placeholder={t('analysisUrlPlaceholder')}
                 value={url}
                 disabled={!!working}
                 onChange={(event) => setUrl(event.target.value)}
@@ -206,12 +213,12 @@ function EngineConnectionSettings({
             </label>
             {error && (
               <p className="error" role="alert">
-                {error}
+                {localizeDiagnostic(error)}
               </p>
             )}
             <div className="engine-actions">
               <button type="submit" disabled={!!working}>
-                {working ? '连接中' : '连接'}
+                {working ? t('connecting') : t('connect')}
               </button>
               <button
                 type="button"
@@ -221,7 +228,7 @@ function EngineConnectionSettings({
                   setError('');
                 }}
               >
-                取消
+                {t('cancel')}
               </button>
             </div>
           </form>

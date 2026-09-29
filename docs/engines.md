@@ -1,5 +1,9 @@
 # 引擎安装、生命周期与扩展
 
+[English](en/engines.md) · [简体中文](engines.md) · [繁體中文](zh-TW/engines.md) · [日本語](ja/engines.md) · [한국어](ko/engines.md)
+
+<a id="installation"></a>
+
 ## 自动安装
 
 源码启动使用 `<repo>/.local/katago/`；`GO_TRAINER_DATA_DIR` 可覆盖。Electron 打包后使用 `app.getPath('userData')/katago/`。这些文件不提交到 Git：
@@ -27,6 +31,8 @@ Windows OpenCL 首次启动会分别为主模型和 HumanSL 模型进行 GPU 调
 清单和 SHA-256 固定在 `config/katago/windows-cuda.json`；NVIDIA 摘要来自 [CUDA 12.8.1 redistrib](https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.8.1.json) 和 [cuDNN 9.8.0 redistrib](https://developer.download.nvidia.com/compute/cudnn/redist/redistrib_9.8.0.json)。后端目录相互独立，模型目录共享。切换会停止旧进程并持久化选择；初始化失败可切回 OpenCL。标准安装包仍预置 OpenCL，CUDA 依赖仅首次选择时下载，之后复用缓存。
 
 性能复测命令：`node --import tsx scripts/benchmark-backends.ts <缓存目录> [轮数]`。读取该目录选中的真实主模型和 HumanSL，交替测试两个后端，分别输出安装检查、进程初始化和 19 路两种局面在 400 / 4000 visits 下的耗时。使用应用的分析配置，结果输出到终端；保存测量记录时请放在仓库外。运行时避免其他 GPU 负载，启动测试和分析吞吐不可混为一个指标。
+
+<a id="custom-paths"></a>
 
 ## 自定义引擎路径
 
@@ -73,7 +79,7 @@ KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；�
 
 「AI 自动落子」提供按次数（50–1,000,000 visits）或按时间（0.1–120 秒）搜索，保存在本地设置中。`Training.searchLimit` 缺省为 `visits`，`maxTime` 缺省为 5 秒。时间模式通过 KataGo 的 `overrideSettings.maxTime` 限制每次搜索，并提高 visits 上限，正常返回当时的分析与落子；进程无响应时的传输超时仍是独立保护机制。后台曲线维持最多 100 visits，教练工具调用仍遵守各自的次数预算。
 
-`Analysis.searchStats` 包含 `elapsedMs` 和 `visitsPerSecond`，后者为实际 `rootInfo.visits` 除以该请求发送后到本次结果的单调时钟耗时（含排队、传输开销），是平均速度，不是 GPU 理论吞吐。中间结果和最终结果均携带统计，Black 视角不变。通知栏显示实时统计，分析结果中保留最终统计；外部引擎未提供计时数据时只显示搜索次数。
+`Analysis.searchStats` 包含 `elapsedMs` 和 `visitsPerSecond`，后者为实际 `rootInfo.visits` 除以该请求发送后到本次结果的单调时钟耗时（含排队、传输开销），是平均速度，不是 GPU 理论吞吐。中间结果和最终结果均携带统计，Black 视角不变。通知栏显示实时统计，展开的目差/胜率面板在已分析进度处保留搜索统计，并在计算时预留候选后续空间；外部引擎未提供计时数据时只显示搜索次数。
 
 `POST /api/bot-move` 继续支持 JSON，并在 `Accept: application/x-ndjson` 时发送中间 `analysis` 事件及含 `move`、`method`、`analysis` 的最终 `done` 事件。断开流会取消对应搜索。
 
@@ -96,6 +102,8 @@ KataGo 为 [MIT](https://github.com/lightvector/KataGo/blob/master/LICENSE)；�
 KataGo 直接使用 `spawn`，`shell:false`、`detached:false`，stdin 管道属于应用。正常关闭结束输入并发 SIGTERM，最多 2 秒后 SIGKILL，等待 close 事件；同步进程退出钩子也会终止拥有的子进程。KataGo 自身在 stdin EOF 后结束分析服务，这为父进程被强杀提供补充，不把它当成平台级 Job Object 保证。
 
 桌面版关闭最后一个窗口即退出，包括 macOS。源码 Web 版 `Ctrl+C` 关闭整个服务；浏览器页面关闭不等于本地服务退出。对外部 HTTP 服务的“停止”只断开本软件连接，不管理外部进程。
+
+<a id="adapters"></a>
 
 ## 其他围棋 AI 适配契约
 

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Training } from '../shared/types';
 
 export function SearchLimitSettings({
@@ -15,17 +16,17 @@ export function SearchLimitSettings({
   return (
     <>
       <label>
-        搜索限制
+        {t('searchLimit')}
         <select
           value={training.searchLimit ?? 'visits'}
           onChange={(event) => onChange({ searchLimit: event.target.value as 'time' | 'visits' })}
         >
-          <option value="visits">按次数</option>
-          <option value="time">按时间</option>
+          <option value="visits">{t('byVisits')}</option>
+          <option value="time">{t('byTime')}</option>
         </select>
       </label>
       <label>
-        {timed ? '时间上限（秒）' : '搜索次数'}
+        {timed ? t('timeLimitSeconds') : t('searchVisits')}
         <input
           key={timed ? 'time' : 'visits'}
           type="number"

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 export function Dialog({
@@ -35,7 +36,7 @@ export function Dialog({
       <div className="dialog-content">
         <div className="dialog-toolbar">
           <h2 id={label}>{title}</h2>
-          <button aria-label={`关闭${title}`} onClick={onClose}>
+          <button aria-label={t('close', { v0: title })} onClick={onClose}>
             ×
           </button>
         </div>

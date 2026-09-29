@@ -1,3 +1,4 @@
+import { t, formatNumber } from './i18n';
 import type { Analysis, Training } from '../shared/types';
 
 export function searchStatsLabel(analysis?: Analysis | null) {
@@ -5,7 +6,13 @@ export function searchStatsLabel(analysis?: Analysis | null) {
   const visits = analysis.rootInfo.visits;
   if (!Number.isFinite(visits) || visits < 0) return '';
   const speed = analysis.searchStats?.visitsPerSecond;
-  return `搜索 ${visits.toLocaleString()} 次${speed !== undefined && Number.isFinite(speed) && speed >= 0 ? ` · ${Math.round(speed).toLocaleString()} 次/秒` : ''}`;
+  return t('visits', {
+    v0: formatNumber(visits),
+    v1:
+      speed !== undefined && Number.isFinite(speed) && speed >= 0
+        ? t('visitsS', { v0: formatNumber(Math.round(speed)) })
+        : '',
+  });
 }
 
 export const searchSettingsKey = 'go-trainer-search-limits-v1';

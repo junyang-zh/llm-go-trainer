@@ -1,3 +1,7 @@
+# 更新记录
+
+[English](en/release-notes.md) · [简体中文](release-notes.md) · [繁體中文](zh-TW/release-notes.md) · [日本語](ja/release-notes.md) · [한국어](ko/release-notes.md)
+
 ## v0.1.3
 
 - 新增围棋模型管理：推荐档位、官方模型目录、自定义模型、下载进度与取消、模型切换和删除。

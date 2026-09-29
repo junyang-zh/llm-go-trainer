@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { COLUMNS, toIndex, toPoint, type Position } from '../shared/go';
 import type { Candidate } from '../shared/types';
 
@@ -35,7 +36,10 @@ export function Board({
     <svg
       className={`go-board ${disabled ? 'board-disabled' : ''}`}
       viewBox={`0 0 ${extent} ${extent}`}
-      aria-label={`${size} 路围棋棋盘，${position.toPlay === 'B' ? '黑' : '白'}方行棋`}
+      aria-label={t('goBoardToPlay', {
+        v0: size,
+        v1: position.toPlay === 'B' ? t('black') : t('white'),
+      })}
     >
       <defs>
         <radialGradient id="black-stone" cx="30%" cy="25%">
@@ -127,8 +131,8 @@ export function Board({
             {color && trial && (
               <text
                 className="trial-stone"
-                aria-label={`${toPoint(i, size)} 试下`}
-                aria-description={`试下第 ${trial} 手`}
+                aria-label={t('trialPoint', { v0: toPoint(i, size) })}
+                aria-description={t('trialMoveNumber', { v0: trial })}
                 x={x}
                 y={y}
                 dy=".35em"
@@ -154,7 +158,10 @@ export function Board({
             {!color && candidate >= 0 && !ownership && (
               <g
                 role="img"
-                aria-label={`候选 ${String.fromCharCode(65 + candidate)}：${toPoint(i, size)}`}
+                aria-label={t('candidate', {
+                  v0: String.fromCharCode(65 + candidate),
+                  v1: toPoint(i, size),
+                })}
               >
                 <circle
                   cx={x}
@@ -185,7 +192,7 @@ export function Board({
               rx="15"
               fill="transparent"
               role="button"
-              aria-label={`${toPoint(i, size)}${color ? (color === 'B' ? ' 黑子' : ' 白子') : ' 空点'}`}
+              aria-label={`${toPoint(i, size)}${color ? (color === 'B' ? t('blackStone') : t('whiteStone')) : t('emptyPoint')}`}
               aria-disabled={disabled || (!!color && !scoring)}
               tabIndex={!disabled && (!color || scoring) ? 0 : -1}
               onClick={() => !disabled && onPlay(toPoint(i, size))}

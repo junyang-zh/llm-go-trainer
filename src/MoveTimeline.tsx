@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useState, type CSSProperties } from 'react';
 
 interface Props {
@@ -38,11 +39,16 @@ export function MoveTimeline({
     >
       <input
         className="timeline"
-        aria-label="复盘手数"
+        aria-label={t('reviewMove')}
         aria-valuetext={
           trial
-            ? `第 ${turn} 手，试下 ${turn - historyTurn} / ${trialLength} 手，起点第 ${historyTurn} 手`
-            : `第 ${turn} 手，共 ${historyLength} 手`
+            ? t('moveTrialStartingAtMove', {
+                v0: turn,
+                v1: turn - historyTurn,
+                v2: trialLength,
+                v3: historyTurn,
+              })
+            : t('moveOf', { v0: turn, v1: historyLength })
         }
         type="range"
         min="0"

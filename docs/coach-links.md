@@ -1,5 +1,7 @@
 # 交互讲解与试下分支
 
+[English](en/coach-links.md) · [简体中文](coach-links.md) · [繁體中文](zh-TW/coach-links.md) · [日本語](ja/coach-links.md) · [한국어](ko/coach-links.md)
+
 选点扩展使用标准 Markdown 的 fragment 链接，因此支持普通段落、列表、表格和引用，也可使用 Markdown 的引用式链接。代码块与行内代码保留原文，不使用 HTML 或 `---#block…` 分隔符。普通网页链接仍按外链处理，未知 fragment 退化为文字。
 
 | 用途             | 示例                                             |

@@ -147,6 +147,10 @@ app.whenReady().then(async () => {
       });
       try {
         await win.loadURL(url);
+        await win.webContents.executeJavaScript(
+          "localStorage.setItem('go-trainer-language-v1', 'zh-CN')",
+        );
+        await win.loadURL(win.webContents.getURL());
         console.log(await win.webContents.executeJavaScript(`(${check.toString()})()`));
       } finally {
         win.destroy();

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { StreamEvent } from '../shared/types';
 import type { AnalysisMessage } from '../shared/library';
 export type { AnalysisMessage } from '../shared/library';
@@ -17,7 +18,7 @@ export function finishMessage(
         ? {
             ...tool,
             state: state === 'error' ? 'error' : 'stopped',
-            detail: state === 'done' ? '未完成' : status,
+            detail: state === 'done' ? t('incomplete') : status,
           }
         : tool,
     ),
@@ -50,7 +51,7 @@ export function updateMessage(message: AnalysisMessage, event: StreamEvent): Ana
         ...message,
         tools,
         trials,
-        status: event.activity.state === 'running' ? event.activity.label : '正在整理分析',
+        status: event.activity.state === 'running' ? event.activity.label : t('preparingAnalysis'),
       };
     }
     case 'analysis':
@@ -62,7 +63,7 @@ export function updateMessage(message: AnalysisMessage, event: StreamEvent): Ana
         },
       };
     case 'text':
-      return { ...message, text: event.text, status: '生成中' };
+      return { ...message, text: event.text, status: t('generating') };
     case 'done':
       return finishMessage({ ...message, text: event.answer ?? message.text }, 'done', '');
     case 'error':

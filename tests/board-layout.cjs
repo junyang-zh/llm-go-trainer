@@ -339,6 +339,10 @@ app.whenReady().then(async () => {
       });
       try {
         await win.loadURL(`http://127.0.0.1:${server.address().port}`);
+        await win.webContents.executeJavaScript(
+          "localStorage.setItem('go-trainer-language-v1', 'zh-CN')",
+        );
+        await win.loadURL(win.webContents.getURL());
         const result = await win.webContents.executeJavaScript(`(${checkLayout.toString()})()`);
         console.log({ ...result, pointer: await checkTimelinePointer(win) });
       } finally {

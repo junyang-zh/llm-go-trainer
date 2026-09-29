@@ -1,15 +1,21 @@
+import { t, formatNumber, localizeDiagnostic } from './i18n';
 import type { ToolActivity } from '../shared/types';
 
-const states = { running: '执行中', done: '完成', error: '失败', stopped: '已停止' };
 export function AgentActivity({ tools }: { tools: ToolActivity[] }) {
+  const states = {
+    running: t('running'),
+    done: t('done'),
+    error: t('failed'),
+    stopped: t('stopped'),
+  };
   if (!tools.length) return null;
   return (
-    <div className="agent-activity" aria-label="讲棋工具执行记录">
+    <div className="agent-activity" aria-label={t('coachToolActivity')}>
       {tools.map((tool) => (
         <details key={tool.id} className={`agent-tool ${tool.state}`}>
           <summary>
             <i aria-hidden="true" />
-            <span>{tool.label}</span>
+            <span>{localizeDiagnostic(tool.label)}</span>
             <small>
               {states[tool.state]}
               {tool.elapsedMs !== undefined && tool.state !== 'running'
@@ -20,26 +26,37 @@ export function AgentActivity({ tools }: { tools: ToolActivity[] }) {
           <div className="agent-tool-detail">
             {tool.baseTurn !== undefined && (
               <div>
-                第 {tool.baseTurn} 手局面
-                {tool.moves?.length
-                  ? ` · 试下 ${tool.moves.map((move) => `${move.color === 'B' ? '黑' : '白'} ${move.point === 'pass' ? '停一手' : move.point}`).join(' → ')}`
-                  : ''}
+                {t('positionAtMove', {
+                  v0: tool.baseTurn,
+                  v1: tool.moves?.length
+                    ? t('trialSequence', {
+                        v0: tool.moves
+                          .map(
+                            (move) =>
+                              `${move.color === 'B' ? t('black') : t('white')} ${move.point === 'pass' ? t('pass') : move.point}`,
+                          )
+                          .join(' → '),
+                      })
+                    : '',
+                })}
               </div>
             )}
-            {tool.detail && <div>{tool.detail}</div>}
+            {tool.detail && <div>{localizeDiagnostic(tool.detail)}</div>}
             {tool.evaluation && (
               <>
                 <div>
-                  黑胜率 {(tool.evaluation.winrate * 100).toFixed(1)}% · 黑目差{' '}
-                  {tool.evaluation.scoreLead > 0 ? '+' : ''}
-                  {tool.evaluation.scoreLead.toFixed(1)} · {tool.evaluation.visits.toLocaleString()}{' '}
-                  visits
+                  {t('toolEvaluation', {
+                    v0: (tool.evaluation.winrate * 100).toFixed(1),
+                    v1: tool.evaluation.scoreLead > 0 ? '+' : '',
+                    v2: tool.evaluation.scoreLead.toFixed(1),
+                    v3: formatNumber(tool.evaluation.visits),
+                  })}
                 </div>
                 <div>
                   {tool.evaluation.pv
                     .map(
                       (move) =>
-                        `${move.color === 'B' ? '黑' : '白'} ${move.point === 'pass' ? '停一手' : move.point}`,
+                        `${move.color === 'B' ? t('black') : t('white')} ${move.point === 'pass' ? t('pass') : move.point}`,
                     )
                     .join(' → ')}
                 </div>

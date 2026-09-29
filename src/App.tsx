@@ -1,12 +1,22 @@
+import { availabilityLabel, displayGameTitle as gameTitle } from './ui-labels';
+import {
+  t,
+  localizeDiagnostic,
+  useLanguage,
+  formatDate,
+  locales,
+  translate,
+  type MessageKey,
+} from './i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLibrary } from './useLibrary';
-import { gameTitle, type BoardContext } from '../shared/library';
+import { type BoardContext } from '../shared/library';
 import { extendTrial, trialStoneNumbers, trialVariation, type TrialBranch } from '../shared/trial';
 import { MoveTimeline } from './MoveTimeline';
 import { EngineSettings, engineLabel } from './EngineSettings';
 import { LlmSettings } from './LlmSettings';
 import { GeneralSettings } from './GeneralSettings';
-import { availabilityLabel, providerNames } from '../shared/llm';
+import { providerNames } from '../shared/llm';
 import { Dialog } from './Dialog';
 import { type AnalysisMessage, updateMessage, finishMessage } from './messages';
 import { AgentActivity } from './AgentActivity';
@@ -33,12 +43,12 @@ import type {
   Training,
 } from '../shared/types';
 
-const labels: Record<CoachAction, string> = {
-  move: '解释这一手',
-  position: '当前局势',
-  variation: '分析后续变化',
-  chat: '提问',
-};
+const coachActionKeys = {
+  move: 'explainThisMove',
+  position: 'currentPosition',
+  variation: 'analyzeContinuations',
+  chat: 'ask',
+} as const;
 const storageKey = 'go-trainer-game-v1';
 function restoredGame(): Game {
   try {
@@ -59,6 +69,13 @@ function download(name: string, text: string, type = 'text/plain') {
 }
 
 export default function App() {
+  useLanguage();
+  const labels: Record<CoachAction, string> = {
+    move: t(coachActionKeys.move),
+    position: t(coachActionKeys.position),
+    variation: t(coachActionKeys.variation),
+    chat: t(coachActionKeys.chat),
+  };
   const [initialGame] = useState(restoredGame);
   const library = useLibrary(initialGame);
   const { game, setGame } = library;
@@ -97,9 +114,17 @@ export default function App() {
     }
   }, [training.visits, training.searchLimit, training.maxTime]);
   const [status, setStatus] = useState<Status>();
-  const [busy, setBusy] = useState('');
+  const [busy, setBusy] = useState<{
+    key: MessageKey;
+    values?: Record<string, string | number>;
+  } | null>(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<
+    | { kind: 'move'; method: string; analysis: Analysis }
+    | { kind: 'import'; name: string; moves: number; warnings: string[] }
+    | { kind: 'fork' }
+    | null
+  >(null);
   const [showOwnership, setShowOwnership] = useState(false);
   const [showCandidates, setShowCandidates] = useState(false);
   const [scoring, setScoring] = useState(false);
@@ -214,7 +239,7 @@ export default function App() {
   }, [messages, chatCollapsed]);
   useEffect(() => () => activeStream.current?.abort(), []);
   function invalidate() {
-    setNotice('');
+    setNotice(null);
     setTrial(null);
     setDead([]);
     setScoring(false);
@@ -225,7 +250,7 @@ export default function App() {
     if (lock.current) return;
     if (trial && value > turn + trial.moves.length) return;
     if (trial) setAutoPlay(false);
-    setNotice('');
+    setNotice(null);
     setDead([]);
     setScoring(false);
     setError('');
@@ -243,7 +268,7 @@ export default function App() {
     setGame(next);
     setTurn(next.moves.length);
   }
-  async function run(label: string, work: () => Promise<void>) {
+  async function run(label: NonNullable<typeof busy>, work: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true;
     setBusy(label);
@@ -255,41 +280,44 @@ export default function App() {
       setError((e as Error).message);
     } finally {
       lock.current = false;
-      setBusy('');
+      setBusy(null);
       void refreshStatus();
     }
   }
   async function botMove() {
-    await run(`${status?.engine.name || 'KataGo'} 搜索中`, async () => {
-      try {
-        let result: { move: string; method: string; analysis: Analysis } | undefined;
-        const controller = new AbortController();
-        activeStream.current = controller;
+    await run(
+      { key: 'engineSearching', values: { v0: status?.engine.name || 'KataGo' } },
+      async () => {
         try {
-          await streamApi(
-            'bot-move',
-            { game: current, training },
-            (event) => {
-              if (event.type === 'analysis') setSearchProgress(event.analysis);
-              if (event.type === 'done' && event.analysis && event.move && event.method) {
-                result = { move: event.move, method: event.method, analysis: event.analysis };
-                setSearchProgress(event.analysis);
-              }
-            },
-            controller.signal,
-          );
-        } finally {
-          if (activeStream.current === controller) activeStream.current = null;
+          let result: { move: string; method: string; analysis: Analysis } | undefined;
+          const controller = new AbortController();
+          activeStream.current = controller;
+          try {
+            await streamApi(
+              'bot-move',
+              { game: current, training },
+              (event) => {
+                if (event.type === 'analysis') setSearchProgress(event.analysis);
+                if (event.type === 'done' && event.analysis && event.move && event.method) {
+                  result = { move: event.move, method: event.method, analysis: event.analysis };
+                  setSearchProgress(event.analysis);
+                }
+              },
+              controller.signal,
+            );
+          } finally {
+            if (activeStream.current === controller) activeStream.current = null;
+          }
+          if (!result) throw new Error(t('engineNoMove'));
+          evaluations.record(current, result.analysis, true);
+          appendMove({ color: position.toPlay, point: result.move });
+          setNotice({ kind: 'move', method: result.method, analysis: result.analysis });
+        } catch (e) {
+          setBotFailed(true);
+          throw e;
         }
-        if (!result) throw new Error('引擎未返回落子结果');
-        evaluations.record(current, result.analysis, true);
-        appendMove({ color: position.toPlay, point: result.move });
-        setNotice(`${result.method} · ${searchStatsLabel(result.analysis)}`);
-      } catch (e) {
-        setBotFailed(true);
-        throw e;
-      }
-    });
+      },
+    );
   }
   useEffect(() => {
     if (
@@ -334,25 +362,28 @@ export default function App() {
   function forkGame() {
     const branch: Game = {
       ...current,
-      metadata: { ...current.metadata, GN: `${gameTitle(game).slice(0, 150)} · 第${turn}手分支` },
+      metadata: {
+        ...current.metadata,
+        GN: t('branchAtMove', { v0: gameTitle(game).slice(0, 150), v1: turn }),
+      },
     };
     delete branch.metadata.RE;
     invalidate();
     evaluations.reset();
     library.newGame(branch);
     setTurn(branch.moves.length);
-    setNotice('已保存为新棋局，后续落子计入新局主线');
+    setNotice({ kind: 'fork' });
   }
   function playCandidate(candidate: Candidate) {
     if (lock.current || scoring) return;
     try {
       if (candidate.pv.length && candidate.pv[0] !== candidate.move)
-        throw new Error('候选变化与首手不一致，请重新分析');
+        throw new Error(t('candidateMismatch'));
       const moves = trialVariation(current, candidate.pv.length ? candidate.pv : [candidate.move]);
       setTrial((previous) => extendTrial(previous, moves));
       setAutoPlay(false);
       setError('');
-      setNotice('');
+      setNotice(null);
       setDead([]);
     } catch (e) {
       setError((e as Error).message);
@@ -369,24 +400,24 @@ export default function App() {
         link.branch && message.trials && Object.hasOwn(message.trials, link.branch)
           ? message.trials[link.branch]
           : undefined;
-      if (link.branch && !branch) throw new Error('该试下分支尚未生成或已删除');
+      if (link.branch && !branch) throw new Error(t('trialMissing'));
       const gameId = branch?.gameId ?? message.context?.gameId;
       const saved = library.games.find((item) => item.id === gameId);
-      if (!saved) throw new Error('找不到这段讲解对应的棋局');
+      if (!saved) throw new Error(t('coachGameMissing'));
       const source = saved.id === library.gameId ? game : saved.game;
       const baseTurn = branch?.baseTurn ?? link.turn ?? message.context!.turn;
-      if (baseTurn < 0 || baseTurn > source.moves.length) throw new Error('起点手数超出棋局范围');
+      if (baseTurn < 0 || baseTurn > source.moves.length) throw new Error(t('invalidStartTurn'));
       const base = { ...source, moves: source.moves.slice(0, baseTurn) };
       let moves: Move[];
       let cursor: number;
       if (branch) {
         const expected = { ...branch.base, moves: branch.base.moves.slice(0, baseTurn) };
         if (JSON.stringify(expected) !== JSON.stringify(base))
-          throw new Error('原局已改变，无法还原该试下');
+          throw new Error(t('trialGameChanged'));
         const prefix = branch.base.moves.slice(baseTurn);
         moves = [...prefix, ...branch.moves];
         const ply = link.ply ?? 0;
-        if (ply > branch.moves.length) throw new Error('试下手数超出分支范围');
+        if (ply > branch.moves.length) throw new Error(t('invalidTrialTurn'));
         cursor = prefix.length + ply;
       } else {
         moves = link.turn === undefined ? message.context!.trialMoves : [];
@@ -398,7 +429,7 @@ export default function App() {
       setScoring(false);
       setDead([]);
       setError('');
-      setNotice('');
+      setNotice(null);
       // Apply board and cursor in the same render when crossing games; an old trial
       // can be illegal on the newly selected board before the game-change effect.
       setTurn(baseTurn);
@@ -435,11 +466,11 @@ export default function App() {
       return;
     }
     if (position.passes >= 2) {
-      setError('双方已停一手');
+      setError(t('bothPlayersHavePassed'));
       return;
     }
     if (autoPlay && position.toPlay === aiColor) {
-      setError('轮到 AI 行棋');
+      setError(t('aiTurn'));
       return;
     }
     try {
@@ -454,7 +485,7 @@ export default function App() {
     payload: unknown,
     resumed?: AnalysisMessage,
   ) {
-    await run('分析中', async () => {
+    await run({ key: 'analyzing' }, async () => {
       const controller = new AbortController();
       activeStream.current = controller;
       followChat.current = true;
@@ -464,7 +495,7 @@ export default function App() {
         setMessages((previous) =>
           previous.map((message) =>
             message.id === id
-              ? { ...message, state: 'running', continuationId: undefined, status: '正在继续' }
+              ? { ...message, state: 'running', continuationId: undefined, status: t('resuming') }
               : message,
           ),
         );
@@ -475,7 +506,7 @@ export default function App() {
             id,
             question: title,
             text: '',
-            status: '连接中',
+            status: t('connecting'),
             state: 'running',
             evaluations: {},
             context: structuredClone(boardContext),
@@ -525,7 +556,7 @@ export default function App() {
               ? finishMessage(
                   message,
                   stopped ? 'stopped' : 'error',
-                  stopped ? '已停止' : (error as Error).message,
+                  stopped ? t('stopped') : localizeDiagnostic((error as Error).message),
                 )
               : message,
           ),
@@ -544,8 +575,9 @@ export default function App() {
     const text = question.trim();
     if (!text) return;
     const action: CoachAction =
-      (['move', 'position', 'variation'] as const).find((action) => labels[action] === text) ??
-      'chat';
+      (['move', 'position', 'variation'] as const).find((action) =>
+        locales.some((locale) => translate(locale, coachActionKeys[action]) === text),
+      ) ?? 'chat';
     await requestAnalysis(text, 'coach', {
       game: current,
       context: boardContext,
@@ -559,7 +591,7 @@ export default function App() {
   }
   async function importFile(file: File) {
     if (file.size > 2_000_000) {
-      setError('棋谱超过 2 MB 限制');
+      setError(t('sgfTooLarge'));
       return;
     }
     try {
@@ -569,9 +601,12 @@ export default function App() {
       library.newGame(imported.game);
       setTurn(imported.game.moves.length);
       setShowGames(false);
-      setNotice(
-        [`已导入 ${file.name} · ${imported.game.moves.length} 手`, ...imported.warnings].join(' '),
-      );
+      setNotice({
+        kind: 'import',
+        name: file.name,
+        moves: imported.game.moves.length,
+        warnings: imported.warnings,
+      });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -582,25 +617,44 @@ export default function App() {
   const llmLabel = selectedLlm
     ? `${providerNames[selectedLlm]} · ${availabilityLabel(status?.llm?.providers[selectedLlm])}`
     : status?.llm
-      ? 'LLM · 未连接'
-      : 'LLM · 检测中';
+      ? t('llmOffline')
+      : t('llmChecking');
   const engineStatus = engineLabel(status?.engine);
   const engineProgress =
     status?.engine.phase && !['ready', 'stopped'].includes(status.engine.phase) ? engineStatus : '';
-  const workspaceError =
-    error || library.error || (status?.engine.phase === 'error' ? engineProgress : '');
+  const workspaceError = localizeDiagnostic(
+    error ||
+      library.error ||
+      (status?.engine.phase === 'error' ? status.engine.error || engineProgress : ''),
+  );
   const liveSearch = searchStatsLabel(searchProgress);
   const backgroundSearch =
     evaluations.pendingTurn !== null
-      ? [`分析第 ${evaluations.pendingTurn} 手`, searchStatsLabel(evaluations.progress)]
+      ? [
+          t('analyzingMove', { v0: evaluations.pendingTurn }),
+          searchStatsLabel(evaluations.progress),
+        ]
           .filter(Boolean)
           .join(' · ')
       : '';
+  const noticeLabel =
+    notice?.kind === 'move'
+      ? [localizeDiagnostic(notice.method), searchStatsLabel(notice.analysis)]
+          .filter(Boolean)
+          .join(' · ')
+      : notice?.kind === 'import'
+        ? [
+            t('importedMoves', { v0: notice.name, v1: notice.moves }),
+            ...notice.warnings.map((warning) => localizeDiagnostic(warning)),
+          ].join(' ')
+        : notice?.kind === 'fork'
+          ? t('forkSaved')
+          : '';
   const workspaceStatus =
     workspaceError ||
-    (busy ? [busy, liveSearch].filter(Boolean).join(' · ') : '') ||
+    (busy ? [t(busy.key, busy.values), liveSearch].filter(Boolean).join(' · ') : '') ||
     engineProgress ||
-    notice ||
+    noticeLabel ||
     backgroundSearch;
   const timelineTurn = current.moves.length;
   const timelineTotal = Math.max(game.moves.length, turn + (trial?.moves.length ?? 0));
@@ -612,12 +666,12 @@ export default function App() {
         enabled={!chatCollapsed && !settings && !setup && !showGames && !showConversations}
         revision={`${boardKey}:${activeCoach?.message}:${activeCoach?.group}:${library.conversationId}`}
       />
-      <section className="board-panel" aria-label="棋盘">
+      <section className="board-panel" aria-label={t('board')}>
         <div className="board-toolbar">
           <button
             className="settings-trigger"
-            aria-label="设置"
-            title="设置"
+            aria-label={t('settings')}
+            title={t('settings')}
             aria-haspopup="dialog"
             aria-expanded={settings}
             onClick={() => setSettings(true)}
@@ -628,7 +682,7 @@ export default function App() {
             <input
               type="checkbox"
               role="switch"
-              aria-label="AI 自动落子"
+              aria-label={t('aiAutoPlay')}
               checked={autoPlay}
               disabled={locked}
               onChange={(e) => {
@@ -636,11 +690,11 @@ export default function App() {
                 setBotFailed(false);
               }}
             />
-            AI 自动落子
+            {t('aiAutoPlay')}
           </label>
           <select
             className="ai-color-select"
-            aria-label="AI 执子"
+            aria-label={t('aiColor')}
             value={aiColor}
             disabled={locked}
             onChange={(e) => {
@@ -648,14 +702,14 @@ export default function App() {
               setBotFailed(false);
             }}
           >
-            <option value="W">AI 执白</option>
-            <option value="B">AI 执黑</option>
+            <option value="W">{t('aiPlaysWhite')}</option>
+            <option value="B">{t('aiPlaysBlack')}</option>
           </select>
           <button disabled={locked} onClick={() => setSetup(true)}>
-            新对局
+            {t('newGame')}
           </button>
           <button disabled={locked} onClick={() => setShowGames(true)}>
-            历史棋局
+            {t('gameHistory')}
           </button>
           <input
             ref={fileInput}
@@ -670,17 +724,19 @@ export default function App() {
           />
         </div>
         <div className="players">
-          <span title={game.metadata.PB || '黑方'}>
+          <span title={game.metadata.PB || t('blackPlayer')}>
             <i className="stone-dot black" />
-            {game.metadata.PB || '黑方'}
-            <small>提 {position.captures.B}</small>
+            {game.metadata.PB || t('blackPlayer')}
+            <small>{t('captures', { v0: position.captures.B })}</small>
           </span>
           <span className="turn-badge">
-            {position.passes >= 2 ? '双方停一手' : `${position.toPlay === 'B' ? '黑' : '白'}方行棋`}
+            {position.passes >= 2
+              ? t('bothPassed')
+              : t('toPlay', { v0: position.toPlay === 'B' ? t('black') : t('white') })}
           </span>
-          <span title={game.metadata.PW || '白方'}>
-            <small>提 {position.captures.W}</small>
-            {game.metadata.PW || '白方'}
+          <span title={game.metadata.PW || t('whitePlayer')}>
+            <small>{t('captures', { v0: position.captures.W })}</small>
+            {game.metadata.PW || t('whitePlayer')}
             <i className="stone-dot white" />
           </span>
         </div>
@@ -712,17 +768,18 @@ export default function App() {
         <div className="board-bottom">
           <div className="move-controls">
             <button
-              aria-label="上一手"
+              aria-label={t('previousMove')}
               disabled={locked || !timelineTurn}
               onClick={() => navigate(timelineTurn - 1)}
             >
               ←
             </button>
             <span className="move-count">
-              <b>{timelineTurn}</b> / {timelineTotal} 手
+              <b>{timelineTurn}</b>
+              {t('moveTotal', { v0: timelineTotal })}
             </span>
             <button
-              aria-label="下一手"
+              aria-label={t('nextMove')}
               disabled={locked || timelineTurn >= timelineLimit}
               onClick={() => navigate(timelineTurn + 1)}
             >
@@ -739,7 +796,7 @@ export default function App() {
           </div>
           <div className="board-tools">
             <button disabled={locked || scoring} onClick={() => place('pass')}>
-              停一手
+              {t('pass')}
             </button>
             <div className="board-tools-right">
               <button
@@ -747,7 +804,7 @@ export default function App() {
                 aria-pressed={showCandidates}
                 onClick={() => setShowCandidates((value) => !value)}
               >
-                候选点
+                {t('candidates')}
               </button>
               <button
                 className={showOwnership ? 'selected' : ''}
@@ -755,30 +812,38 @@ export default function App() {
                 aria-pressed={showOwnership}
                 onClick={() => setShowOwnership((value) => !value)}
               >
-                领地预测
+                {t('ownership')}
               </button>
               <button
                 className={scoring ? 'selected' : ''}
                 disabled={locked || game.rules === 'japanese'}
-                title={game.rules === 'japanese' ? '日本规则数目未实现' : '中国规则面积计分'}
+                title={
+                  game.rules === 'japanese'
+                    ? t('japaneseFinalScoringIsNotImplemented')
+                    : t('chineseAreaScoring')
+                }
                 onClick={() => {
                   setScoring(!scoring);
                   setDead([]);
                 }}
               >
-                数目
+                {t('score')}
               </button>
             </div>
           </div>
           <div className="board-secondary">
             <div className="board-meta">
-              {game.size} 路 · {game.rules === 'chinese' ? '中国' : '日本'} · 贴 {game.komi}
+              {t('boardSummary', {
+                v0: game.size,
+                v1: game.rules === 'chinese' ? t('chinese') : t('japanese'),
+                v2: game.komi,
+              })}
             </div>
             <div className="trial-bar" aria-hidden={turn === game.moves.length && !trial}>
               <span>
                 {trial
-                  ? `试下 · 第 ${turn} 手起 ${trial.cursor} / ${trial.moves.length} 手`
-                  : '复盘中'}
+                  ? t('trialProgress', { v0: turn, v1: trial.cursor, v2: trial.moves.length })
+                  : t('reviewing')}
               </span>
               <button
                 disabled={locked || !trial}
@@ -788,18 +853,23 @@ export default function App() {
                   setScoring(false);
                 }}
               >
-                清空试下
+                {t('clearTrial')}
               </button>
               <button disabled={locked} onClick={forkGame}>
-                {trial ? '保存试下为新棋局' : '分支新棋局'}
+                {trial ? t('saveTrialAsNewGame') : t('newGameFromHere')}
               </button>
             </div>
           </div>
           {scoring && (
             <div className="score-line">
-              面积计分：黑 {score.black} · 白 {score.white} + {game.komi + handicapBonus}　
-              {score.lead >= 0 ? '黑' : '白'} +{Math.abs(score.lead).toFixed(1)}{' '}
-              <span>标记死子 {dead.length}</span>
+              {t('areaBlackWhite', {
+                v0: score.black,
+                v1: score.white,
+                v2: game.komi + handicapBonus,
+                v3: score.lead >= 0 ? t('black') : t('white'),
+                v4: Math.abs(score.lead).toFixed(1),
+              })}
+              <span>{t('deadStonesMarked', { v0: dead.length })}</span>
             </div>
           )}
         </div>
@@ -808,8 +878,8 @@ export default function App() {
         <button
           type="button"
           className="chat-collapse-toggle"
-          aria-label={chatCollapsed ? '展开对话面板' : '收起对话面板'}
-          title={chatCollapsed ? '展开对话面板' : '收起对话面板'}
+          aria-label={chatCollapsed ? t('expandChatPanel') : t('collapseChatPanel')}
+          title={chatCollapsed ? t('expandChatPanel') : t('collapseChatPanel')}
           aria-expanded={!chatCollapsed}
           aria-controls="chat-panel"
           onClick={() => setChatCollapsed((collapsed) => !collapsed)}
@@ -825,7 +895,7 @@ export default function App() {
           title={workspaceStatus}
         >
           <span>{workspaceStatus}</span>
-          {library.error && <button onClick={library.retry}>重试</button>}
+          {library.error && <button onClick={library.retry}>{t('retry')}</button>}
           {botFailed && (
             <button
               onClick={() => {
@@ -833,22 +903,27 @@ export default function App() {
                 setError('');
               }}
             >
-              重试
+              {t('retry')}
             </button>
           )}
           {!busy && (error || (!library.error && !engineProgress && notice)) && (
             <button
-              aria-label="关闭通知"
+              aria-label={t('dismissNotification')}
               onClick={() => {
                 setError('');
-                setNotice('');
+                setNotice(null);
               }}
             >
               ×
             </button>
           )}
         </div>
-        <aside id="chat-panel" className="chat-panel" aria-label="分析对话" hidden={chatCollapsed}>
+        <aside
+          id="chat-panel"
+          className="chat-panel"
+          aria-label={t('analysisChat')}
+          hidden={chatCollapsed}
+        >
           <div className="chat-toolbar">
             <span
               className={`engine-status llm-status ${llmReady ? 'online' : ''}`}
@@ -875,7 +950,7 @@ export default function App() {
             ready={!!status?.engine.ready}
             completing={evaluations.completing}
             pendingTurn={evaluations.pendingTurn}
-            error={evaluations.error}
+            error={localizeDiagnostic(evaluations.error)}
             navigate={navigate}
             complete={evaluations.complete}
             stop={evaluations.stop}
@@ -900,23 +975,33 @@ export default function App() {
                 ))}
               </div>
             ) : (
-              <span className="evaluation-empty">暂无候选变化</span>
+              <span className="evaluation-empty">{t('noCandidates')}</span>
             )}
           </EvaluationPanel>
           <div className="conversation-toolbar">
-            <span title={library.activeConversation.title}>{library.activeConversation.title}</span>
+            <span
+              title={
+                library.activeConversation.messages.length
+                  ? library.activeConversation.title
+                  : t('newChat')
+              }
+            >
+              {library.activeConversation.messages.length
+                ? library.activeConversation.title
+                : t('newChat')}
+            </span>
             <button disabled={locked} onClick={() => library.newConversation()}>
-              新对话
+              {t('newChat')}
             </button>
             <button disabled={locked} onClick={() => setShowConversations(true)}>
-              历史对话
+              {t('chatHistory')}
             </button>
           </div>
           <div
             className="chat-log"
             ref={chatLog}
             role="log"
-            aria-label="分析结果"
+            aria-label={t('analysisResults')}
             aria-live="polite"
             onScroll={(e) => {
               const log = e.currentTarget;
@@ -927,9 +1012,14 @@ export default function App() {
               <article className="chat-message" key={message.id}>
                 {message.context && (
                   <div className="message-context">
-                    {message.context.gameTitle} · 第 {message.context.turn} 手
-                    {message.context.trialMoves.length > 0 &&
-                      ` · 试下 +${message.context.trialMoves.length} 手`}
+                    {t('messageContext', {
+                      v0: message.context.gameTitle,
+                      v1: message.context.turn,
+                      v2:
+                        message.context.trialMoves.length > 0
+                          ? t('trialMoves', { v0: message.context.trialMoves.length })
+                          : '',
+                    })}
                     <small title={message.context.gameId}>
                       {' '}
                       · {message.context.gameId.slice(0, 8)}
@@ -947,14 +1037,20 @@ export default function App() {
                   return (
                     <div className="search-result" key={phase}>
                       <span>
-                        {phase === 'before' ? '落子前' : '当前局面'} ·{' '}
-                        {final ? '搜索完成' : message.state === 'running' ? '搜索中' : '搜索未完成'}{' '}
+                        {phase === 'before' ? t('beforeMove') : t('currentBoardPosition')} ·{' '}
+                        {final
+                          ? t('searchComplete')
+                          : message.state === 'running'
+                            ? t('searching')
+                            : t('searchIncomplete')}{' '}
                         · {searchStatsLabel(value)}
                       </span>
                       <div>
-                        黑胜率 {(value.rootInfo.winrate * 100).toFixed(1)}% · 黑目差{' '}
-                        {value.rootInfo.scoreLead > 0 ? '+' : ''}
-                        {value.rootInfo.scoreLead.toFixed(1)}
+                        {t('analysisEvaluation', {
+                          v0: (value.rootInfo.winrate * 100).toFixed(1),
+                          v1: value.rootInfo.scoreLead > 0 ? '+' : '',
+                          v2: value.rootInfo.scoreLead.toFixed(1),
+                        })}
                       </div>
                       {candidate && (
                         <div className="search-pv">{candidate.pv.slice(0, 8).join(' → ')}</div>
@@ -986,13 +1082,13 @@ export default function App() {
                     role={message.state === 'error' ? 'alert' : undefined}
                   >
                     {message.state === 'running' && <i />}
-                    {message.status}
+                    {localizeDiagnostic(message.status || '')}
                     {message.state === 'paused' && message.continuationId && (
                       <button
                         type="button"
                         className="continue-coach"
                         disabled={locked}
-                        title="保留已有结果，补充一轮额度继续原任务"
+                        title={t('keepResultsAndAddAnotherAllowanceToContinue')}
                         onClick={() =>
                           void requestAnalysis(
                             message.question,
@@ -1002,7 +1098,7 @@ export default function App() {
                           )
                         }
                       >
-                        继续
+                        {t('continue')}
                       </button>
                     )}
                   </div>
@@ -1017,7 +1113,7 @@ export default function App() {
               void ask();
             }}
           >
-            <div className="quick-actions" aria-label="快捷提示">
+            <div className="quick-actions" aria-label={t('quickPrompts')}>
               {(['move', 'position', 'variation'] as const).map((action) => (
                 <button
                   type="button"
@@ -1034,9 +1130,9 @@ export default function App() {
             </div>
             <textarea
               ref={questionInput}
-              aria-label="问题"
+              aria-label={t('question')}
               maxLength={4000}
-              placeholder="输入问题"
+              placeholder={t('enterAQuestion')}
               value={question}
               disabled={locked}
               onChange={(e) => setQuestion(e.target.value)}
@@ -1059,7 +1155,7 @@ export default function App() {
                   )
                 }
               >
-                导出分析
+                {t('exportAnalysis')}
               </button>
               {activeStream.current && locked ? (
                 <button
@@ -1067,11 +1163,11 @@ export default function App() {
                   className="primary"
                   onClick={() => activeStream.current?.abort()}
                 >
-                  停止
+                  {t('stop')}
                 </button>
               ) : (
                 <button className="primary" disabled={locked || !llmReady || !question.trim()}>
-                  发送
+                  {t('send')}
                 </button>
               )}
             </div>
@@ -1079,15 +1175,15 @@ export default function App() {
         </aside>
       </div>
       {settings && (
-        <Dialog title="设置" wide onClose={() => setSettings(false)}>
-          <div className="settings-tabs" role="tablist" aria-label="设置类别">
+        <Dialog title={t('settings')} wide onClose={() => setSettings(false)}>
+          <div className="settings-tabs" role="tablist" aria-label={t('settingsCategory')}>
             <button
               role="tab"
               aria-selected={settingsTab === 'general'}
               className={settingsTab === 'general' ? 'selected' : ''}
               onClick={() => setSettingsTab('general')}
             >
-              通用
+              {t('general')}
             </button>
             <button
               role="tab"
@@ -1095,7 +1191,7 @@ export default function App() {
               className={settingsTab === 'models' ? 'selected' : ''}
               onClick={() => setSettingsTab('models')}
             >
-              围棋模型
+              {t('goModels')}
             </button>
             <button
               role="tab"
@@ -1103,7 +1199,7 @@ export default function App() {
               className={settingsTab === 'training' ? 'selected' : ''}
               onClick={() => setSettingsTab('training')}
             >
-              AI 自动落子
+              {t('aiAutoPlay')}
             </button>
             <button
               role="tab"
@@ -1111,7 +1207,7 @@ export default function App() {
               className={settingsTab === 'connections' ? 'selected' : ''}
               onClick={() => setSettingsTab('connections')}
             >
-              连接 LLM
+              {t('connectLlm')}
             </button>
           </div>
           {settingsTab === 'general' ? (
@@ -1119,7 +1215,7 @@ export default function App() {
           ) : settingsTab === 'training' ? (
             <fieldset disabled={locked}>
               <label>
-                对手级位 / 段位
+                {t('opponentRank')}
                 <select
                   value={training.rank}
                   onChange={(e) =>
@@ -1133,13 +1229,13 @@ export default function App() {
                 >
                   {RANKS.map((rank) => (
                     <option key={rank} value={rank}>
-                      {rank.slice(0, -1)} {rank.endsWith('k') ? '级' : '段'}
+                      {rank.slice(0, -1)} {rank.endsWith('k') ? t('kyu') : t('dan')}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                选点方式
+                {t('moveSelection')}
                 <select
                   value={training.mode}
                   onChange={(e) =>
@@ -1147,10 +1243,10 @@ export default function App() {
                   }
                 >
                   <option value="human">
-                    HumanSL{status?.engine.humanModel ? '' : '（未配置）'}
+                    HumanSL{status?.engine.humanModel ? '' : t('notConfiguredSuffix')}
                   </option>
-                  <option value="balanced">随机劣手</option>
-                  <option value="strong">最强候选</option>
+                  <option value="balanced">{t('randomWeakerMoves')}</option>
+                  <option value="strong">{t('strongestCandidate')}</option>
                 </select>
               </label>
               <fieldset
@@ -1160,31 +1256,33 @@ export default function App() {
                 }
               >
                 <label>
-                  随机程度 <output>{Math.round(training.randomness * 100)}%</output>
+                  {t('randomness')}
+                  <output>{Math.round(training.randomness * 100)}%</output>
                   <input
                     type="range"
                     min="0"
                     max="1"
                     step="0.01"
-                    aria-label="随机程度"
+                    aria-label={t('randomness')}
                     value={training.randomness}
                     onChange={(e) => setTraining((t) => ({ ...t, randomness: +e.target.value }))}
                   />
                 </label>
                 <label>
-                  激进度 <output>{Math.round(training.aggression * 100)}%</output>
+                  {t('aggression')}
+                  <output>{Math.round(training.aggression * 100)}%</output>
                   <input
                     type="range"
                     min="0"
                     max="1"
                     step="0.05"
-                    aria-label="激进度"
+                    aria-label={t('aggression')}
                     value={training.aggression}
                     onChange={(e) => setTraining((t) => ({ ...t, aggression: +e.target.value }))}
                   />
                 </label>
                 <label>
-                  候选目损上限
+                  {t('maximumCandidatePointLoss')}
                   <input
                     type="number"
                     min="0"
@@ -1235,12 +1333,12 @@ export default function App() {
         </Dialog>
       )}
       {showGames && (
-        <Dialog title="历史棋局" onClose={() => setShowGames(false)}>
+        <Dialog title={t('gameHistory')} onClose={() => setShowGames(false)}>
           <div className="history-actions">
             <button disabled={locked} onClick={() => fileInput.current?.click()}>
-              导入 SGF
+              {t('importSgf')}
             </button>
-            <span>棋局自动保存 · {library.games.length} 局</span>
+            <span>{t('autoSavedGames', { v0: library.games.length })}</span>
           </div>
           <div className="history-list">
             {library.games.map((item) => (
@@ -1256,10 +1354,13 @@ export default function App() {
                     setShowGames(false);
                   }}
                 >
-                  <b>{item.title}</b>
+                  <b>{gameTitle(item.game)}</b>
                   <small>
-                    {item.game.moves.length} 手 · {new Date(item.updatedAt).toLocaleString()} ·{' '}
-                    {item.id.slice(0, 8)}
+                    {t('gameHistoryEntry', {
+                      v0: item.game.moves.length,
+                      v1: formatDate(item.updatedAt),
+                      v2: item.id.slice(0, 8),
+                    })}
                   </small>
                 </button>
                 <button
@@ -1267,7 +1368,7 @@ export default function App() {
                     download(`${item.id}.sgf`, exportSgf(item.game), 'application/x-go-sgf')
                   }
                 >
-                  导出 SGF
+                  {t('exportSgf')}
                 </button>
               </article>
             ))}
@@ -1275,7 +1376,7 @@ export default function App() {
         </Dialog>
       )}
       {showConversations && (
-        <Dialog title="历史对话" onClose={() => setShowConversations(false)}>
+        <Dialog title={t('chatHistory')} onClose={() => setShowConversations(false)}>
           <div className="history-list">
             {library.conversations.map((item) => (
               <article key={item.id}>
@@ -1287,9 +1388,9 @@ export default function App() {
                     setShowConversations(false);
                   }}
                 >
-                  <b>{item.title}</b>
+                  <b>{item.messages.length ? item.title : t('newChat')}</b>
                   <small>
-                    {item.messages.length} 轮 · {new Date(item.updatedAt).toLocaleString()}
+                    {t('exchanges', { v0: item.messages.length, v1: formatDate(item.updatedAt) })}
                   </small>
                 </button>
               </article>
@@ -1298,7 +1399,7 @@ export default function App() {
         </Dialog>
       )}
       {setup && (
-        <Dialog title="新对局" onClose={() => setSetup(false)}>
+        <Dialog title={t('newGame')} onClose={() => setSetup(false)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -1311,17 +1412,17 @@ export default function App() {
             }}
           >
             <label>
-              棋盘
+              {t('board')}
               <select value={size} onChange={(e) => setSize(+e.target.value)}>
                 {[9, 13, 19].map((n) => (
                   <option key={n} value={n}>
-                    {n} 路
+                    {t('boardSize', { v0: n })}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              规则
+              {t('rules')}
               <select
                 value={rules}
                 onChange={(e) => {
@@ -1329,12 +1430,12 @@ export default function App() {
                   if (!handicap) setKomi(e.target.value === 'chinese' ? 7.5 : 6.5);
                 }}
               >
-                <option value="chinese">中国规则</option>
-                <option value="japanese">日本规则</option>
+                <option value="chinese">{t('chineseRules')}</option>
+                <option value="japanese">{t('japaneseRules')}</option>
               </select>
             </label>
             <label>
-              让子
+              {t('handicap')}
               <select
                 value={handicap}
                 onChange={(e) => {
@@ -1344,13 +1445,13 @@ export default function App() {
               >
                 {[0, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
                   <option key={n} value={n}>
-                    {n ? `${n} 子，白先` : '分先'}
+                    {n ? t('stonesWhiteFirst', { v0: n }) : t('evenGame')}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              贴目
+              {t('komi')}
               <input
                 type="number"
                 min="-100"
@@ -1361,7 +1462,7 @@ export default function App() {
                 onChange={(e) => setKomi(+e.target.value)}
               />
             </label>
-            <button className="primary full">开始</button>
+            <button className="primary full">{t('start')}</button>
           </form>
         </Dialog>
       )}

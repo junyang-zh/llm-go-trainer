@@ -1,5 +1,7 @@
 # LLM 配置
 
+[English](en/llm.md) · [简体中文](llm.md) · [繁體中文](zh-TW/llm.md) · [日本語](ja/llm.md) · [한국어](ko/llm.md)
+
 [返回 README](../README.md) · [使用指南](usage.md)
 
 在「设置 → 连接 LLM」配置服务。也可使用 `.env` 提供默认值，文件位置见[环境配置](development.md#环境配置)。更改环境变量后需重启应用。
@@ -69,5 +71,7 @@ Claude npm 包同理设置 `CLAUDE_PATH` / `CLAUDE_SCRIPT`，以该包实际入�
 - [可复用 go-coach 技能](../skills/go-coach/SKILL.md)：手动调用时读入同一教练规范。
 
 解释某手时，LLM 会收到落子前后的棋盘、引擎候选与变化数据，并可按需补充搜索。提示词引导教练使用挖、粘、冲断、虎、立等符合棋形的术语说明目的与取舍。
+
+界面语言设置不修改这份中文提示词，也不会自动翻译生成回答。
 
 Agent 正文支持坐标高亮、互斥变化开关及可保存的试下分支。语法与 `edit_trial` 工具约定见[交互讲解与试下分支](coach-links.md)。

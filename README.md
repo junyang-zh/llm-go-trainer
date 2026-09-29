@@ -1,5 +1,7 @@
 # LLM Go Trainer
 
+[English](README.en.md) · [简体中文](README.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
+
 围棋训练工具，支持本地部署 [KataGo](https://github.com/lightvector/katago) 对战、棋谱复盘和接入 LLM agent 讲解。支持 macOS / Windows。
 
 ![LLM Go Trainer 桌面界面：棋盘复盘与试下、KataGo 胜率和目差曲线，以及 LLM 教练讲解](assets/UI-Example.png)
@@ -12,6 +14,8 @@ _在同一界面复盘棋局、探索变化，并结合 KataGo 分析与 LLM 讲
 - **棋谱复盘**：导入 / 导出 SGF、保存历史棋局，在任意历史局面试下变化并另存新棋局。
 - **局势分析**：查看胜率、目差曲线、候选点、主要变化与归属预测。
 - **AI 教练**：接入 DeepSeek API、Codex CLI 或 Claude Code CLI，结合引擎分析讲解选点、局势与变化。
+
+- **界面语言**：英文、简体中文、繁体中文、日语、韩语，默认跟随系统语言。
 
 详细操作与功能边界见[使用指南](docs/usage.md)。
 
@@ -33,6 +37,7 @@ _在同一界面复盘棋局、探索变化，并结合 KataGo 分析与 LLM 讲
 | [使用指南](docs/usage.md)          | 安装、对战、棋谱复盘、试下、教练对话与应用更新          |
 | [引擎与模型](docs/engines.md)      | KataGo 安装、模型库、计算后端、自定义路径与外部 AI 接口 |
 | [LLM 配置](docs/llm.md)            | DeepSeek / Codex / Claude Code 接入、凭据与讲棋提示词   |
+| [交互讲解](docs/coach-links.md)    | 坐标链接、变化开关与试下分支                            |
 | [开发指南](docs/development.md)    | Electron 源码启动、浏览器调试、测试与项目目录           |
 | [构建与发布](docs/releases.md)     | 本地打包、GitHub Release、签名、公证与自动更新          |
 | [架构与路线](docs/architecture.md) | 模块职责、流式协议、数据存储与后续计划                  |

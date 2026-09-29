@@ -1,17 +1,12 @@
+import { displayModelName } from './ui-labels';
+import { t, localizeDiagnostic, formatDateOnly } from './i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EngineStatus } from '../shared/types';
 import type { ModelEntry, ModelsView, ModelTier } from '../shared/models';
 import { api } from './api';
 
-const tiers: Record<ModelTier, string> = {
-  light: '轻量快速',
-  balanced: '日常均衡',
-  advanced: '进阶分析',
-  other: '其他模型',
-  human: '人类棋风',
-};
 export function modelBytes(bytes?: number) {
-  if (bytes === undefined) return '大小待获取';
+  if (bytes === undefined) return t('sizeUnknown');
   return bytes >= 1024 ** 3
     ? `${(bytes / 1024 ** 3).toFixed(2)} GB`
     : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
@@ -27,6 +22,13 @@ export function ModelSettings({
   busy?: boolean;
   children: ReactNode;
 }) {
+  const tiers: Record<ModelTier, string> = {
+    light: t('lightAndFast'),
+    balanced: t('balanced'),
+    advanced: t('advancedAnalysis'),
+    other: t('otherModels'),
+    human: t('humanStyle'),
+  };
   const [view, setView] = useState<ModelsView>();
   const [error, setError] = useState('');
   const [working, setWorking] = useState('');
@@ -80,7 +82,9 @@ export function ModelSettings({
   const canSelect =
     !!view?.canSelect && status?.mode !== 'external' && !view.pending && !busy && !working;
   const matches = (model: ModelEntry) =>
-    `${model.name} ${model.architecture}`.toLowerCase().includes(query.toLowerCase());
+    `${model.name} ${displayModelName(model)} ${model.architecture}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
   const visible =
     view?.models.filter(
       (model) =>
@@ -115,27 +119,36 @@ export function ModelSettings({
       <article
         key={model.id}
         className={`katago-model-card ${active ? 'active-model' : ''}`}
-        aria-label={model.name}
+        aria-label={displayModelName(model)}
       >
         <div className="model-card-heading">
           <span className={`model-tier tier-${model.tier}`}>{tiers[model.tier]}</span>
           <span className="model-badge">
-            {changing ? '验证中' : active ? '已选用' : model.installed ? '已下载' : '未下载'}
+            {changing
+              ? t('validating')
+              : active
+                ? t('selected')
+                : model.installed
+                  ? t('downloaded')
+                  : t('notDownloaded')}
           </span>
         </div>
-        <h4>{model.name}</h4>
+        <h4>{displayModelName(model)}</h4>
         <div className="model-metadata">
-          {model.architecture} · {modelBytes(model.bytes || model.diskBytes)} ·{' '}
-          {model.boards.join(' / ')} 路
+          {t('modelMetadata', {
+            v0: localizeDiagnostic(model.architecture),
+            v1: modelBytes(model.bytes || model.diskBytes),
+            v2: model.boards.join(' / '),
+          })}
         </div>
         {downloading && (
           <div className="model-download-progress" role="status">
             <span>
-              {model.phase === 'queued' ? '排队中' : '下载中'}
+              {model.phase === 'queued' ? t('queued') : t('downloading')}
               {percent !== undefined ? ` · ${percent}%` : ''}
             </span>
             <progress
-              aria-label={`${model.name} 下载进度`}
+              aria-label={t('modelDownloadProgress', { v0: displayModelName(model) })}
               max={model.total || undefined}
               value={model.total ? (model.received ?? 0) : undefined}
             />
@@ -146,13 +159,13 @@ export function ModelSettings({
         )}
         {model.error && (
           <p className="error" role="alert">
-            {model.error}
+            {localizeDiagnostic(model.error)}
           </p>
         )}
         <div className="model-card-actions">
           {downloading ? (
             <button disabled={!!working} onClick={() => void action('cancel', { id: model.id })}>
-              取消下载
+              {t('cancelDownload')}
             </button>
           ) : !model.installed ? (
             <button
@@ -160,7 +173,9 @@ export function ModelSettings({
               disabled={!!working}
               onClick={() => void action('download', { id: model.id })}
             >
-              {model.phase === 'error' || model.phase === 'canceled' ? '重新下载' : '下载模型'}
+              {model.phase === 'error' || model.phase === 'canceled'
+                ? t('downloadAgain')
+                : t('downloadModel')}
             </button>
           ) : !active ? (
             <button
@@ -168,21 +183,21 @@ export function ModelSettings({
               disabled={!canSelect || !companionReady}
               onClick={() => void useModel(model)}
             >
-              使用此模型
+              {t('useThisModel')}
             </button>
           ) : null}
           {model.diskBytes > 0 && !active && !changing && (
             <button disabled={!!working} onClick={() => setConfirmDelete(model.id)}>
-              删除
+              {t('delete')}
             </button>
           )}
           <a href={model.source} target="_blank" rel="noreferrer">
-            来源 ↗
+            {t('source')}
           </a>
         </div>
         {confirmDelete === model.id && (
           <div className="model-delete-confirm" role="alert">
-            <p>删除本地模型，释放 {modelBytes(model.diskBytes)}？</p>
+            <p>{t('deleteModelConfirmation', { v0: modelBytes(model.diskBytes) })}</p>
             <button
               disabled={!!working}
               onClick={() =>
@@ -191,15 +206,15 @@ export function ModelSettings({
                 })
               }
             >
-              确认删除
+              {t('confirmDeletion')}
             </button>
             <button disabled={!!working} onClick={() => setConfirmDelete(undefined)}>
-              保留
+              {t('keep')}
             </button>
           </div>
         )}
         <details className="model-file-details">
-          <summary>文件详情</summary>
+          <summary>{t('fileDetails')}</summary>
           <p>{model.url.split('/').at(-1)}</p>
           <code>SHA-256 {model.sha256}</code>
         </details>
@@ -207,23 +222,23 @@ export function ModelSettings({
     );
   }
   return (
-    <section className="katago-model-settings" aria-label="KataGo 模型管理">
+    <section className="katago-model-settings" aria-label={t('katagoModelManager')}>
       {children}
       <header className="models-heading">
-        <h3>模型</h3>
+        <h3>{t('model')}</h3>
         <span className="model-storage">
-          本地模型 {view ? modelBytes(view.storageBytes) : '读取中…'}
+          {t('localModels', { v0: view ? modelBytes(view.storageBytes) : t('loading') })}
         </span>
       </header>
       <div className="model-active-summary">
         <div>
-          <span className="model-eyebrow">当前分析模型</span>
-          <strong>{selected?.name || '读取模型设置…'}</strong>
+          <span className="model-eyebrow">{t('currentAnalysisModel')}</span>
+          <strong>{selected ? displayModelName(selected) : t('readingModelSettings')}</strong>
         </div>
         <label>
-          人类棋风模型
+          {t('humanStyleModel')}
           <select
-            aria-label="人类棋风模型"
+            aria-label={t('humanStyleModel')}
             value={view?.selected.human ?? ''}
             disabled={!canSelect || !selected?.installed}
             onChange={(event) =>
@@ -233,13 +248,13 @@ export function ModelSettings({
               })
             }
           >
-            <option value="">关闭 HumanSL</option>
+            <option value="">{t('disableHumansl')}</option>
             {view?.models
               .filter((model) => model.role === 'human')
               .map((model) => (
                 <option key={model.id} value={model.id} disabled={!model.installed}>
-                  {model.name}
-                  {!model.installed ? '（需先下载）' : ''}
+                  {displayModelName(model)}
+                  {!model.installed ? t('downloadFirst') : ''}
                 </option>
               ))}
           </select>
@@ -247,25 +262,21 @@ export function ModelSettings({
       </div>
       {pending && (
         <p className="model-notice" role="status">
-          正在验证 {pending.name}…
+          {t('validatingModel', { v0: displayModelName(pending) })}
         </p>
       )}
-      {busy && <p className="model-notice">分析中，暂不可切换模型。</p>}
-      {view && !view.canSelect && (
-        <p className="model-notice">
-          当前使用 .env 自定义引擎。可管理下载；移除 KATAGO_MODEL 配置后可在此切换模型。
-        </p>
-      )}
+      {busy && <p className="model-notice">{t('modelsCannotBeSwitchedDuringAnalysis')}</p>}
+      {view && !view.canSelect && <p className="model-notice">{t('customEngineModelsHelp')}</p>}
       {status?.mode === 'external' && (
-        <p className="model-notice">切换到 KataGo 后可选择本地模型。</p>
+        <p className="model-notice">{t('switchToKatagoToSelectLocalModels')}</p>
       )}
-      {view?.notice && <p className="model-notice">{view.notice}</p>}
+      {view?.notice && <p className="model-notice">{localizeDiagnostic(view.notice)}</p>}
       <div className="model-browser-toolbar">
-        <div className="model-filters" role="group" aria-label="筛选模型">
+        <div className="model-filters" role="group" aria-label={t('filterModels')}>
           {[
-            ['recommended', '推荐'],
-            ['downloaded', '已下载'],
-            ['all', '全部'],
+            ['recommended', t('recommended')],
+            ['downloaded', t('downloaded')],
+            ['all', t('all')],
           ].map(([value, name]) => (
             <button
               key={value}
@@ -278,23 +289,23 @@ export function ModelSettings({
           ))}
         </div>
         <input
-          aria-label="搜索模型"
-          placeholder="搜索名称或网络结构"
+          aria-label={t('searchModels')}
+          placeholder={t('searchNameOrArchitecture')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
       {error && (
         <p className="error" role="alert">
-          {error}
+          {localizeDiagnostic(error)}
         </p>
       )}
       {!view ? (
-        <p role="status">正在读取本地模型…</p>
+        <p role="status">{t('readingLocalModels')}</p>
       ) : (
         <div className="katago-model-grid">{visible.map(card)}</div>
       )}
-      {view && !visible.length && <p className="model-empty">没有符合条件的模型</p>}
+      {view && !visible.length && <p className="model-empty">{t('noMatchingModels')}</p>}
       <div className="model-catalog-actions">
         <button
           disabled={!!working}
@@ -307,7 +318,7 @@ export function ModelSettings({
             })
           }
         >
-          {working === 'refresh' ? '正在读取官方目录…' : '获取最新官方模型'}
+          {working === 'refresh' ? t('readingOfficialCatalog') : t('getLatestOfficialModels')}
         </button>
         {view?.catalogUpdatedAt && (
           <button
@@ -321,17 +332,17 @@ export function ModelSettings({
               })
             }
           >
-            加载更早的模型
+            {t('loadEarlierModels')}
           </button>
         )}
         <span>
           {view?.catalogUpdatedAt
-            ? `目录更新于 ${new Date(view.catalogUpdatedAt).toLocaleDateString()}`
+            ? t('catalogUpdated', { v0: formatDateOnly(view.catalogUpdatedAt) })
             : ''}
         </span>
       </div>
       <details className="model-custom">
-        <summary>添加其他模型</summary>
+        <summary>{t('addAnotherModel')}</summary>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -353,19 +364,19 @@ export function ModelSettings({
         >
           <div className="model-form-grid">
             <label>
-              模型名称
+              {t('modelName')}
               <input name="name" required maxLength={120} />
             </label>
             <label>
-              模型用途
+              {t('modelPurpose')}
               <select name="role">
-                <option value="main">主分析模型</option>
-                <option value="human">HumanSL 棋风模型</option>
+                <option value="main">{t('mainAnalysisModel')}</option>
+                <option value="human">{t('humanslStyleModel')}</option>
               </select>
             </label>
           </div>
           <label>
-            官方 HTTPS 下载链接
+            {t('officialHttpsDownloadUrl')}
             <input
               name="url"
               type="url"
@@ -384,16 +395,16 @@ export function ModelSettings({
             />
           </label>
           <fieldset className="model-board-options">
-            <legend>模型适用的棋盘</legend>
+            <legend>{t('supportedBoardSizes')}</legend>
             {[9, 13, 19].map((size) => (
               <label key={size}>
                 <input type="checkbox" name="boards" value={size} defaultChecked />
-                {size} 路
+                {t('boardSize', { v0: size })}
               </label>
             ))}
           </fieldset>
           <button disabled={!!working} type="submit">
-            添加到模型库
+            {t('addToModelLibrary')}
           </button>
         </form>
       </details>

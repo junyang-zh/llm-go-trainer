@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { StreamEvent } from '../shared/types';
 import { readLines } from '../shared/stream';
 
@@ -8,7 +9,7 @@ export async function api<T>(path: string, data?: unknown): Promise<T> {
     body: data ? JSON.stringify(data) : undefined,
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? `请求失败：${response.status}`);
+  if (!response.ok) throw new Error(result.error ?? t('requestFailed', { v0: response.status }));
   return result;
 }
 
@@ -30,9 +31,9 @@ export async function streamApi(
   });
   if (!response.ok) {
     const body = await response.json();
-    throw new Error(body.error ?? `请求失败：${response.status}`);
+    throw new Error(body.error ?? t('requestFailed', { v0: response.status }));
   }
-  if (!response.body) throw new Error('浏览器未收到数据流');
+  if (!response.body) throw new Error(t('noResponseStreamReceived'));
   let complete = false;
   for await (const line of readLines(response.body, signal)) {
     if (!line.trim()) continue;
@@ -44,5 +45,5 @@ export async function streamApi(
       break;
     }
   }
-  if (!complete) throw new Error('连接中断，分析未完成');
+  if (!complete) throw new Error(t('connectionInterruptedAnalysisIncomplete'));
 }

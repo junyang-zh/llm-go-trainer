@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useState, type ReactNode } from 'react';
 import { evaluationSegments, type EvaluationHistory } from './evaluation-history';
 
@@ -25,7 +26,7 @@ export function EvaluationChart({
   const plots = [
     {
       key: 'winrate' as const,
-      label: '黑胜率 (%)',
+      label: t('blackWinRate'),
       top: 18,
       bottom: 74,
       max: '100',
@@ -34,7 +35,7 @@ export function EvaluationChart({
     },
     {
       key: 'scoreLead' as const,
-      label: '黑目差 (目)',
+      label: t('blackLeadPoints'),
       top: 112,
       bottom: 168,
       max: `+${limit}`,
@@ -47,7 +48,7 @@ export function EvaluationChart({
       className="evaluation-chart"
       viewBox="0 0 416 188"
       role="group"
-      aria-label="黑方胜率与目差历史曲线"
+      aria-label={t('blackWinRateAndScoreHistory')}
     >
       {plots.map((plot) => (
         <g key={plot.key} className={`plot-${plot.key}`}>
@@ -82,7 +83,12 @@ export function EvaluationChart({
               role="button"
               aria-disabled={disabled}
               tabIndex={disabled ? -1 : 0}
-              aria-label={`第 ${point.turn} 手，黑胜率 ${(point.winrate * 100).toFixed(1)}%，黑目差 ${signed(point.scoreLead)}${point.final ? '' : '，未完成'}`}
+              aria-label={t('chartPointLabel', {
+                v0: point.turn,
+                v1: (point.winrate * 100).toFixed(1),
+                v2: signed(point.scoreLead),
+                v3: point.final ? '' : t('incompleteClause'),
+              })}
               onClick={() => !disabled && navigate(point.turn)}
               onKeyDown={(event) => {
                 if (!disabled && ['Enter', ' '].includes(event.key)) {
@@ -92,7 +98,15 @@ export function EvaluationChart({
               }}
               className={`plot-point ${point.final ? '' : 'partial'}`}
             >
-              <title>{`第 ${point.turn} 手 · 黑胜率 ${(point.winrate * 100).toFixed(1)}% · 黑目差 ${signed(point.scoreLead)} · ${point.visits} visits${point.final ? '' : ' · 未完成'}`}</title>
+              <title>
+                {t('chartPointTitle', {
+                  v0: point.turn,
+                  v1: (point.winrate * 100).toFixed(1),
+                  v2: signed(point.scoreLead),
+                  v3: point.visits,
+                  v4: point.final ? '' : t('incompleteSuffix'),
+                })}
+              </title>
               <circle cx={x(point.turn)} cy={plot.y(point[plot.key])} r="6" fill="transparent" />
               <circle
                 cx={x(point.turn)}
@@ -114,7 +128,7 @@ export function EvaluationChart({
       )}
       {total > 0 && (
         <text x="398" y="184" textAnchor="end">
-          {total} 手
+          {t('moveCount', { v0: total })}
         </text>
       )}
     </svg>
@@ -156,7 +170,7 @@ export function EvaluationPanel({
   const current = history[turn];
   const completed = Object.values(history).filter((point) => point.final).length;
   return (
-    <section className="evaluation" aria-label="目差与胜率">
+    <section className="evaluation" aria-label={t('scoreAndWinRate')}>
       <button
         className="evaluation-toggle"
         aria-expanded={expanded}
@@ -164,18 +178,26 @@ export function EvaluationPanel({
         title={error || undefined}
         onClick={() => setExpanded((value) => !value)}
       >
-        <span>{expanded ? '⌄' : '›'} 目差 / 胜率</span>
+        <span>{t('scoreWinRate', { v0: expanded ? '⌄' : '›' })}</span>
         {expanded && (
           <span className="evaluation-current">
             {current
-              ? `黑 ${signed(current.scoreLead)} · ${(current.winrate * 100).toFixed(1)}%${current.final ? '' : pendingTurn === turn ? ' · 搜索中' : ' · 未完成'}`
+              ? t('currentEvaluation', {
+                  v0: signed(current.scoreLead),
+                  v1: (current.winrate * 100).toFixed(1),
+                  v2: current.final
+                    ? ''
+                    : pendingTurn === turn
+                      ? t('searchingSuffix')
+                      : t('incompleteSuffix'),
+                })
               : error
-                ? '分析失败'
+                ? t('analysisFailed')
                 : pendingTurn !== null
-                  ? '分析中'
+                  ? t('analyzing')
                   : ready
-                    ? '未分析'
-                    : '引擎未就绪'}
+                    ? t('notAnalyzed')
+                    : t('engineNotReady')}
           </span>
         )}
       </button>
@@ -193,21 +215,23 @@ export function EvaluationPanel({
             <span className="evaluation-progress">
               <span>
                 {pendingTurn !== null
-                  ? `分析第 ${pendingTurn} 手`
-                  : `已分析 ${completed} / ${total + 1}`}
+                  ? t('analyzingMove', { v0: pendingTurn })
+                  : t('analyzed', { v0: completed, v1: total + 1 })}
               </span>
-              <span className="evaluation-search">{searchStats || '搜索 — 次 · — 次/秒'}</span>
+              <span className="evaluation-search">
+                {searchStats || t('searchStatsPlaceholder')}
+              </span>
             </span>
             {completing ? (
-              <button onClick={stop}>停止补全</button>
+              <button onClick={stop}>{t('stopFill')}</button>
             ) : (
               <button disabled={disabled || !ready || completed === total + 1} onClick={complete}>
-                补全曲线
+                {t('fillGraph')}
               </button>
             )}
             {error && (
               <button disabled={disabled || !ready} onClick={retry}>
-                重试
+                {t('retry')}
               </button>
             )}
           </div>

@@ -1,5 +1,7 @@
 # 开发指南
 
+[English](en/development.md) · [简体中文](development.md) · [繁體中文](zh-TW/development.md) · [日本語](ja/development.md) · [한국어](ko/development.md)
+
 [返回 README](../README.md) · [架构与路线](architecture.md) · [构建与发布](releases.md)
 
 ## 启动 Electron 桌面应用
@@ -35,6 +37,8 @@ npm run desktop
 
 Web 模式需在终端按 `Ctrl+C` 关闭服务；关闭浏览器标签页不会结束服务或 KataGo。
 
+<a id="environment"></a>
+
 ## 环境配置
 
 源码运行时可将 [`.env.example`](../.env.example) 复制为项目根目录的 `.env`，提供默认配置；更改环境变量后需重启。环境排查可运行 `npm run doctor`。LLM 在应用内保存的配置优先于环境默认值，详见 [LLM 配置](llm.md)。
@@ -64,13 +68,26 @@ npm run desktop
 
 ```sh
 npm run test:coach-layout
+npm run test:i18n-layout
 ```
 
 该测试使用独立临时存储，覆盖多个窗口尺寸下的选点高亮、距离亮度、双向悬浮/键盘连线、滚动裁剪、分组切换、分支定位及折叠恢复。
 
+`test:i18n-layout` 使用 Electron 覆盖五语言、多窗口尺寸、模型通知、搜索开始/完成/错误/重试的预留布局、标题对齐与溢出。
+
 自动测试覆盖围棋规则、SGF、对手采样、黑白视角、引擎生命周期、LLM 协议和界面交互。测试使用本地夹具，需允许 loopback 监听，无需配置 LLM API key。
 
 CI 配置覆盖 Ubuntu、macOS 和 Windows 的测试与构建。
+
+## 国际化维护
+
+`src/i18n.ts` 解析系统语言、保存语言偏好并插值消息；`src/locales/{en,zh-CN,zh-TW,ja,ko}.json` 必须具有相同键和占位参数。UI 文字使用 `t(...)`；服务端诊断保留原文，在渲染时通过 `localizeDiagnostic(...)` 翻译，确保已有通知随语言变化。保留自定义名称和未知供应商输出，不翻译或替换运行时教练提示词。
+
+简中 README 和文档保留原路径，其他语言使用 `README.<locale>.md` 与 `docs/<locale>/`。每页提供五语言对应页入口。修改文档时同步各语言，保持命令、配置名与技术约束一致，并检查相对链接。`tests/i18n.test.tsx` 检查语言解析、词条/参数一致性和切换时状态保留。
+
+模拟评估只允许放在 `tests/fixtures/`，不能作为应用引擎的回退结果。验证结果、硬件、供应商与剩余缺口在对话中报告，会话报告和日志保留在仓库外。
+
+<a id="local-build"></a>
 
 ## 桌面打包
 

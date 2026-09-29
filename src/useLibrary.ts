@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { api } from './api';
 import { gameTitle, type Conversation, type Library, type SavedGame } from '../shared/library';
@@ -7,7 +8,7 @@ import { finishMessage } from './messages';
 function conversation(): Conversation {
   return {
     id: crypto.randomUUID(),
-    title: '新对话',
+    title: t('newChat'),
     updatedAt: new Date().toISOString(),
     messages: [],
     history: [],
@@ -39,7 +40,7 @@ export function useLibrary(initialGame: Game) {
   }
   function save(path: string, value: { id: string }) {
     pending.current.set(`${path}/${value.id}`, { path, value });
-    void flush().catch((e) => setError(`历史保存失败：${(e as Error).message}`));
+    void flush().catch((e) => setError(t('couldNotSaveHistory', { v0: (e as Error).message })));
   }
   useEffect(() => {
     let active = true;
@@ -57,7 +58,7 @@ export function useLibrary(initialGame: Game) {
             ...item,
             messages: item.messages.map((message) =>
               message.state === 'running'
-                ? finishMessage(message, 'stopped', '应用已关闭，分析已中断')
+                ? finishMessage(message, 'stopped', t('analysisInterrupted'))
                 : message,
             ),
           }));
@@ -69,7 +70,7 @@ export function useLibrary(initialGame: Game) {
         setReady(true);
       })
       .catch((e) => {
-        if (active) setError(`历史读取失败：${(e as Error).message}`);
+        if (active) setError(t('couldNotLoadHistory', { v0: (e as Error).message }));
       });
     return () => {
       active = false;
@@ -127,7 +128,7 @@ export function useLibrary(initialGame: Game) {
         setLoadAttempt((value) => value + 1);
         return;
       }
-      void flush().catch((e) => setError(`历史保存失败：${(e as Error).message}`));
+      void flush().catch((e) => setError(t('couldNotSaveHistory', { v0: (e as Error).message })));
     },
     selectConversation: setConversationId,
     newConversation() {

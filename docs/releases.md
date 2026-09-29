@@ -1,10 +1,12 @@
 # 发布桌面应用
 
+[English](en/releases.md) · [简体中文](releases.md) · [繁體中文](zh-TW/releases.md) · [日本語](ja/releases.md) · [한국어](ko/releases.md)
+
 GitHub Actions 在推送 `v*` tag 后构建并发布四个安装包：Windows 10/11 x64 × 普通版/minimal 版、macOS 15+ Apple Silicon × 普通版/minimal 版。无 32 位、Windows 7/8 或 Intel Mac 构建。macOS 在发布凭据齐全时启用 Developer ID 签名与 Apple 公证，否则构建未签名、未公证的安装包；Windows 安装器尚未配置代码签名。
 
 ## 发布步骤
 
-1. 更新 `package.json` 与 `package-lock.json` 中的版本（例如 `npm version 0.1.1 --no-git-tag-version`），按需更新 `docs/release-notes.md`。
+1. 更新 `package.json` 与 `package-lock.json` 中的版本（例如 `npm version 0.1.1 --no-git-tag-version`），按需同步更新各语言的更新记录。
 2. 准备本地提交，确保工作区干净。将待推送的 commit、具体改动、目标远端与分支、验证结果交给用户审阅，获得对本次推送的明确批准后，才推送代码。
 3. 发布 tag 也必须先审阅：提供准确的版本/tag、目标 commit、目标远端、Release notes 和验证结果，获得明确批准后，才创建并推送与 package.json 一致的 tag。批准仅适用于已审阅的改动和目标；新增改动或替换远端 tag 必须重新审阅。选择版本号或要求实现发布流程不等于批准任何 push。
 
@@ -21,6 +23,8 @@ git push origin v0.1.0
 四个构建全部成功后，发布 job 检查四个安装包、两个 macOS 更新 ZIP 和四个独立更新清单，验证清单内的版本、文件名、大小和 SHA-512，再生成 `SHA256SUMS.txt`，将安装包、更新 ZIP、更新清单及校验摘要一起上传到草稿 Release，最后公开。仅发布 job 获得 `contents: write`，使用仓库自动提供的 `GITHUB_TOKEN`，无需配置个人 token。失败时可在 Actions 重跑；未公开的草稿可以继续上传，已公开的版本不被重写，应发布新版本。含 `-` 的版本（如 `0.2.0-beta.1`）标记为 prerelease。
 
 也可在 Actions 手动运行工作流：选择分支时只构建并保留 Actions artifacts；选择版本 tag 时会尝试发布。不要先手工创建公开 Release。
+
+<a id="local-build"></a>
 
 ## 本地构建
 
@@ -41,6 +45,8 @@ npm run package:desktop -- minimal
 当前 CI 校验安装包内权重和各平台引擎、依赖归档，但不具备目标显卡驱动，不能代替真实 Windows OpenCL、macOS Metal 和安装流程的验证。公开发布前后应在目标系统检查安装、启动、引擎分析及退出。
 
 配置依据：[GitHub runner 平台](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)、[electron-builder v26 配置](https://www.electron.build/v26/docs/configuration/)、[KataGo 模型许可](https://katagotraining.org/network_license/)。
+
+<a id="updates"></a>
 
 ## 自动更新与 macOS 签名
 

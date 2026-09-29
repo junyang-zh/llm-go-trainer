@@ -1,17 +1,16 @@
+import {
+  t,
+  localizeDiagnostic,
+  useLanguage,
+  locales,
+  languageNames,
+  type LanguagePreference,
+  formatDate,
+} from './i18n';
 import { useEffect, useState } from 'react';
 import type { UpdateStatus } from '../shared/updates';
 import { version } from '../package.json';
 
-const labels: Record<UpdateStatus['phase'], string> = {
-  idle: '尚未检查更新',
-  checking: '正在检查 GitHub Release…',
-  current: '已是最新版本',
-  available: '发现新版本',
-  downloading: '正在下载更新',
-  downloaded: '更新已下载，可重启安装',
-  installing: '正在退出并安装更新…',
-  error: '更新失败',
-};
 export function GeneralSettings({
   beforeInstall,
   busy = false,
@@ -19,6 +18,17 @@ export function GeneralSettings({
   beforeInstall: () => Promise<void>;
   busy?: boolean;
 }) {
+  const labels: Record<UpdateStatus['phase'], string> = {
+    idle: t('updatesNotCheckedYet'),
+    checking: t('checkingGithubReleases'),
+    current: t('upToDate'),
+    available: t('updateAvailable'),
+    downloading: t('downloadingUpdate'),
+    downloaded: t('updateDownloadedReadyToRestart'),
+    installing: t('quittingAndInstallingUpdate'),
+    error: t('updateFailed'),
+  };
+  const language = useLanguage();
   const bridge = window.goTrainerUpdates;
   const [status, setStatus] = useState<UpdateStatus>();
   const [working, setWorking] = useState(false);
@@ -60,14 +70,33 @@ export function GeneralSettings({
   const pending =
     working || ['checking', 'downloading', 'installing'].includes(status?.phase || '');
   return (
-    <section className="general-settings" aria-label="通用设置">
-      <h3>应用更新</h3>
+    <section className="general-settings" aria-label={t('generalSettings')}>
+      <label>
+        {t('language')}
+        <select
+          aria-label={t('language')}
+          value={language.preference}
+          onChange={(event) => language.setLanguage(event.target.value as LanguagePreference)}
+        >
+          <option value="system">{t('systemLanguage')}</option>
+          {locales.map((locale) => (
+            <option key={locale} value={locale}>
+              {languageNames[locale]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <h3>{t('appUpdates')}</h3>
       <p className="engine-detail">
-        当前版本 {status?.version || version}
-        {status ? ` · ${status.edition === 'minimal' ? 'minimal 版' : '普通版'}` : ''}
+        {t('currentVersion', {
+          v0: status?.version || version,
+          v1: status
+            ? ` · ${status.edition === 'minimal' ? t('minimalEdition') : t('standardEdition')}`
+            : '',
+        })}
       </p>
       {!bridge ? (
-        <p className="engine-detail">请使用桌面应用检查和安装更新。</p>
+        <p className="engine-detail">{t('updatesDesktopOnly')}</p>
       ) : (
         <>
           <label className="update-checkbox">
@@ -77,34 +106,36 @@ export function GeneralSettings({
               disabled={!status?.supported || working}
               onChange={(event) => void run(() => bridge.automatic(event.target.checked))}
             />
-            自动更新
+            {t('automaticUpdates')}
           </label>
-          <p className="engine-detail">
-            启动后自动检查并下载更新，准备好后点击“重启并安装”。已有模型缓存时只下载不含模型的应用安装包，保留模型、引擎缓存与本地数据；缺失的模型按需下载。
-          </p>
-          {status?.reason && <p className="engine-detail">{status.reason}</p>}
-          {status?.reusesModels && (
-            <p className="update-cache-note">本次更新复用本地模型，不重复下载模型权重。</p>
-          )}
+          <p className="engine-detail">{t('automaticUpdatesHelp')}</p>
+          {status?.reason && <p className="engine-detail">{localizeDiagnostic(status.reason)}</p>}
+          {status?.reusesModels && <p className="update-cache-note">{t('updateReusesModels')}</p>}
           <p role="status">
-            {status ? labels[status.phase] : '读取更新设置…'}
+            {status ? labels[status.phase] : t('readingUpdateSettings')}
             {status?.latestVersion ? ` · ${status.latestVersion}` : ''}
           </p>
           {status?.phase === 'downloading' && (
             <>
-              <progress max="100" value={status.progress || 0} aria-label="更新下载进度" />
+              <progress
+                max="100"
+                value={status.progress || 0}
+                aria-label={t('updateDownloadProgress')}
+              />
               <span className="engine-detail"> {Math.round(status.progress || 0)}%</span>
             </>
           )}
           {status?.checkedAt && (
-            <p className="engine-detail">上次检查：{new Date(status.checkedAt).toLocaleString()}</p>
+            <p className="engine-detail">
+              {t('lastChecked', { v0: formatDate(status.checkedAt) })}
+            </p>
           )}
           <div className="engine-actions">
             <button
               disabled={!status?.supported || pending || status.phase === 'downloaded'}
               onClick={() => void run(() => bridge.check())}
             >
-              检查更新
+              {t('checkForUpdates')}
             </button>
             {status?.phase === 'available' && status.canInstall && (
               <button
@@ -112,7 +143,7 @@ export function GeneralSettings({
                 disabled={pending}
                 onClick={() => void run(() => bridge.download())}
               >
-                下载更新
+                {t('downloadUpdate')}
               </button>
             )}
             {status?.phase === 'downloaded' && (
@@ -126,18 +157,18 @@ export function GeneralSettings({
                   })
                 }
               >
-                重启并安装
+                {t('restartAndInstall')}
               </button>
             )}
           </div>
           {status?.phase === 'downloaded' && busy && (
-            <p className="engine-detail">请先结束当前分析或对局操作，再重启安装。</p>
+            <p className="engine-detail">{t('updateWaitUntilIdle')}</p>
           )}
         </>
       )}
       {(error || status?.error) && (
         <p className="error" role="alert">
-          {error || status?.error}
+          {localizeDiagnostic(error || status?.error || '')}
         </p>
       )}
       <a
@@ -145,7 +176,7 @@ export function GeneralSettings({
         target="_blank"
         rel="noreferrer"
       >
-        查看 GitHub Release
+        {t('viewGithubReleases')}
       </a>
     </section>
   );

@@ -1,14 +1,9 @@
+import { availabilityLabel, effortLabel, limitLabel } from './ui-labels';
+import { t, localizeDiagnostic } from './i18n';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import type { LlmSettingsView, LlmStatus, Provider, ProviderPreference } from '../shared/types';
-import {
-  coachLimitFields,
-  type CoachLimits,
-  availabilityLabel,
-  effortLabels,
-  effortOptions,
-  providerNames,
-} from '../shared/llm';
+import { coachLimitFields, type CoachLimits, effortOptions, providerNames } from '../shared/llm';
 
 function ProviderForm({
   provider,
@@ -60,7 +55,7 @@ function ProviderForm({
       {provider === 'deepseek' && (
         <>
           <label>
-            API 地址
+            {t('apiUrl')}
             <input
               type="url"
               required
@@ -70,13 +65,13 @@ function ProviderForm({
             />
           </label>
           <label>
-            API key{' '}
+            {t('apiKey')}{' '}
             <span className="key-source">
               {view.deepseek.keySource === 'app'
-                ? '本机已保存'
+                ? t('savedLocally')
                 : view.deepseek.keySource === 'env'
-                  ? '环境变量'
-                  : '未配置'}
+                  ? t('environmentVariable')
+                  : t('notConfigured')}
             </span>
             <input
               type="password"
@@ -84,7 +79,7 @@ function ProviderForm({
               value={key}
               maxLength={4096}
               disabled={working}
-              placeholder={view.deepseek.keyConfigured ? '已配置' : 'API key'}
+              placeholder={view.deepseek.keyConfigured ? t('configured') : t('apiKey')}
               onChange={(event) => setKey(event.target.value)}
             />
           </label>
@@ -92,9 +87,9 @@ function ProviderForm({
       )}
       <div className="model-settings">
         <label>
-          模型
+          {t('model')}
           <select
-            aria-label={`${providerNames[provider]} 模型`}
+            aria-label={t('providerModel', { v0: providerNames[provider] })}
             disabled={working}
             value={custom ? '__custom' : model}
             onChange={(event) => {
@@ -103,26 +98,26 @@ function ProviderForm({
               chooseModel(value === '__custom' ? '' : value);
             }}
           >
-            {provider !== 'deepseek' && <option value="">CLI 默认</option>}
+            {provider !== 'deepseek' && <option value="">{t('cliDefault')}</option>}
             {choices.map((choice) => (
               <option key={choice.id} value={choice.id}>
                 {choice.id}
               </option>
             ))}
-            <option value="__custom">自定义…</option>
+            <option value="__custom">{t('custom')}</option>
           </select>
         </label>
         <label>
-          思考深度
+          {t('reasoningEffort')}
           <select
-            aria-label={`${providerNames[provider]} 思考深度`}
+            aria-label={t('providerEffort', { v0: providerNames[provider] })}
             disabled={working}
             value={effort}
             onChange={(event) => setEffort(event.target.value)}
           >
             {levels.map((value) => (
               <option key={value} value={value}>
-                {effortLabels[value] || value}
+                {effortLabel(value)}
               </option>
             ))}
           </select>
@@ -130,7 +125,7 @@ function ProviderForm({
       </div>
       {custom && (
         <label>
-          模型 ID
+          {t('modelId')}
           <input
             required
             value={model}
@@ -142,7 +137,7 @@ function ProviderForm({
       )}
       <div className="engine-actions">
         <button type="submit" disabled={working}>
-          保存
+          {t('save')}
         </button>
         {provider === 'deepseek' && view.deepseek.keySource === 'app' && (
           <button
@@ -152,7 +147,7 @@ function ProviderForm({
               if (await save({ deepseek: { apiKey: null } })) setKey('');
             }}
           >
-            移除本机 key
+            {t('removeLocalKey')}
           </button>
         )}
       </div>
@@ -172,7 +167,7 @@ function WorkLimits({
   useEffect(() => setDraft(limits), [limits]);
   return (
     <details className="provider-config">
-      <summary>Agent 工作量上限</summary>
+      <summary>{t('agentWorkLimits')}</summary>
       <form
         className="provider-form"
         onSubmit={(event) => {
@@ -185,10 +180,10 @@ function WorkLimits({
             const field = coachLimitFields[key];
             return (
               <label key={key}>
-                {field.label}
+                {limitLabel(key)}
                 <input
                   type="number"
-                  placeholder="无限制"
+                  placeholder={t('unlimited')}
                   min={field.min}
                   max={field.max}
                   step="1"
@@ -205,12 +200,10 @@ function WorkLimits({
             );
           })}
         </div>
-        <p className="limits-help">
-          默认无限制，留空即可取消该项限制。设置上限后，达到额度会暂停，点击对话中的「继续」可补充一轮；保存后生效。
-        </p>
+        <p className="limits-help">{t('workLimitsHelp')}</p>
         <div className="engine-actions">
           <button type="submit" disabled={working}>
-            保存工作量上限
+            {t('saveWorkLimits')}
           </button>
         </div>
       </form>
@@ -257,11 +250,11 @@ export function LlmSettings({
   }
   const current = status || view;
   return (
-    <section className="llm-settings" aria-label="LLM 设置">
+    <section className="llm-settings" aria-label={t('llmSettings')}>
       <label>
         LLM
         <select
-          aria-label="LLM 服务"
+          aria-label={t('llmProvider')}
           value={current?.preference || 'auto'}
           disabled={working || !view}
           onChange={async (event) => {
@@ -272,10 +265,12 @@ export function LlmSettings({
           }}
         >
           <option value="auto">
-            自动选择
-            {current?.preference === 'auto' && current.selected
-              ? ` · ${providerNames[current.selected]}`
-              : ''}
+            {t('automatic', {
+              v0:
+                current?.preference === 'auto' && current.selected
+                  ? ` · ${providerNames[current.selected]}`
+                  : '',
+            })}
           </option>
           {(Object.keys(providerNames) as Provider[]).map((provider) => (
             <option key={provider} value={provider}>
@@ -307,14 +302,14 @@ export function LlmSettings({
       {view && <WorkLimits limits={view.limits} save={save} working={working} />}
       {(error || current?.error) && (
         <p className="error" role="alert">
-          {error || current?.error}
+          {localizeDiagnostic(error || current?.error || '')}
         </p>
       )}
       <div className="llm-settings-footer">
         <button disabled={working || !view} onClick={() => void save({}, true)}>
-          {working ? '检测中' : '检测连接'}
+          {working ? t('checking') : t('checkConnection')}
         </button>
-        {saved && <span role="status">已保存</span>}
+        {saved && <span role="status">{t('saved')}</span>}
       </div>
     </section>
   );

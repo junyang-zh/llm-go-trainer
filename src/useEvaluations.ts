@@ -139,7 +139,10 @@ export function useEvaluations(
             if (!controller.signal.aborted) setCompleting(false);
           } catch (error) {
             if (!controller.signal.aborted) {
-              setFailure({ request: requestKey, message: (error as Error).message });
+              setFailure({
+                request: requestKey,
+                message: (error as Error).message,
+              });
               setCompleting(false);
             }
           } finally {
