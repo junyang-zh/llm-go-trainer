@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { resolveCliLaunch } from './cli-path';
 import type { ChatMessage, Provider } from '../shared/types';
 import { callDeepSeek } from './deepseek';
 import type { CoachTools } from './coach-tools';
@@ -20,6 +21,8 @@ export interface ProviderConfig {
   claudeEffort?: string;
   codexPath: string;
   claudePath: string;
+  codexNodePath?: string;
+  claudeNodePath?: string;
   codexScript?: string;
   claudeScript?: string;
   timeout: number;
@@ -133,13 +136,23 @@ export async function callCli(
     if (options.tools) mcp = await openCoachMcp(options.tools);
     options.signal?.throwIfAborted();
     const streaming = !!(options.onText || options.onStatus || options.tools);
-    const invocation = cliInvocation(provider, config, output, streaming, mcp);
+    const launch = await resolveCliLaunch(provider, config);
+    options.signal?.throwIfAborted();
+    const invocation = cliInvocation(
+      provider,
+      {
+        ...config,
+        [`${provider}Path`]: launch.executable,
+        [`${provider}Script`]: launch.script,
+      },
+      output,
+      streaming,
+      mcp,
+    );
     if (/\.(cmd|bat)$/i.test(invocation.executable))
       throw new Error('请使用原生 CLI 或 Node + JS 入口');
     const result = await new Promise<string>((resolve, reject) => {
-      const env = { ...process.env };
-      delete env.DEEPSEEK_API_KEY;
-      delete env.GO_TRAINER_TOKEN;
+      const env = launch.env;
       delete env[coachMcpTokenEnv];
       if (mcp) env[coachMcpTokenEnv] = mcp.token;
       const child = spawn(invocation.executable, invocation.args, {

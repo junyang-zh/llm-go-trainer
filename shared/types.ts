@@ -59,6 +59,14 @@ export interface LlmStatus {
   providers: Record<Provider, ProviderAvailability>;
   error?: string;
 }
+export interface CliSettingsView {
+  model: string;
+  effort: string;
+  path: string;
+  nodePath: string;
+  defaultPath: string;
+  defaultNodePath: string;
+}
 export interface LlmSettingsView extends LlmStatus {
   limits: import('./llm').CoachLimits;
   deepseek: {
@@ -68,8 +76,8 @@ export interface LlmSettingsView extends LlmStatus {
     keyConfigured: boolean;
     keySource: 'app' | 'env' | 'none';
   };
-  codex: { model: string; effort: string };
-  claude: { model: string; effort: string };
+  codex: CliSettingsView;
+  claude: CliSettingsView;
   models: Record<Provider, { id: string; efforts: string[] }[]>;
 }
 export interface ChatMessage {

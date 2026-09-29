@@ -37,6 +37,8 @@ Asking a question sends the current board, relevant engine data and conversation
 
 ## Codex / Claude Code CLI
 
+Expand Codex CLI or Claude Code under Settings → Connect LLM to save a separate CLI path and optional Node path for each provider, without editing `.env`. Enter an absolute path without quotes or arguments; `~/` is supported. npm installs accept the CLI link or the actual JS entry point. On Windows, use a native `.exe` or JS entry point, not `.cmd` / `.bat`. The configured directories are added to that CLI’s PATH; specify an absolute Node executable path if Node is elsewhere. Saving rechecks authentication and applies to the next coaching request. Settings survive restarts; blank fields restore environment defaults or command names.
+
 Install/login in a terminal first. Confirm `codex exec --help` or `claude --help`, then choose the model in the UI. Set absolute paths when necessary:
 
 ```dotenv

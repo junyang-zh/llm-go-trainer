@@ -513,5 +513,8 @@
   "otherRecordsCopyrightNotice": "공개된 Fox 대국은 Fox 바둑 서비스에서, 가져온 SGF는 사용자가 제공한 파일에서 가져옵니다. 해당 권리는 각 권리자에게 있으며 사용 및 재배포는 원래 출처의 조건과 허가를 따라야 합니다.",
   "dependenciesCopyrightNotice": "Electron, React 등 의존성의 저작권은 각 저작자 또는 권리자에게 있으며 각각의 라이선스를 따릅니다.",
   "runtimeKatagoSetupRequired": "활성화되지 않았습니다. 왼쪽 위 설정에서 KataGo를 수동으로 다운로드하고 활성화하세요.",
-  "downloadAndEnableKatago": "KataGo 다운로드 및 활성화"
+  "downloadAndEnableKatago": "KataGo 다운로드 및 활성화",
+  "providerCliPath": "{v0} 경로",
+  "nodePath": "Node 경로 (선택 사항)",
+  "cliPathHelp": "따옴표나 인수 없이 CLI 절대 경로를 입력하세요. npm 설치는 JS 진입점도 지정할 수 있습니다. Node를 찾을 수 없다면 node 실행 파일 경로를 입력하세요. Windows에서는 .cmd 대신 .exe 또는 JS 진입점을 사용하세요. 비워 두면 기본값으로 복원됩니다. 저장하면 연결을 다시 확인하고 다음 해설부터 적용합니다."
 }

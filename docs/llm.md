@@ -39,6 +39,8 @@ DEEPSEEK_EFFORT=default
 
 ## Codex / Claude Code CLI
 
+在「设置 → 连接 LLM」展开 Codex CLI 或 Claude Code，可直接保存各自的 CLI 路径和可选 Node 路径，无需编辑 `.env`。填写绝对路径，不加引号或参数；也支持 `~/`。npm 安装版可填写 CLI 链接或实际 JS 入口；Windows 使用原生 `.exe` 或 JS 入口，不能填写 `.cmd` / `.bat`。应用会将配置路径所在目录加入该 CLI 的 PATH；若 Node 不在同目录或默认 PATH 中，请填写 Node 可执行文件的绝对路径。保存后立即重新检测，下一次讲棋生效，重启后保留；字段留空恢复环境默认值或命令名。
+
 先在终端完成所选 CLI 的安装与登录，确认 `codex exec --help` 或 `claude --help` 可用；在 UI 切换模型。必要时设置绝对路径：
 
 ```dotenv

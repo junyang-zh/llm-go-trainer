@@ -37,6 +37,8 @@ DEEPSEEK_EFFORT=default
 
 ## Codex / Claude Code CLI
 
+「설정 → LLM 연결」에서 Codex CLI 또는 Claude Code를 펼치면 `.env`를 편집하지 않고 각 CLI 경로와 선택 사항인 Node 경로를 저장할 수 있습니다. 따옴표나 인수 없이 절대 경로를 입력하세요. `~/`도 지원합니다. npm 설치는 CLI 링크 또는 실제 JS 진입점을 지정할 수 있습니다. Windows에서는 `.cmd` / `.bat` 대신 네이티브 `.exe` 또는 JS 진입점을 사용하세요. 지정한 경로의 디렉터리를 해당 CLI의 PATH에 추가합니다. Node가 다른 위치에 있다면 Node 실행 파일의 절대 경로를 입력하세요. 저장하면 인증을 다시 확인하고 다음 해설부터 적용합니다. 재시작 후에도 유지되며, 비워 두면 환경 기본값 또는 명령 이름으로 복원됩니다.
+
 터미널에서 설치·로그인하고 `codex exec --help` / `claude --help`를 확인한 후 UI에서 모델을 선택합니다. 필요하면 절대 경로를 설정합니다.
 
 ```dotenv

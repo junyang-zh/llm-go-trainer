@@ -513,5 +513,8 @@
   "otherRecordsCopyrightNotice": "Public Fox games come from the Fox Go service; imported SGFs come from user-provided files. Any applicable rights remain with their respective holders. Use and redistribution must follow the original source’s terms and permissions.",
   "dependenciesCopyrightNotice": "Electron, React and other dependencies are copyrighted by their respective authors or rights holders and retain their own licenses.",
   "runtimeKatagoSetupRequired": "Not enabled. Open Settings at the top left to download and enable KataGo manually.",
-  "downloadAndEnableKatago": "Download and enable KataGo"
+  "downloadAndEnableKatago": "Download and enable KataGo",
+  "providerCliPath": "{v0} path",
+  "nodePath": "Node path (optional)",
+  "cliPathHelp": "Enter the absolute CLI path without quotes or arguments, or the JS entry point for an npm install. If Node cannot be found, enter the node executable path. On Windows, use an .exe or JS entry point, not .cmd. Leave blank to restore defaults. Saving rechecks the connection and applies to the next coaching request."
 }

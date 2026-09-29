@@ -513,5 +513,8 @@
   "otherRecordsCopyrightNotice": "野狐公開對局來自野狐圍棋服務；匯入的 SGF 來自使用者提供的檔案。相關權利歸各自權利人（如適用），使用與再散布須遵循原始來源的條款和授權。",
   "dependenciesCopyrightNotice": "Electron、React 等第三方相依套件的著作權歸各自作者或權利人所有，遵循各自授權。",
   "runtimeKatagoSetupRequired": "尚未啟用，請到左上角設定中手動下載並啟用 KataGo",
-  "downloadAndEnableKatago": "下載並啟用 KataGo"
+  "downloadAndEnableKatago": "下載並啟用 KataGo",
+  "providerCliPath": "{v0} 路徑",
+  "nodePath": "Node 路徑（選填）",
+  "cliPathHelp": "填寫 CLI 的絕對路徑，不加引號或參數；npm 安裝版也可填寫 JS 入口。若找不到 Node，請填寫 node 執行檔路徑。Windows 請使用 .exe 或 JS 入口，不使用 .cmd。留空恢復預設；儲存後重新檢測並在下次講棋時生效。"
 }

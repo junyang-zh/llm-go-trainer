@@ -53,6 +53,28 @@ describe('LLM settings', () => {
     await settings.update({ preference: 'auto' });
     expect((await settings.resolve()).provider).toBe('codex');
   });
+  it('persists independent CLI paths and restores defaults', async () => {
+    const file = await settingsFile();
+    const probe = vi.fn().mockResolvedValue(availability());
+    const settings = new LlmSettings(config, file, probe);
+    await settings.status();
+    const paths = {
+      codex: { path: resolve('tests/fixtures/fake-cli.mjs'), nodePath: process.execPath },
+      claude: { path: resolve('tests/fixtures/fake-auth.mjs'), nodePath: process.execPath },
+    };
+    await settings.update(paths);
+    const restarted = new LlmSettings(config, file, probe);
+    await restarted.load();
+    expect(await restarted.view()).toMatchObject(paths);
+    expect((await restarted.resolve('codex')).config.codexPath).toBe(paths.codex.path);
+    await restarted.update({ codex: { path: '', nodePath: '' } });
+    expect((await restarted.resolve('codex')).config).toMatchObject({
+      codexPath: config.codexPath,
+      codexScript: config.codexScript,
+      claudePath: paths.claude.path,
+    });
+    expect((await restarted.view()).codex).toMatchObject({ path: '', nodePath: '' });
+  });
   it('persists private credentials and independent model settings across restarts', async () => {
     const file = await settingsFile();
     const probe = async () => availability(true);

@@ -21,6 +21,9 @@ function ProviderForm({
   const [effort, setEffort] = useState(config.effort);
   const [key, setKey] = useState('');
   const [url, setUrl] = useState(view.deepseek.baseUrl);
+  const cli = provider === 'deepseek' ? undefined : view[provider];
+  const [path, setPath] = useState(cli?.path || '');
+  const [nodePath, setNodePath] = useState(cli?.nodePath || '');
   const choices = view.models[provider];
   const [custom, setCustom] = useState(!!model && !choices.some((choice) => choice.id === model));
   const advertised = choices.find((choice) => choice.id === model)?.efforts;
@@ -48,8 +51,12 @@ function ProviderForm({
                   ...(key.trim() ? { apiKey: key.trim() } : {}),
                 },
               }
-            : { [provider]: { model, effort } };
-        if (await save(patch)) setKey('');
+            : { [provider]: { model, effort, path, nodePath } };
+        if (await save(patch)) {
+          setKey('');
+          setPath(path.trim());
+          setNodePath(nodePath.trim());
+        }
       }}
     >
       {provider === 'deepseek' && (
@@ -83,6 +90,37 @@ function ProviderForm({
               onChange={(event) => setKey(event.target.value)}
             />
           </label>
+        </>
+      )}
+      {cli && (
+        <>
+          <label>
+            {t('providerCliPath', { v0: providerNames[provider] })}
+            <input
+              aria-label={t('providerCliPath', { v0: providerNames[provider] })}
+              value={path}
+              placeholder={cli.defaultPath}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={4096}
+              disabled={working}
+              onChange={(event) => setPath(event.target.value)}
+            />
+          </label>
+          <label>
+            {t('nodePath')}
+            <input
+              aria-label={t('nodePath')}
+              value={nodePath}
+              placeholder={cli.defaultNodePath}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={4096}
+              disabled={working}
+              onChange={(event) => setNodePath(event.target.value)}
+            />
+          </label>
+          <p className="limits-help">{t('cliPathHelp')}</p>
         </>
       )}
       <div className="model-settings">

@@ -141,7 +141,12 @@ describe('local API contracts', () => {
     const patch = {
       preference: 'codex',
       deepseek: { apiKey: 'test-api-private-key' },
-      codex: { model: 'test-custom-codex', effort: 'low' },
+      codex: {
+        model: 'test-custom-codex',
+        effort: 'low',
+        path: resolve('tests/fixtures/fake-cli.mjs'),
+        nodePath: process.execPath,
+      },
     };
     expect(
       (await post('/api/llm/settings', patch, { Origin: 'https://evil.example' })).status,
@@ -151,7 +156,11 @@ describe('local API contracts', () => {
     expect(saved.headers.get('cache-control')).toBe('no-store');
     const view = await saved.json();
     expect(view.deepseek.keySource).toBe('app');
-    expect(view.codex).toEqual(patch.codex);
+    expect(view.codex).toEqual({
+      ...patch.codex,
+      defaultPath: providers.codexScript,
+      defaultNodePath: process.execPath,
+    });
     for (const body of [
       view,
       await (await fetch(base + '/api/status')).json(),
@@ -161,6 +170,9 @@ describe('local API contracts', () => {
     expect((await llm.resolve()).config).toMatchObject({
       codexModel: 'test-custom-codex',
       codexEffort: 'low',
+      codexPath: patch.codex.path,
+      codexNodePath: process.execPath,
+      codexScript: undefined,
     });
     const coached = await post('/api/coach', { ...payload(), action: 'position', history: [] });
     expect(coached.status).toBe(200);

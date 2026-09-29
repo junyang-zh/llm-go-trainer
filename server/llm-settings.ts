@@ -1,6 +1,5 @@
-import { constants, existsSync } from 'node:fs';
-import { access, chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { delimiter, dirname, join } from 'node:path';
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute } from 'node:path';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -8,6 +7,7 @@ import type { LlmSettingsView, LlmStatus, Provider, ProviderAvailability } from 
 import type { ProviderConfig } from './providers';
 import { coachLimitFields, defaultCoachLimits, effortOptions } from '../shared/llm';
 import { modelCatalog } from './model-catalog';
+import { resolveCliLaunch, expandCliPath } from './cli-path';
 
 export function apiBaseUrl(value: string) {
   const url = new URL(value);
@@ -35,6 +35,16 @@ const baseUrl = z
       return z.NEVER;
     }
   });
+const cliPath = z
+  .string()
+  .trim()
+  .max(4096)
+  .refine((value) => !/[\x00-\x1f\x7f]/.test(value), '路径不能包含控制字符')
+  .refine(
+    (value) => !value || isAbsolute(expandCliPath(value)) || /^[\w.-]+$/.test(value),
+    '请填写绝对路径或命令名',
+  )
+  .refine((value) => !/\.(cmd|bat)$/i.test(value), '请使用原生 CLI 或 Node + JS 入口');
 export const llmUpdateSchema = z
   .object({
     limits: z
@@ -80,6 +90,8 @@ export const llmUpdateSchema = z
       .optional(),
     codex: z
       .object({
+        path: cliPath.optional(),
+        nodePath: cliPath.optional(),
         model: z.string().trim().max(200).optional(),
         effort: z.enum(effortOptions.codex).optional(),
       })
@@ -87,6 +99,8 @@ export const llmUpdateSchema = z
       .optional(),
     claude: z
       .object({
+        path: cliPath.optional(),
+        nodePath: cliPath.optional(),
         model: z.string().trim().max(200).optional(),
         effort: z.enum(effortOptions.claude).optional(),
       })
@@ -101,44 +115,24 @@ const state = (value: ProviderAvailability['state']): ProviderAvailability => ({
   available: value === 'ready',
   state: value,
 });
-async function executableAvailable(path: string) {
-  if (/\.(cmd|bat)$/i.test(path)) return false;
-  const paths =
-    path.includes('/') || path.includes('\\')
-      ? [path]
-      : (process.env.PATH ?? '')
-          .split(delimiter)
-          .flatMap((directory) => [
-            join(directory, path),
-            ...(process.platform === 'win32' ? [join(directory, path + '.exe')] : []),
-          ]);
-  for (const path of paths) {
-    try {
-      await access(path, constants.X_OK);
-      return true;
-    } catch {
-      /* try next */
-    }
-  }
-  return false;
-}
 async function cliStatus(
   provider: 'codex' | 'claude',
   config: ProviderConfig,
   signal: AbortSignal,
 ) {
-  const executable = provider === 'codex' ? config.codexPath : config.claudePath;
-  const script = provider === 'codex' ? config.codexScript : config.claudeScript;
-  if (!(await executableAvailable(executable)) || (script && !existsSync(script)))
+  let launch;
+  try {
+    launch = await resolveCliLaunch(provider, config);
+  } catch {
     return state('missing');
+  }
+  const { executable, script, env } = launch;
   const args = [
     ...(script ? [script] : []),
     ...(provider === 'codex' ? ['login', 'status'] : ['auth', 'status']),
   ];
   // Capture no login output in responses or logs: it can contain account information.
   return new Promise<ProviderAvailability>((resolve) => {
-    const env = { ...process.env };
-    delete env.DEEPSEEK_API_KEY;
     const child = execFile(
       executable,
       args,
@@ -225,8 +219,20 @@ export class LlmSettings {
       deepseekEffort: saved.deepseek?.effort ?? this.defaults.deepseekEffort,
       codexModel: saved.codex?.model ?? this.defaults.codexModel,
       codexEffort: saved.codex?.effort ?? this.defaults.codexEffort,
+      codexPath: saved.codex?.path || this.defaults.codexPath,
+      codexNodePath:
+        saved.codex?.nodePath ||
+        this.defaults.codexNodePath ||
+        (this.defaults.codexScript ? this.defaults.codexPath : undefined),
+      codexScript: saved.codex?.path ? undefined : this.defaults.codexScript,
       claudeModel: saved.claude?.model ?? this.defaults.claudeModel,
       claudeEffort: saved.claude?.effort ?? this.defaults.claudeEffort,
+      claudePath: saved.claude?.path || this.defaults.claudePath,
+      claudeNodePath:
+        saved.claude?.nodePath ||
+        this.defaults.claudeNodePath ||
+        (this.defaults.claudeScript ? this.defaults.claudePath : undefined),
+      claudeScript: saved.claude?.path ? undefined : this.defaults.claudeScript,
     };
   }
   private async snapshot() {
@@ -263,8 +269,26 @@ export class LlmSettings {
       ...status,
       limits: config.limits!,
       models: await modelCatalog(),
-      codex: { model: config.codexModel || '', effort: config.codexEffort || 'default' },
-      claude: { model: config.claudeModel || '', effort: config.claudeEffort || 'default' },
+      codex: {
+        model: config.codexModel || '',
+        effort: config.codexEffort || 'default',
+        path: saved.codex?.path || '',
+        nodePath: saved.codex?.nodePath || '',
+        defaultPath: this.defaults.codexScript || this.defaults.codexPath,
+        defaultNodePath:
+          this.defaults.codexNodePath ||
+          (this.defaults.codexScript ? this.defaults.codexPath : 'node'),
+      },
+      claude: {
+        model: config.claudeModel || '',
+        effort: config.claudeEffort || 'default',
+        path: saved.claude?.path || '',
+        nodePath: saved.claude?.nodePath || '',
+        defaultPath: this.defaults.claudeScript || this.defaults.claudePath,
+        defaultNodePath:
+          this.defaults.claudeNodePath ||
+          (this.defaults.claudeScript ? this.defaults.claudePath : 'node'),
+      },
       deepseek: {
         baseUrl: config.deepseekUrl,
         model: config.deepseekModel,
