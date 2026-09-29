@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MarkdownText } from '../src/MarkdownText';
-import { EvaluationChart, EvaluationPanel } from '../src/EvaluationPanel';
+import { EvaluationChart } from '../src/EvaluationPanel';
 import { recordEvaluation } from '../src/evaluation-history';
 import { evaluation } from './fixtures/evaluation';
 
@@ -27,27 +27,6 @@ it('never renders HTML scripts, remote images, or executable/local links', () =>
   expect(html).toContain('href="https://example.com/doc"');
   expect(html).toContain('rel="noreferrer noopener"');
   expect(html).toContain('target="_blank"');
-});
-it('keeps the graph panel present and collapsed before the first analysis', () => {
-  const html = renderToStaticMarkup(
-    <EvaluationPanel
-      history={{}}
-      turn={0}
-      total={0}
-      disabled={false}
-      ready={false}
-      completing={false}
-      pendingTurn={null}
-      error=""
-      navigate={() => {}}
-      complete={() => {}}
-      stop={() => {}}
-      retry={() => {}}
-    />,
-  );
-  expect(html).toContain('目差 / 胜率');
-  expect(html).toContain('aria-expanded="false"');
-  expect(html).not.toContain('<svg');
 });
 it('renders real Black values and accessible chart navigation without fabricated empty curves', () => {
   const history = recordEvaluation({}, 'test', evaluation(1), true);

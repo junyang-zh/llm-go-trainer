@@ -1,19 +1,12 @@
 import { join } from 'node:path';
 import { expect, it, describe, beforeAll } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
-import {
-  configurePresets,
-  searchPresets,
-  presetRecord,
-  presetSgf,
-  presetSummary,
-} from '../server/presets';
+import { configurePresets, searchPresets, presetRecord } from '../server/presets';
 import type { CwiIndex } from '../shared/presets';
-import { exportSgf, importSgf } from '../shared/sgf';
 import { replay } from '../shared/go';
-import { HistoryLibrary } from '../server/library';
 
 const directory = process.env.GO_TRAINER_TEST_CWI_DIR ?? '';
+// API behavior uses the small fixture in presets.test.ts; this suite checks release data.
 describe.skipIf(!directory)('downloaded full CWI catalog', () => {
   beforeAll(() => configurePresets(directory));
   const earId = 'c0000000-0000-4000-8000-000000000001';
@@ -43,7 +36,7 @@ describe.skipIf(!directory)('downloaded full CWI catalog', () => {
     }
     expect(ids).toEqual(new Set(index.rows.map((row) => row[0])));
   });
-  it('lazily loads legal famous games with intact moves and exportable source attribution', () => {
+  it('loads the expected famous games from the full catalog', () => {
     for (const [id, count, result] of [
       [earId, 325, 'B+2'],
       [bloodId, 246, 'W+R'],
@@ -52,37 +45,9 @@ describe.skipIf(!directory)('downloaded full CWI catalog', () => {
       expect(record.game.moves).toHaveLength(count);
       expect(record.game.metadata.RE).toBe(result);
       expect(() => replay(record.game)).not.toThrow();
-      const imported = importSgf(exportSgf(record.game)).game;
-      expect(imported.moves).toEqual(record.game.moves);
-      expect(imported.metadata.SO).toBe(record.game.metadata.SO);
-      expect(imported.metadata.CP).toBe(record.game.metadata.CP);
     }
-    expect(presetRecord(earId)!.game.moves[126]).toEqual({ color: 'B', point: 'K11' });
-  });
-  it('searches and paginates summaries without sending full games; unavailable records remain exportable', () => {
-    const first = searchPresets('', 0, 20),
-      second = searchPresets('', 20, 20);
-    expect(first.total).toBe(96143);
-    expect(first.games).toHaveLength(20);
-    expect(new Set([...first.games, ...second.games].map((item) => item.id)).size).toBe(40);
-    expect(first.games.every((item) => !('game' in item))).toBe(true);
     expect(searchPresets('Shusaku/126.sgf').games[0].id).toBe(earId);
     expect(searchPresets('SHUSAKU 1846').total).toBeGreaterThan(0);
-    expect(searchPresets('', 0, 20, earId).games.map((item) => item.id)).toEqual([earId]);
-    expect(searchPresets('不存在的棋手').total).toBe(0);
-    const index = JSON.parse(readFileSync(join(directory, 'index.json'), 'utf8')) as CwiIndex;
-    const unavailable = index.rows.find((row) => row[8])!;
-    expect(presetSummary(unavailable[0])!.unavailable).toBeTruthy();
-    expect(() => presetRecord(unavailable[0])).toThrow();
-    expect(presetSgf(unavailable[0])).toContain('(');
-  });
-  it('keeps CWI originals read-only', () => {
-    const library = new HistoryLibrary();
-    const record = presetRecord(earId)!;
-    expect(() => library.saveGame(record)).toThrow('只读');
-    record.game.moves.length = 0;
-    expect(library.getGame(earId).game.moves).toHaveLength(325);
-    expect(library.snapshot().games).toEqual([]);
-    expect(presetRecord('../../index.json')).toBeUndefined();
+    expect(presetRecord(earId)!.game.moves[126]).toEqual({ color: 'B', point: 'K11' });
   });
 });

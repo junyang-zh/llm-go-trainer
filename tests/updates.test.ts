@@ -125,17 +125,19 @@ it('rejects cross-edition, external and cross-platform update payloads', async (
   await controller.download();
   expect(updater.downloadUpdate).not.toHaveBeenCalled();
 });
-it('uses the model-free update feed when a standard installation has cached its selected models', async () => {
+it('reevaluates the model cache on each check and downloads from the selected feed', async () => {
   const { options } = await setup();
   const updater = new TestUpdater();
-  const hasCachedModels = vi.fn(async () => true);
-  updater.info.files[0].url = 'LLM-Go-Trainer-0.2.0-windows-x64-minimal.exe';
+  const hasCachedModels = vi.fn(async () => false);
   const controller = new DesktopUpdates({
     ...options,
     updater: updater.adapter(),
     hasCachedModels,
   });
   controllers.push(controller);
+  expect((await controller.check()).downloadEdition).toBe('standard');
+  hasCachedModels.mockResolvedValue(true);
+  updater.info.files[0].url = 'LLM-Go-Trainer-0.2.0-windows-x64-minimal.exe';
   await controller.check();
   expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('minimal'));
   expect(controller.status()).toMatchObject({
@@ -161,23 +163,6 @@ it('does not silently fall back to a model-bundled installer when cached-model u
   await controller.download();
   expect(updater.downloadUpdate).not.toHaveBeenCalled();
 });
-it('keeps standard updates when no verified model is cached and reevaluates it on a new check', async () => {
-  const { options } = await setup();
-  const updater = new TestUpdater();
-  const hasCachedModels = vi.fn(async () => false);
-  const controller = new DesktopUpdates({
-    ...options,
-    updater: updater.adapter(),
-    hasCachedModels,
-  });
-  controllers.push(controller);
-  expect((await controller.check()).downloadEdition).toBe('standard');
-  hasCachedModels.mockResolvedValue(true);
-  updater.info.files[0].url = 'LLM-Go-Trainer-0.2.0-windows-x64-minimal.exe';
-  expect((await controller.check()).downloadEdition).toBe('minimal');
-  expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('minimal'));
-});
-
 it('retains the standard feed when a minimal update would remove bundled records', async () => {
   const { options } = await setup();
   const updater = new TestUpdater();

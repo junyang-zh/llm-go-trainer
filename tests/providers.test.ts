@@ -23,6 +23,13 @@ describe('LLM adapters', () => {
     expect(overrides).toContain('features.unified_exec=false');
     expect(codex[codex.indexOf('--sandbox') + 1]).toBe('read-only');
     const claude = cliInvocation('claude', config, '', true, mcp).args;
+    if (mcp) {
+      for (const args of [codex, claude]) {
+        expect(args.join(' ')).not.toContain(mcp.token);
+        expect(args.join(' ')).toContain('GO_COACH_MCP_TOKEN');
+        expect(args.join(' ')).not.toContain('dangerously');
+      }
+    }
     expect(claude[claude.indexOf('--tools') + 1]).toBe('WebSearch,WebFetch');
     const allowed = claude.slice(
       claude.indexOf('--allowedTools') + 1,

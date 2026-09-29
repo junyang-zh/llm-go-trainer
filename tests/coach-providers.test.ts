@@ -1,7 +1,7 @@
 import { defaultCoachLimits } from '../shared/llm';
 import { afterEach, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
-import { callCli, callDeepSeek, cliInvocation, type ProviderConfig } from '../server/providers';
+import { callCli, callDeepSeek, type ProviderConfig } from '../server/providers';
 import { CoachTools } from '../server/coach-tools';
 import {
   whiteAtari,
@@ -274,19 +274,6 @@ it.each(['codex', 'claude'] as const)(
     expect(events.at(-1)).toMatchObject({ name: 'analyze_variation', state: 'stopped' });
   },
 );
-it('passes the scoped MCP connection and approved Go tools alongside native web tools', () => {
-  const mcp = { url: 'http://127.0.0.1:1234/mcp', token: 'private-session-token' };
-  for (const provider of ['codex', 'claude'] as const) {
-    const args = cliInvocation(provider, config, 'answer.txt', true, mcp).args;
-    expect(args.join(' ')).not.toContain(mcp.token);
-    expect(args.join(' ')).toContain('GO_COACH_MCP_TOKEN');
-    expect(args.join(' ')).not.toContain('dangerously');
-  }
-  expect(cliInvocation('claude', config, '', true, mcp).args).toContain(
-    'mcp__go_trainer__analyze_variation',
-  );
-});
-
 it('runs beyond the former tool round and call limits with the unlimited defaults', async () => {
   const { tools } = harness();
   let calls = 0;
