@@ -496,5 +496,17 @@
   "errorFoxList": "한큐에서 잘못된 대국 목록을 반환했습니다",
   "errorFoxQueryFirst": "먼저 한큐 대국을 검색하세요",
   "errorFoxEmpty": "한큐에서 빈 기보를 반환했습니다",
-  "warningSgfFoxKomi": "한큐 덤 KM[375]를 7.5집으로 변환했습니다."
+  "warningSgfFoxKomi": "한큐 덤 KM[375]를 7.5집으로 변환했습니다.",
+  "licenseAndCopyright": "라이선스 및 저작권",
+  "projectMitLicense": "이 프로젝트의 자체 코드와 문서는 MIT 라이선스로 제공됩니다.",
+  "mitLicenseFullText": "MIT 라이선스 전문",
+  "thirdPartyNotices": "제3자 출처 및 저작권",
+  "thirdPartyLicenseScope": "제3자 엔진, 모델, 의존성 및 기보에는 각각의 라이선스가 적용되며, 이 프로젝트의 MIT 허가는 적용되지 않습니다.",
+  "katagoCopyrightNotice": "David J Wu(lightvector) 및 다른 기여자가 개발했습니다. 엔진 본체는 주로 MIT 라이선스를 따르며, 제3자 구성 요소는 각각의 라이선스를 따릅니다.",
+  "katagoLicenseFullText": "KataGo 엔진 라이선스 전문",
+  "katagoModelCopyrightNotice": "공식 kata1 모델과 Human SL Network의 저작권은 David J Wu(lightvector)에게 있으며 공식 신경망 라이선스를 따릅니다. 초기 g170 모델(B10 포함)은 CC0를, 기타 모델은 출처의 라이선스를 따릅니다.",
+  "modelLicenseFullText": "공식 모델 라이선스 전문",
+  "cwiCopyrightNotice": "명국 기보는 이 모음에서 가져옵니다. 출처 사이트는 수집된 기보가 퍼블릭 도메인이라고 명시합니다. 앱은 착수, 배치된 돌 및 대국 사실만 수록하며 현대 해설은 포함하지 않고 출처 정보를 보존합니다.",
+  "otherRecordsCopyrightNotice": "공개된 Fox 대국은 Fox 바둑 서비스에서, 가져온 SGF는 사용자가 제공한 파일에서 가져옵니다. 해당 권리는 각 권리자에게 있으며 사용 및 재배포는 원래 출처의 조건과 허가를 따라야 합니다.",
+  "dependenciesCopyrightNotice": "Electron, React 등 의존성의 저작권은 각 저작자 또는 권리자에게 있으며 각각의 라이선스를 따릅니다."
 }

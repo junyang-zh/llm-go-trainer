@@ -45,3 +45,9 @@ _在同一界面复盘棋局、探索变化，并结合 KataGo 分析与 LLM 讲
 | [开发指南](docs/development.md)    | Electron 源码启动、浏览器调试、测试与项目目录           |
 | [构建与发布](docs/releases.md)     | 本地打包、GitHub Release、签名、公证与自动更新          |
 | [架构与路线](docs/architecture.md) | 模块职责、流式协议、数据存储与后续计划                  |
+
+## 许可与版权
+
+本项目采用 [MIT License](LICENSE)。Copyright © 2026 Zhang Junyang（mail@junyang.me）。
+
+KataGo 引擎、模型、第三方依赖及棋谱遵循各自的许可与来源声明，详见[第三方来源与版权](THIRD_PARTY_NOTICES.md)。应用内可点击 logo，在「通用」页查看许可全文与来源说明。

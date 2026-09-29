@@ -74,7 +74,9 @@
       "prompts/**/*",
       "config/**/*",
       "package.json",
-      "dist-desktop/**/*"
+      "dist-desktop/**/*",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
     ],
     "mac": {
       "icon": ".local/icons/icon.icns",
@@ -98,5 +100,6 @@
       "allowToChangeInstallationDirectory": true
     }
   },
-  "author": "junyang-zh"
+  "author": "Zhang Junyang <mail@junyang.me>",
+  "license": "MIT"
 }

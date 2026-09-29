@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from 'react';
 import type { UpdateStatus } from '../shared/updates';
 import { version } from '../package.json';
+import { LicenseNotice } from './LicenseNotice';
 
 export function GeneralSettings({
   beforeInstall,
@@ -178,6 +179,7 @@ export function GeneralSettings({
       >
         {t('viewGithubReleases')}
       </a>
+      <LicenseNotice />
     </section>
   );
 }

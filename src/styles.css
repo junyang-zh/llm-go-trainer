@@ -1262,6 +1262,36 @@ h2 {
   align-items: center;
   gap: 8px;
 }
+.license-notice {
+  margin-top: 22px;
+  border-top: 1px solid #e0e6d8;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.license-notice h4 {
+  margin: 18px 0 8px;
+  font-size: 12px;
+}
+.license-notice p {
+  margin: 8px 0;
+}
+.license-notice a {
+  display: inline;
+  margin: 0;
+}
+.license-notice summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: #4b7056;
+}
+.license-notice pre {
+  white-space: pre-wrap;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 12px;
+  background: #f1f2ed;
+  border-radius: 6px;
+}
 .general-settings .update-checkbox input {
   width: auto;
   margin: 0;

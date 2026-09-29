@@ -496,5 +496,17 @@
   "errorFoxList": "野狐回傳的對局列表無效",
   "errorFoxQueryFirst": "請先查詢野狐對局列表",
   "errorFoxEmpty": "野狐回傳的棋譜為空",
-  "warningSgfFoxKomi": "已將野狐貼子值 KM[375] 轉換為貼目 7.5。"
+  "warningSgfFoxKomi": "已將野狐貼子值 KM[375] 轉換為貼目 7.5。",
+  "licenseAndCopyright": "授權與著作權",
+  "projectMitLicense": "本專案原創程式碼與文件採用 MIT 授權。",
+  "mitLicenseFullText": "MIT 授權全文",
+  "thirdPartyNotices": "第三方來源與著作權",
+  "thirdPartyLicenseScope": "第三方引擎、模型、相依套件與棋譜遵循各自授權，不適用本專案的 MIT 授權。",
+  "katagoCopyrightNotice": "由 David J Wu（lightvector）及其他貢獻者開發；引擎主體採用 MIT 授權，所含第三方元件遵循各自授權。",
+  "katagoLicenseFullText": "KataGo 引擎授權全文",
+  "katagoModelCopyrightNotice": "官方 kata1 模型及 Human SL Network 著作權歸 David J Wu（lightvector）所有，遵循官方神經網路授權。早期 g170 模型（包括 B10）採用 CC0；其他模型以來源授權為準。",
+  "modelLicenseFullText": "官方模型授權全文",
+  "cwiCopyrightNotice": "經典名局來自此棋譜庫。據來源網站聲明，所收集的棋譜屬於公眾領域；本專案僅收錄落子、擺子與對局事實，不包含現代評註，並保留來源資訊。",
+  "otherRecordsCopyrightNotice": "野狐公開對局來自野狐圍棋服務；匯入的 SGF 來自使用者提供的檔案。相關權利歸各自權利人（如適用），使用與再散布須遵循原始來源的條款和授權。",
+  "dependenciesCopyrightNotice": "Electron、React 等第三方相依套件的著作權歸各自作者或權利人所有，遵循各自授權。"
 }
