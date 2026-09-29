@@ -292,7 +292,7 @@ export function createApp(
     const request = resumed?.request ?? coachRequest.parse(req.body);
     const { game, training, provider: requested, action, question, history, context } = request;
     replay(game);
-    if (context) {
+    if (context && !resumed) {
       const saved = library.getGame(context.gameId);
       const expected = {
         ...saved.game,
@@ -414,6 +414,8 @@ export function createApp(
                   previousText: resumed.text,
                   toolResults: resumed.tools.results,
                   trials: resumed.tools.trials.map(([, trial]) => trial),
+                  currentContext: resumed.tools.context,
+                  currentGame: resumed.tools.game,
                 },
               }
             : {}),

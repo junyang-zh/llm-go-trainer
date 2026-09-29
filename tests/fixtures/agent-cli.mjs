@@ -1,9 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-for await (const _chunk of process.stdin) {
-  /* consume the supplied question */
-}
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
 const args = process.argv.slice(2);
 const codex = args.includes('exec');
 const url = codex
@@ -25,13 +24,23 @@ await client.connect(
 );
 let index = 0;
 try {
-  for (const [name, arguments_] of [
-    ['inspect_position', { point: 'D4' }],
-    [
-      'analyze_variation',
-      { moves: ['D5'], point: 'D4', visits: 100, purpose: '搜索白棋长出后的应对' },
-    ],
-  ]) {
+  const calls = input.includes('fixture:manage-games')
+    ? [
+        ['query_game_history', { query: '第二局' }],
+        ['load_game', { gameId: '22222222-2222-4222-8222-222222222222' }],
+        ['edit_trial', { id: 'saved-line', moves: ['D4'] }],
+        ['save_game', { branchId: 'saved-line', title: 'Agent 保存' }],
+        ['rename_game', { title: 'Agent 研究' }],
+        ['inspect_position', { point: 'D4' }],
+      ]
+    : [
+        ['inspect_position', { point: 'D4' }],
+        [
+          'analyze_variation',
+          { moves: ['D5'], point: 'D4', visits: 100, purpose: '搜索白棋长出后的应对' },
+        ],
+      ];
+  for (const [name, arguments_] of calls) {
     index++;
     const item = { id: `tool-${index}`, type: 'mcp_tool_call', server: 'go_trainer', tool: name };
     emit(
@@ -58,7 +67,9 @@ try {
           },
     );
   }
-  const answer = '白 D4 被打吃，应向 D5 长出。';
+  const answer = input.includes('fixture:manage-games')
+    ? '已加载第二局、保存变化并改名为 Agent 研究。'
+    : '白 D4 被打吃，应向 D5 长出。';
   if (codex) {
     emit({ type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: answer } });
     emit({ type: 'turn.completed' });

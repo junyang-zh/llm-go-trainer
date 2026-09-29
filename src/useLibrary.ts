@@ -3,7 +3,7 @@ import { t } from './i18n';
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { api } from './api';
 import { gameTitle, type Conversation, type Library, type SavedGame } from '../shared/library';
-import type { Game } from '../shared/types';
+import type { Game, ToolActivity } from '../shared/types';
 import { finishMessage } from './messages';
 
 function conversation(): Conversation {
@@ -29,6 +29,7 @@ export function useLibrary(initialGame: Game) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [error, setError] = useState('');
   const pending = useRef(new Map<string, { path: string; value: unknown }>());
+  const serverGame = useRef<{ id: string; game: Game } | null>(null);
   const queue = useRef(Promise.resolve());
   function flush() {
     queue.current = queue.current
@@ -84,6 +85,8 @@ export function useLibrary(initialGame: Game) {
   }, [loadAttempt]);
   useEffect(() => {
     if (!ready || review) return;
+    // Agent changes are already persisted. Echoing them back can race with its next tool.
+    if (serverGame.current?.id === gameId && serverGame.current.game === game) return;
     const record = {
       ...lineage,
       id: gameId,
@@ -143,6 +146,22 @@ export function useLibrary(initialGame: Game) {
       const item = conversation();
       setConversations((items) => [item, ...items]);
       setConversationId(item.id);
+    },
+    applyGameChange(change: NonNullable<ToolActivity['gameChange']>) {
+      const { record, context } = change;
+      const updateRecords = record.preset ? setPresets : setGames;
+      updateRecords((items) => [record, ...items.filter((item) => item.id !== record.id)]);
+      if (context) {
+        serverGame.current = { id: record.id, game: record.game };
+        if (change.operation !== 'rename_game') setReview(true);
+        setLineage({
+          groupId: record.groupId,
+          sourceId: record.sourceId,
+          forkTurn: record.forkTurn,
+        });
+        setGame(record.game);
+        setGameId(record.id);
+      }
     },
     async renameGame(id: string, title: string) {
       await flush();

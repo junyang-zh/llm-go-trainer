@@ -48,7 +48,9 @@ export async function openCoachMcp(tools: CoachTools) {
         ...tool,
         inputSchema: { ...tool.inputSchema, type: 'object' as const },
         annotations: {
-          readOnlyHint: tool.name !== 'edit_trial',
+          readOnlyHint: ['query_game_history', 'inspect_position', 'analyze_variation'].includes(
+            tool.name,
+          ),
           destructiveHint: false,
           openWorldHint: false,
         },

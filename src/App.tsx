@@ -79,6 +79,8 @@ export default function App() {
   };
   const [initialGame] = useState(restoredGame);
   const library = useLibrary(initialGame);
+  const displayedGameId = useRef(library.gameId);
+  displayedGameId.current = library.gameId;
   const { game, setGame } = library;
   const [trial, setTrial] = useState<TrialBranch | null>(null);
   const trialMoves = useMemo(() => trial?.moves.slice(0, trial.cursor) ?? [], [trial]);
@@ -404,16 +406,17 @@ export default function App() {
       return;
     }
     try {
+      const linkContext = message.resultContext ?? message.context;
       const branch =
         link.branch && message.trials && Object.hasOwn(message.trials, link.branch)
           ? message.trials[link.branch]
           : undefined;
       if (link.branch && !branch) throw new Error(t('trialMissing'));
-      const gameId = branch?.gameId ?? message.context?.gameId;
+      const gameId = branch?.gameId ?? linkContext?.gameId;
       const saved = await library.findGame(gameId ?? '');
       if (!saved) throw new Error(t('coachGameMissing'));
       const source = saved.id === library.gameId ? game : saved.game;
-      const baseTurn = branch?.baseTurn ?? link.turn ?? message.context!.turn;
+      const baseTurn = branch?.baseTurn ?? link.turn ?? linkContext!.turn;
       if (baseTurn < 0 || baseTurn > source.moves.length) throw new Error(t('invalidStartTurn'));
       const base = { ...source, moves: source.moves.slice(0, baseTurn) };
       let moves: Move[];
@@ -430,7 +433,7 @@ export default function App() {
         if (ply > branch.moves.length) throw new Error(t('invalidTrialTurn'));
         cursor = prefix.length + ply;
       } else {
-        moves = link.turn === undefined ? message.context!.trialMoves : [];
+        moves = link.turn === undefined ? linkContext!.trialMoves : [];
         cursor = moves.length;
       }
       replay({ ...base, moves: [...base.moves, ...moves] });
@@ -526,21 +529,52 @@ export default function App() {
       if (endpoint === 'coach' && !resumed) setQuestion('');
       try {
         await library.flush();
+        let boardChanged = !!resumed?.resultContext;
+        const appliedChanges = new Set<string>();
         await streamApi(
           endpoint,
           payload,
           (event) => {
+            if (controller.signal.aborted) return;
+            if (
+              event.type === 'tool' &&
+              event.activity.state === 'done' &&
+              event.activity.gameChange &&
+              !appliedChanges.has(event.activity.id)
+            ) {
+              appliedChanges.add(event.activity.id);
+              const change = event.activity.gameChange;
+              if (change.context) {
+                const { turn, trialMoves } = change.context;
+                const nextTrial = trialMoves.length
+                  ? { moves: trialMoves, cursor: trialMoves.length }
+                  : null;
+                pendingCoach.current =
+                  change.record.id !== displayedGameId.current ? { turn, trial: nextTrial } : null;
+                setTurn(turn);
+                setTrial(nextTrial);
+                setAutoPlay(false);
+                setScoring(false);
+                setDead([]);
+                setNotice(null);
+                setCoachSelection(undefined);
+                setSearchProgress(null);
+                evaluations.reset();
+                boardChanged = true;
+              }
+              library.applyGameChange(change);
+            }
             setMessages((previous) =>
               previous.map((message) =>
                 message.id === id ? updateMessage(message, event) : message,
               ),
             );
-            if (event.type === 'analysis') {
+            if (event.type === 'analysis' && !boardChanged) {
               setSearchProgress(event.analysis);
               if (!resumed) evaluations.record(current, event.analysis, event.final);
             }
             if (event.type === 'done') {
-              if (event.analysis) {
+              if (event.analysis && !boardChanged) {
                 if (!resumed) evaluations.record(current, event.analysis, true);
                 setSearchProgress(event.analysis);
               }
@@ -1075,7 +1109,8 @@ export default function App() {
                       size: game.size,
                       enabled:
                         !chatCollapsed &&
-                        ((!!message.context && contextKey(message.context) === boardKey) ||
+                        ((!!(message.resultContext ?? message.context) &&
+                          contextKey((message.resultContext ?? message.context)!) === boardKey) ||
                           activeCoach?.message === message.id),
                       activeGroup:
                         activeCoach?.message === message.id ? activeCoach.group : undefined,

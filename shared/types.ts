@@ -87,6 +87,11 @@ export interface ToolActivity {
   detail?: string;
   elapsedMs?: number;
   trialEdit?: { id: string; branch: import('./trial').CoachTrial | null };
+  gameChange?: {
+    operation: 'load_game' | 'save_game' | 'rename_game';
+    record: import('./library').SavedGame;
+    context?: import('./library').BoardContext;
+  };
   evaluation?: { visits: number; winrate: number; scoreLead: number; pv: Move[] };
 }
 export type StreamEvent =

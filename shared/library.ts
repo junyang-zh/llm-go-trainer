@@ -17,6 +17,7 @@ export interface AnalysisMessage {
   tools?: ToolActivity[];
   trials?: Record<string, import('./trial').CoachTrial>;
   context?: BoardContext;
+  resultContext?: BoardContext;
   createdAt?: string;
 }
 export interface SavedGame {

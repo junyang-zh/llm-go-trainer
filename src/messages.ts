@@ -51,6 +51,9 @@ export function updateMessage(message: AnalysisMessage, event: StreamEvent): Ana
         ...message,
         tools,
         trials,
+        resultContext:
+          (event.activity.state === 'done' ? event.activity.gameChange?.context : undefined) ??
+          message.resultContext,
         status: event.activity.state === 'running' ? event.activity.label : t('preparingAnalysis'),
       };
     }

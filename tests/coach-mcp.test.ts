@@ -31,11 +31,18 @@ it('serves scoped MCP tools, rejects unauthenticated/cross-origin calls and clos
       }),
     );
     expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([
+      'load_game',
+      'save_game',
+      'rename_game',
       'edit_trial',
       'query_game_history',
       'inspect_position',
       'analyze_variation',
     ]);
+    for (const tool of (await client.listTools()).tools)
+      expect(tool.annotations?.readOnlyHint).toBe(
+        ['query_game_history', 'inspect_position', 'analyze_variation'].includes(tool.name),
+      );
     const result = await client.callTool({ name: 'inspect_position', arguments: { point: 'D4' } });
     expect(result.structuredContent).toMatchObject({ focus: { color: 'W', liberties: ['D5'] } });
     expect(

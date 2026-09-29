@@ -1,4 +1,4 @@
-import { matchesRecord } from '../shared/library';
+import { gameTitle, matchesRecord, recordGroupId, type SavedGame } from '../shared/library';
 import { searchPresets } from './presets';
 import { summarizeRecord } from '../shared/presets';
 import { defaultCoachLimits, type CoachLimits } from '../shared/llm';
@@ -23,6 +23,32 @@ const context = {
   point: z.string().max(4).optional().describe('需要重点观察的棋块坐标'),
 };
 export const coachToolSchemas = {
+  load_game: z
+    .object({
+      gameId: z.uuid().describe('从 query_game_history 获取的棋局 ID'),
+      turn: z.number().int().min(0).max(1500).optional().describe('打开的手数；省略时打开全局末手'),
+    })
+    .strict(),
+  save_game: z
+    .object({
+      title: z.string().trim().min(1).max(200).optional(),
+      asCopy: z
+        .boolean()
+        .default(false)
+        .describe('另存为同源新棋局；试下、回看中途或预置棋谱始终另存'),
+      branchId: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]{1,40}$/)
+        .optional()
+        .describe('保存 edit_trial 创建的完整分支；省略时保存当前棋盘局面'),
+    })
+    .strict(),
+  rename_game: z
+    .object({
+      gameId: z.uuid().optional().describe('省略时给当前棋局改名'),
+      title: z.string().trim().min(1).max(200),
+    })
+    .strict(),
   edit_trial: z
     .object({
       id: z
@@ -92,6 +118,12 @@ export const coachToolSchemas = {
     .strict(),
 };
 const descriptions = {
+  load_game:
+    '将本地历史或预置棋局加载到用户棋盘，可指定手数。清除棋盘试下并切换本轮后续工具的当前局面；不修改棋谱或对话。',
+  save_game:
+    '把当前棋盘（含用户试下）或本轮 edit_trial 分支保存到本地棋谱库并打开。完整历史棋局保存原 ID；回看中途、试下、预置棋谱或 asCopy=true 时创建同源分支，保留原谱。不是导出 SGF 文件。',
+  rename_game:
+    '修改本地历史棋局名称及 SGF 的 GN，保留手顺和来源。省略 gameId 时修改当前棋局；预置棋谱只读，请先另存。',
   edit_trial:
     '创建、修改或删除讲解用的试下分支，不修改实战棋谱。可从当前局面（含用户试下）、原局某手或本轮已有分支某手开始。合法性检查成功后保存到对话并返回可点击的 Markdown selector 链接；用户点击才切换棋盘。',
   query_game_history:
@@ -133,6 +165,12 @@ export class CoachTools {
     private budget?: CoachBudget,
     saved?: ReturnType<CoachTools['snapshot']>,
   ) {
+    this.game = structuredClone(saved?.game ?? game);
+    if (session)
+      this.session = {
+        ...session,
+        context: structuredClone(saved ? saved.context : session.context),
+      };
     if (saved) {
       this.idPrefix = randomUUID() + ':';
       this.cache = new Map(saved.cache);
@@ -142,7 +180,13 @@ export class CoachTools {
     this.signal = AbortSignal.any([this.controller.signal, ...(signal ? [signal] : [])]);
   }
   snapshot() {
-    return { cache: [...this.cache], trials: [...this.trials], results: [...this.results] };
+    return {
+      game: structuredClone(this.game),
+      context: structuredClone(this.session?.context),
+      cache: [...this.cache],
+      trials: [...this.trials],
+      results: [...this.results],
+    };
   }
   get available() {
     return (
@@ -176,13 +220,19 @@ export class CoachTools {
       id,
       name,
       label:
-        name === 'edit_trial'
-          ? '编辑试下'
-          : name === 'query_game_history'
-            ? '搜索棋谱'
-            : name === 'inspect_position'
-              ? '检查棋块'
-              : '搜索变化',
+        name === 'load_game'
+          ? '加载棋局'
+          : name === 'save_game'
+            ? '保存棋局'
+            : name === 'rename_game'
+              ? '棋局改名'
+              : name === 'edit_trial'
+                ? '编辑试下'
+                : name === 'query_game_history'
+                  ? '搜索棋谱'
+                  : name === 'inspect_position'
+                    ? '检查棋块'
+                    : '搜索变化',
       state: 'running',
     };
     const emit = (patch: Partial<ToolActivity>) => {
@@ -196,6 +246,88 @@ export class CoachTools {
         this.budget?.hit('已达到工具调用次数上限');
         throw new Error('本次工具调用额度已用完，请依据已有结果完成讲解');
       }
+      if (name === 'load_game' || name === 'save_game' || name === 'rename_game') {
+        if (!this.session) throw new Error('历史棋局库不可用');
+        const { library } = this.session;
+        let record: SavedGame;
+        let nextContext: BoardContext | undefined;
+        if (name === 'load_game') {
+          const args = coachToolSchemas.load_game.parse(raw);
+          record = library.getGame(args.gameId);
+          const turn = args.turn ?? record.game.moves.length;
+          if (turn > record.game.moves.length) throw new Error('手数超出棋局范围');
+          replay(record.game);
+          nextContext = { gameId: record.id, gameTitle: record.title, turn, trialMoves: [] };
+        } else if (name === 'rename_game') {
+          const args = coachToolSchemas.rename_game.parse(raw);
+          const gameId = args.gameId ?? this.session.context?.gameId;
+          if (!gameId) throw new Error('当前棋局尚未保存，请先保存棋局');
+          signal.throwIfAborted();
+          record = library.renameGame(gameId, args.title);
+          if (gameId === this.session.context?.gameId)
+            nextContext = { ...this.session.context, gameTitle: record.title };
+        } else {
+          const args = coachToolSchemas.save_game.parse(raw);
+          const branch = args.branchId ? this.trials.get(args.branchId) : undefined;
+          if (args.branchId && !branch) throw new Error('找不到本轮试下分支');
+          const sourceId = branch ? branch.gameId : this.session.context?.gameId;
+          const source = sourceId ? library.getGame(sourceId) : undefined;
+          const forkTurn = branch ? branch.baseTurn : this.session.context?.turn;
+          const game = structuredClone(
+            branch ? { ...branch.base, moves: [...branch.base.moves, ...branch.moves] } : this.game,
+          );
+          const variation = !!(
+            branch ||
+            (source &&
+              (forkTurn !== source.game.moves.length || this.session.context?.trialMoves.length))
+          );
+          const copy = !!(args.asCopy || source?.preset || variation);
+          if (variation) delete game.metadata.RE;
+          if (args.title) game.metadata.GN = args.title;
+          signal.throwIfAborted();
+          record = library.saveGame({
+            ...(!copy && source ? source : {}),
+            ...(copy && source
+              ? { sourceId: source.id, groupId: recordGroupId(source), forkTurn }
+              : {}),
+            id: !copy && source ? source.id : randomUUID(),
+            title: args.title ?? gameTitle(game),
+            updatedAt: new Date().toISOString(),
+            game,
+          });
+          nextContext = {
+            gameId: record.id,
+            gameTitle: record.title,
+            turn: record.game.moves.length,
+            trialMoves: [],
+          };
+        }
+        if (nextContext) {
+          this.game = {
+            ...structuredClone(record.game),
+            moves: [...record.game.moves.slice(0, nextContext.turn), ...nextContext.trialMoves],
+          };
+          this.session.context = nextContext;
+          this.cache.clear();
+        }
+        result = {
+          data: {
+            record,
+            currentContext: this.session.context,
+            position: positionFacts(this.game),
+            remainingCalls: this.limits.toolCalls
+              ? Math.max(0, this.limits.toolCalls - this.calls)
+              : 'unlimited',
+          },
+        };
+        emit({
+          state: 'done',
+          detail: record.title,
+          gameChange: { operation: name, record, context: nextContext },
+        });
+        this.results.push({ name, arguments: raw, result });
+        return result;
+      }
       if (name === 'edit_trial') {
         const args = coachToolSchemas.edit_trial.parse(raw);
         let branch: CoachTrial | null = null;
@@ -206,6 +338,7 @@ export class CoachTools {
           let baseTurn = this.session?.context?.turn ?? this.game.moves.length;
           let prefix: Move[] = [];
           let ply = 0;
+          let gameId = this.session?.context?.gameId;
           if (args.base === 'main') {
             if (args.turn === undefined || args.source !== undefined || args.ply !== undefined)
               throw new Error('原局起点需要 turn，不能带 source 或 ply');
@@ -221,6 +354,7 @@ export class CoachTools {
             const source = this.trials.get(args.source);
             if (!source) throw new Error('找不到本轮试下分支');
             base = source.base;
+            gameId = source.gameId;
             baseTurn = source.baseTurn;
             prefix = source.moves;
             ply = args.ply ?? prefix.length;
@@ -236,7 +370,7 @@ export class CoachTools {
           branch = {
             id: args.id,
             label: args.label,
-            gameId: this.session?.context?.gameId,
+            gameId,
             baseTurn,
             base: structuredClone(base),
             moves,

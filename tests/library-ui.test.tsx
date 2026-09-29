@@ -7,6 +7,9 @@ import App from '../src/App';
 import { presetRecord, presetSummary, searchPresets } from '../server/presets';
 import { api, streamApi } from '../src/api';
 import type { Library } from '../shared/library';
+import { CoachTools } from '../server/coach-tools';
+import { HistoryLibrary } from '../server/library';
+import { trainingForRank } from '../shared/training';
 import {
   libraryFixture,
   chatStatus,
@@ -121,6 +124,103 @@ async function next() {
   expect(button.disabled).toBe(false);
   await act(async () => button.click());
 }
+it('applies agent loads, saves and renames in order, keeps the chat, and sends the new context next turn', async () => {
+  let managedId = '';
+  vi.mocked(streamApi).mockImplementationOnce(async (_path, body, emit) => {
+    const request = body as {
+      game: import('../shared/types').Game;
+      context: import('../shared/library').BoardContext;
+    };
+    const records = new HistoryLibrary();
+    saved.games.forEach((record) => records.saveGame(record));
+    const tools = new CoachTools(
+      { status: () => chatStatus.engine, analyze: vi.fn(), close() {} },
+      request.game,
+      trainingForRank('5k'),
+      (activity) => emit({ type: 'tool', activity }),
+      undefined,
+      { library: records, context: request.context },
+    );
+    for (const [name, args] of [
+      ['load_game', { gameId: secondGameId }],
+      ['edit_trial', { id: 'line', moves: ['D4'] }],
+      ['save_game', { branchId: 'line', title: '已保存' }],
+      ['rename_game', { title: 'Agent 研究' }],
+      ['rename_game', { gameId: firstGameId, title: '旧局改名' }],
+    ] as const) {
+      expect((await tools.run(name, args)).isError).toBeUndefined();
+    }
+    managedId = tools.snapshot().context!.gameId;
+    saved.games = records.snapshot().games;
+    emit({ type: 'done', answer: '[查看开局](#go/selector/root?turn=0)', analysis: null });
+  });
+  await act(async () => root.render(<App />));
+  await point('D4'); // existing trial must be cleared when loading another game
+  await click('当前局势');
+  await click('发送');
+  expect(host.querySelector('[aria-label="D4 黑子"]')).not.toBeNull();
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('1');
+  expect(saved.games.find((record) => record.id === managedId)).toMatchObject({
+    title: 'Agent 研究',
+    sourceId: secondGameId,
+  });
+  expect(saved.games.find((record) => record.id === firstGameId)!.game.moves).toHaveLength(3);
+  expect(saved.conversations).toHaveLength(1);
+  await click('当前局势');
+  await click('发送');
+  expect(vi.mocked(streamApi).mock.calls.at(-1)![1]).toMatchObject({
+    context: { gameId: managedId, gameTitle: 'Agent 研究', turn: 1, trialMoves: [] },
+    game: { metadata: { GN: 'Agent 研究' } },
+  });
+  await click('查看开局');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe('1');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('0');
+  await click('棋谱');
+  expect(host.querySelector('.record-library')!.textContent).toContain('Agent 研究');
+  expect(host.querySelector('.record-library')!.textContent).toContain('旧局改名');
+});
+it('does not echo an agent rename back over later server changes while a live game remains playable', async () => {
+  saved.games = [];
+  await act(async () => root.render(<App />));
+  vi.mocked(streamApi).mockImplementationOnce(async (_path, body, emit) => {
+    const { context } = body as { context: import('../shared/library').BoardContext };
+    const record = structuredClone(saved.games.find((record) => record.id === context.gameId)!);
+    record.title = '实战改名';
+    record.game.metadata.GN = record.title;
+    saved.games = [record];
+    emit({
+      type: 'tool',
+      activity: {
+        id: 'rename',
+        name: 'rename_game',
+        label: '棋局改名',
+        state: 'done',
+        gameChange: {
+          operation: 'rename_game',
+          record,
+          context: { ...context, gameTitle: record.title },
+        },
+      },
+    });
+    emit({ type: 'done', answer: '已改名', analysis: null });
+  });
+  const writesBefore = vi
+    .mocked(api)
+    .mock.calls.filter(([path]) => path === 'library/games').length;
+  await click('当前局势');
+  await click('发送');
+  expect(vi.mocked(api).mock.calls.filter(([path]) => path === 'library/games')).toHaveLength(
+    writesBefore,
+  );
+  await point('D4');
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(saved.games[0]).toMatchObject({
+    title: '实战改名',
+    game: { moves: [{ color: 'B', point: 'D4' }] },
+  });
+});
+
 it.each([
   ['panel', 3],
   ['board', 2],

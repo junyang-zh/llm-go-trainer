@@ -3,6 +3,8 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { createApp } from '../server/app';
 import { LlmSettings } from '../server/llm-settings';
+import { HistoryLibrary } from '../server/library';
+import { libraryFixture, firstGameId, secondGameId } from './fixtures/library';
 import { defaultCoachLimits } from '../shared/llm';
 import { readLines } from '../shared/stream';
 import type { StreamEvent, Provider } from '../shared/types';
@@ -34,8 +36,10 @@ async function harness(provider: Provider = 'deepseek', patch: Partial<ProviderC
     analyze: vi.fn(async () => coachAnalysis(whiteAtari)),
     close() {},
   };
+  const library = new HistoryLibrary();
+  libraryFixture.games.forEach((game) => library.saveGame(game));
   const server = createServer(
-    createApp(engine, config, '围棋教练', resolve('dist'), undefined, llm),
+    createApp(engine, config, '围棋教练', resolve('dist'), undefined, llm, library),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -158,6 +162,40 @@ it('continues with original task, evidence and editable trials, rotates tokens, 
       type: 'done',
       answer: '已摆第一手。\n\n继续第二手。\n\n完成。',
     });
+    expect(app.engine.analyze).toHaveBeenCalledOnce();
+  } finally {
+    await app.close();
+  }
+});
+
+it('resumes after renaming the request game and retains the subsequently loaded board', async () => {
+  const app = await harness('deepseek', { limits: { ...defaultCoachLimits, toolCalls: 1 } });
+  const requests: any[] = [];
+  intercept(async (init) => {
+    requests.push(JSON.parse(init.body as string));
+    if (requests.length === 1)
+      return call('rename', 'rename_game', { title: '续接改名' }, '', true);
+    if (requests.length === 2) return call('load', 'load_game', { gameId: secondGameId }, '', true);
+    if (requests.length === 3) return call('inspect', 'inspect_position', {});
+    return sseResponse([{ content: '完成。' }]);
+  });
+  try {
+    const first = paused(
+      await app.events({
+        game: libraryFixture.games[0].game,
+        context: { gameId: firstGameId, gameTitle: '第一局', turn: 3, trialMoves: [] },
+        training: trainingForRank('5k'),
+        action: 'chat',
+        question: '改名并打开第二局',
+      }),
+    );
+    const second = paused(await app.events({ continuationId: first.continuationId }));
+    expect(requests[1].messages[1].content).toContain('续接改名');
+    const final = await app.events({ continuationId: second.continuationId });
+    expect(final.at(-1)?.type).toBe('done');
+    const result = JSON.parse(requests[3].messages.at(-1).content);
+    expect(result.currentContext).toMatchObject({ gameId: secondGameId, turn: 0 });
+    expect(result.position.turn).toBe(0);
     expect(app.engine.analyze).toHaveBeenCalledOnce();
   } finally {
     await app.close();
