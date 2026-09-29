@@ -1,0 +1,28 @@
+{
+  "user": { "result": 0, "uid": "12345", "username": "测试棋手" },
+  "list": {
+    "result": 0,
+    "chesslist": [
+      {
+        "chessid": "1566713791010001299",
+        "blacknick": "测试棋手",
+        "whitenick": "测试对手",
+        "starttime": "2026-09-29 10:00:00",
+        "movenum": 2
+      },
+      {
+        "chessid": "1566713791010001300",
+        "blackenname": "WhitePlayer",
+        "whiteenname": "BlackPlayer",
+        "dt": "2026-09-28",
+        "movenum": "2"
+      }
+    ]
+  },
+  "sgf": {
+    "result": 0,
+    "chess": "(;GM[1]FF[4]SZ[19]PB[测试棋手]PW[测试对手]RU[Chinese]KM[375]AP[GNU Go:3.8]C[AP[foxwq\\] KM[375\\]]AP[foxwq];B[pd];W[dp])"
+  },
+  "badSgf": { "result": 0, "chess": "(;GM[1]SZ[19]RU[Chinese]KM[7.5];B[pd];W[pd])" },
+  "missing": { "result": 1, "resultstr": "user not found" }
+}

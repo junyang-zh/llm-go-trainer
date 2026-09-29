@@ -1,4 +1,5 @@
 import { RecordDownloader } from './RecordDownloader';
+import { FoxRecords } from './FoxRecords';
 import { useEffect, useState } from 'react';
 import {
   matchesRecord,
@@ -30,12 +31,13 @@ export function RecordLibrary({
   selectedId: string;
   disabled: boolean;
   onImport: () => void;
-  onSelect: (record: SavedGame) => void;
+  onSelect: (record: SavedGame, warnings?: string[]) => void;
   onExport: (record: SavedGame) => void;
   onRename: (id: string, title: string) => Promise<void>;
 }) {
   const [category, setCategory] = useState<RecordCategory>('history');
   const [downloads, setDownloads] = useState(false);
+  const [fox, setFox] = useState(false);
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<string>();
   const [name, setName] = useState('');
@@ -174,9 +176,10 @@ export function RecordLibrary({
         {Object.entries(categories).map(([value, key]) => (
           <button
             key={value}
-            aria-pressed={!downloads && category === value}
+            aria-pressed={!downloads && !fox && category === value}
             onClick={() => {
               setDownloads(false);
+              setFox(false);
               setCategory(value as RecordCategory);
               setOffset(0);
               setError('');
@@ -185,11 +188,28 @@ export function RecordLibrary({
             {t(key)}
           </button>
         ))}
-        <button aria-pressed={downloads} onClick={() => setDownloads(true)}>
+        <button
+          aria-pressed={fox}
+          onClick={() => {
+            setFox(true);
+            setDownloads(false);
+          }}
+        >
+          {t('foxRecords')}
+        </button>
+        <button
+          aria-pressed={downloads}
+          onClick={() => {
+            setDownloads(true);
+            setFox(false);
+          }}
+        >
           {t('recordDownloads')}
         </button>
       </div>
-      {downloads ? (
+      {fox ? (
+        <FoxRecords disabled={disabled} onSelect={onSelect} />
+      ) : downloads ? (
         <RecordDownloader onInstalled={() => setRevision((value) => value + 1)} />
       ) : (
         <>

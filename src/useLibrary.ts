@@ -159,6 +159,7 @@ export function useLibrary(initialGame: Game) {
     selectGame(item: SavedGame) {
       if (item.preset)
         setPresets((items) => [item, ...items.filter((value) => value.id !== item.id)]);
+      else setGames((items) => [item, ...items.filter((value) => value.id !== item.id)]);
       setReview(true);
       setLineage({ groupId: item.groupId, sourceId: item.sourceId, forkTurn: item.forkTurn });
       setGame(item.game);

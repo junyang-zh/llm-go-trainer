@@ -5,6 +5,7 @@ import { cwiPresetInfo } from '../shared/presets';
 import { randomUUID } from 'node:crypto';
 import { CoachBudget } from './coach-budget';
 import { HistoryLibrary } from './library';
+import { FoxRecords } from './fox';
 import { CoachTools } from './coach-tools';
 import { join } from 'node:path';
 import { LlmSettings } from './llm-settings';
@@ -32,6 +33,7 @@ export function createApp(
   library = new HistoryLibrary(),
   models?: KataGoModels,
   records?: RecordSources,
+  fox = new FoxRecords(library),
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -73,6 +75,9 @@ export function createApp(
     next();
   });
   app.get('/api/library/sources', (_req, res) => res.json(records?.list() ?? []));
+  app.get('/api/library/fox', (_req, res) => res.json(fox.snapshot()));
+  app.post('/api/library/fox/sync', async (req, res) => res.json(await fox.sync(req.body)));
+  app.post('/api/library/fox/open', async (req, res) => res.json(await fox.open(req.body)));
   app.post('/api/library/sources/:id/download', (req, res) => {
     if (!records) throw new Error('Record downloader unavailable');
     res.json(records.start(req.params.id));

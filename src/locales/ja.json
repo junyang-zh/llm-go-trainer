@@ -479,5 +479,22 @@
   "recordImporting": "棋譜を整理中：{v0} 局",
   "recordDownloading": "ダウンロード中：{v0} / {v1} MB",
   "recordRetryDownload": "再ダウンロード",
-  "recordDownload": "ダウンロード"
+  "recordDownload": "ダウンロード",
+  "foxRecords": "野狐の対局",
+  "foxDescription": "野狐のユーザー名または数字の UID で最近の公開対局を検索します。対局を開くと棋譜をダウンロードして履歴に保存します。取得範囲は野狐が返す一覧に限られます。",
+  "foxUsername": "野狐のユーザー名または UID",
+  "foxQuery": "対局を検索",
+  "foxOpening": "棋譜をダウンロード・読み込み中…",
+  "foxResults": "{name}（UID {uid}）· {count} 局",
+  "foxEmpty": "公開対局が見つかりません。別のユーザー名でお試しください。",
+  "foxMoves": "{count} 手",
+  "foxSaved": "保存済み · 開く",
+  "foxDownloadOpen": "ダウンロードして開く",
+  "errorFoxRequest": "野狐へのリクエストに失敗しました：{detail}",
+  "errorFoxBusy": "野狐を検索中です。しばらくしてからお試しください。",
+  "errorFoxUser": "野狐のユーザーが見つかりません",
+  "errorFoxList": "野狐から無効な対局一覧が返されました",
+  "errorFoxQueryFirst": "先に野狐の対局を検索してください",
+  "errorFoxEmpty": "野狐から空の棋譜が返されました",
+  "warningSgfFoxKomi": "野狐のコミ KM[375] を 7.5 目に変換しました。"
 }

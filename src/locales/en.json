@@ -479,5 +479,22 @@
   "recordImporting": "Importing records: {v0}",
   "recordDownloading": "Downloading: {v0} / {v1} MB",
   "recordRetryDownload": "Retry download",
-  "recordDownload": "Download"
+  "recordDownload": "Download",
+  "foxRecords": "Fox games",
+  "foxDescription": "Enter a Fox username or numeric UID to find recent public games. Open a game to download and save it to your history. Availability is limited to the list returned by Fox.",
+  "foxUsername": "Fox username or UID",
+  "foxQuery": "Find games",
+  "foxOpening": "Downloading and importing game…",
+  "foxResults": "{name} (UID {uid}) · {count} games",
+  "foxEmpty": "No public games found. Try another username.",
+  "foxMoves": "{count} moves",
+  "foxSaved": "Saved · Open",
+  "foxDownloadOpen": "Download and open",
+  "errorFoxRequest": "Fox request failed: {detail}",
+  "errorFoxBusy": "A Fox query is running. Please try again shortly.",
+  "errorFoxUser": "Fox user not found",
+  "errorFoxList": "Fox returned an invalid game list",
+  "errorFoxQueryFirst": "Search for Fox games first",
+  "errorFoxEmpty": "Fox returned an empty game record",
+  "warningSgfFoxKomi": "Converted Fox komi KM[375] from stone units to 7.5 points."
 }

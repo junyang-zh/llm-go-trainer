@@ -479,5 +479,22 @@
   "recordImporting": "正在整理棋譜：{v0} 局",
   "recordDownloading": "正在下載：{v0} / {v1} MB",
   "recordRetryDownload": "重試下載",
-  "recordDownload": "下載"
+  "recordDownload": "下載",
+  "foxRecords": "野狐對局",
+  "foxDescription": "輸入野狐使用者名稱或數字 UID 查詢最近公開對局。點選對局後下載並儲存至歷史棋局；列表範圍以野狐介面回傳為準。",
+  "foxUsername": "野狐使用者名稱或 UID",
+  "foxQuery": "查詢對局",
+  "foxOpening": "正在下載並匯入棋譜…",
+  "foxResults": "{name}（UID {uid}）· {count} 局",
+  "foxEmpty": "未找到公開對局，可以換一個使用者名稱重試。",
+  "foxMoves": "{count} 手",
+  "foxSaved": "已儲存 · 開啟",
+  "foxDownloadOpen": "下載並開啟",
+  "errorFoxRequest": "野狐請求失敗：{detail}",
+  "errorFoxBusy": "野狐查詢進行中，請稍後重試",
+  "errorFoxUser": "找不到野狐使用者",
+  "errorFoxList": "野狐回傳的對局列表無效",
+  "errorFoxQueryFirst": "請先查詢野狐對局列表",
+  "errorFoxEmpty": "野狐回傳的棋譜為空",
+  "warningSgfFoxKomi": "已將野狐貼子值 KM[375] 轉換為貼目 7.5。"
 }

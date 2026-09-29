@@ -5,7 +5,7 @@ export interface SgfNode {
   properties: Record<string, string[]>;
   children: SgfNode[];
 }
-export function parseSgf(text: string): SgfNode[] {
+export function parseSgf(text: string, source?: 'fox'): SgfNode[] {
   if (text.length > 2_000_000) throw new Error('棋谱超过 2 MB 限制');
   text = text.replace(/^\uFEFF/, '');
   let i = 0,
@@ -48,8 +48,12 @@ export function parseSgf(text: string): SgfNode[] {
           values.push(value());
           ws();
         }
-        if (!key || !values.length || node.properties[key]) throw new Error('SGF 属性无效或重复');
-        node.properties[key] = values;
+        const foxApplication = source === 'fox' && depth === 0 && !root && key === 'AP';
+        if (!key || !values.length || (node.properties[key] && !foxApplication))
+          throw new Error('SGF 属性无效或重复');
+        node.properties[key] = foxApplication
+          ? [...(node.properties[key] ?? []), ...values]
+          : values;
       }
       if (tail) tail.children.push(node);
       else root = node;
@@ -95,8 +99,8 @@ function expandSetup(values: string[], size: number): string[] {
     return points;
   });
 }
-export function importSgf(text: string): { game: Game; warnings: string[] } {
-  const roots = parseSgf(text),
+export function importSgf(text: string, source?: 'fox'): { game: Game; warnings: string[] } {
+  const roots = parseSgf(text, source),
     root = roots[0],
     props = root.properties;
   if (props.GM && props.GM[0] !== '1') throw new Error('这不是围棋棋谱');
@@ -108,7 +112,13 @@ export function importSgf(text: string): { game: Game; warnings: string[] } {
   if (!ru || !/chinese|china|中国|japan|日本/.test(ru))
     warnings.push('规则未注明或暂不支持，按中国规则导入；请核对。');
   if (roots.length > 1) warnings.push('棋谱集只导入第一局。');
-  const komi = Number(props.KM?.[0] ?? (rules === 'japanese' ? 6.5 : 7.5));
+  let komi = Number(props.KM?.[0] ?? (rules === 'japanese' ? 6.5 : 7.5));
+  // Fox's Chinese KM[375] is hundredths of a stone: 3.75 stones = 7.5 points.
+  // Restrict repair to the known provider encoding; unknown values still fail validation.
+  if (source === 'fox' && /chinese|china|中国/.test(ru) && komi === 375) {
+    komi = 7.5;
+    warnings.push('已将野狐贴子值 KM[375] 转换为贴目 7.5。');
+  }
   if (!Number.isFinite(komi) || Math.abs(komi) > 100 || !Number.isInteger(komi * 2))
     throw new Error('贴目必须是 -100 至 100 之间的整数或半整数');
   const game = newGame(size, 0, komi, rules);

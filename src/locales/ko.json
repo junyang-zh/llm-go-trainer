@@ -479,5 +479,22 @@
   "recordImporting": "기보 정리 중: {v0}국",
   "recordDownloading": "다운로드 중: {v0} / {v1} MB",
   "recordRetryDownload": "다운로드 재시도",
-  "recordDownload": "다운로드"
+  "recordDownload": "다운로드",
+  "foxRecords": "한큐 대국",
+  "foxDescription": "한큐 사용자 이름 또는 숫자 UID로 최근 공개 대국을 검색합니다. 대국을 열면 기보를 다운로드하여 기록에 저장합니다. 검색 범위는 한큐에서 반환하는 목록으로 제한됩니다.",
+  "foxUsername": "한큐 사용자 이름 또는 UID",
+  "foxQuery": "대국 검색",
+  "foxOpening": "기보 다운로드 및 가져오는 중…",
+  "foxResults": "{name} (UID {uid}) · {count}국",
+  "foxEmpty": "공개 대국을 찾지 못했습니다. 다른 사용자 이름으로 다시 시도하세요.",
+  "foxMoves": "{count}수",
+  "foxSaved": "저장됨 · 열기",
+  "foxDownloadOpen": "다운로드하여 열기",
+  "errorFoxRequest": "한큐 요청 실패: {detail}",
+  "errorFoxBusy": "한큐 검색 중입니다. 잠시 후 다시 시도하세요.",
+  "errorFoxUser": "한큐 사용자를 찾을 수 없습니다",
+  "errorFoxList": "한큐에서 잘못된 대국 목록을 반환했습니다",
+  "errorFoxQueryFirst": "먼저 한큐 대국을 검색하세요",
+  "errorFoxEmpty": "한큐에서 빈 기보를 반환했습니다",
+  "warningSgfFoxKomi": "한큐 덤 KM[375]를 7.5집으로 변환했습니다."
 }

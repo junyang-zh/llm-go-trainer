@@ -1357,11 +1357,18 @@ export default function App() {
                 'application/x-go-sgf',
               )
             }
-            onSelect={(item) => {
+            onSelect={(item, warnings) => {
               invalidate();
               evaluations.reset();
               setAutoPlay(false);
               library.selectGame(item);
+              if (warnings)
+                setNotice({
+                  kind: 'import',
+                  name: item.title,
+                  moves: item.game.moves.length,
+                  warnings,
+                });
               setTurn(item.preset ? 0 : item.game.moves.length);
               // The game-ID effect also handles first-time preset selection.
               pendingCoach.current =
