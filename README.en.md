@@ -30,7 +30,7 @@ Download from [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/rel
 | Windows 10/11 x64         | `.exe`    |
 | macOS 15+ / Apple Silicon | `.dmg`    |
 
-The standard edition bundles the engine, dependencies and models; `minimal` downloads them on first launch. Both have the same features. See the [user guide](docs/en/usage.md#installation) and [release notes](docs/en/release-notes.md).
+The standard edition bundles the engine, dependencies and models; `minimal` waits for you to open **Settings → Go models** at the top left and click **Download and enable KataGo**, as prompted at the top right. Both have the same features. See the [user guide](docs/en/usage.md#installation) and [release notes](docs/en/release-notes.md).
 
 ## Documentation
 

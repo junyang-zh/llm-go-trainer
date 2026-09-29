@@ -508,5 +508,7 @@
   "modelLicenseFullText": "Full official model license",
   "cwiCopyrightNotice": "Classic games come from this collection. The source states that its collected records are in the public domain. This app includes moves, setup stones and game facts, without modern commentary, and retains source information.",
   "otherRecordsCopyrightNotice": "Public Fox games come from the Fox Go service; imported SGFs come from user-provided files. Any applicable rights remain with their respective holders. Use and redistribution must follow the original source’s terms and permissions.",
-  "dependenciesCopyrightNotice": "Electron, React and other dependencies are copyrighted by their respective authors or rights holders and retain their own licenses."
+  "dependenciesCopyrightNotice": "Electron, React and other dependencies are copyrighted by their respective authors or rights holders and retain their own licenses.",
+  "runtimeKatagoSetupRequired": "Not enabled. Open Settings at the top left to download and enable KataGo manually.",
+  "downloadAndEnableKatago": "Download and enable KataGo"
 }

@@ -30,7 +30,7 @@ _ひとつの画面で棋譜を振り返り、変化を試し、KataGo の分析
 | Windows 10/11 x64         | `.exe`         |
 | macOS 15+ / Apple Silicon | `.dmg`         |
 
-通常版はエンジン・依存ライブラリ・モデルを同梱し、`minimal` 版は初回起動時にダウンロードします。機能は同じです。[初回起動](docs/ja/usage.md#installation)と[更新履歴](docs/ja/release-notes.md)も参照してください。
+通常版はエンジン・依存ライブラリ・モデルを同梱し、`minimal` 版は自動ダウンロードせず、右上の案内に従い左上の「設定 → 囲碁モデル」で「KataGo をダウンロードして有効化」を押して導入します。機能は同じです。[初回起動](docs/ja/usage.md#installation)と[更新履歴](docs/ja/release-notes.md)も参照してください。
 
 ## ドキュメント
 

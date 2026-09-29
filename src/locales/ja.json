@@ -508,5 +508,7 @@
   "modelLicenseFullText": "公式モデルのライセンス全文",
   "cwiCopyrightNotice": "名局棋譜はこのコレクションから取得しています。出典サイトは収集した棋譜をパブリックドメインとしています。本アプリは着手、配置石、対局の事実のみを収録し、現代の解説は含めず、出典情報を保持します。",
   "otherRecordsCopyrightNotice": "野狐の公開対局は野狐囲碁サービスから、インポートした SGF はユーザー提供のファイルから取得します。該当する権利は各権利者に帰属し、利用と再配布は元の出典の条件と許諾に従います。",
-  "dependenciesCopyrightNotice": "Electron、React などの著作権は各作者または権利者に帰属し、それぞれのライセンスが適用されます。"
+  "dependenciesCopyrightNotice": "Electron、React などの著作権は各作者または権利者に帰属し、それぞれのライセンスが適用されます。",
+  "runtimeKatagoSetupRequired": "未有効化です。左上の設定から KataGo を手動でダウンロードして有効にしてください。",
+  "downloadAndEnableKatago": "KataGo をダウンロードして有効化"
 }

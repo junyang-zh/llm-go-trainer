@@ -508,5 +508,7 @@
   "modelLicenseFullText": "공식 모델 라이선스 전문",
   "cwiCopyrightNotice": "명국 기보는 이 모음에서 가져옵니다. 출처 사이트는 수집된 기보가 퍼블릭 도메인이라고 명시합니다. 앱은 착수, 배치된 돌 및 대국 사실만 수록하며 현대 해설은 포함하지 않고 출처 정보를 보존합니다.",
   "otherRecordsCopyrightNotice": "공개된 Fox 대국은 Fox 바둑 서비스에서, 가져온 SGF는 사용자가 제공한 파일에서 가져옵니다. 해당 권리는 각 권리자에게 있으며 사용 및 재배포는 원래 출처의 조건과 허가를 따라야 합니다.",
-  "dependenciesCopyrightNotice": "Electron, React 등 의존성의 저작권은 각 저작자 또는 권리자에게 있으며 각각의 라이선스를 따릅니다."
+  "dependenciesCopyrightNotice": "Electron, React 등 의존성의 저작권은 각 저작자 또는 권리자에게 있으며 각각의 라이선스를 따릅니다.",
+  "runtimeKatagoSetupRequired": "활성화되지 않았습니다. 왼쪽 위 설정에서 KataGo를 수동으로 다운로드하고 활성화하세요.",
+  "downloadAndEnableKatago": "KataGo 다운로드 및 활성화"
 }

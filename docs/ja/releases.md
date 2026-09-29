@@ -40,7 +40,7 @@ npm run package:desktop -- minimal
 
 `public/logo.svg` から Windows ICO、macOS ICNS、窓用 PNG を生成し、無視対象 `.local/icons/` に保存します。ロゴ変更後は再ビルドします。
 
-通常版の `Resources/katago-models/` は主モデル・HumanSL・出典摘要・許諾文を含みます。起動は検証済み利用者キャッシュ、同梱コピーの順で優先し、不足・破損時だけ取得します。`katago-runtime/` は固定 SHA-256 の Windows OpenCL ZIP（DLL 含む）または macOS Metal と全依存 bottles・宣言を含みます。初回もオフライン導入でき、Windows は GPU の OpenCL ドライバーが必要、macOS は Homebrew 不要です。minimal はこれらを含まず初回取得します。
+通常版の `Resources/katago-models/` は主モデル・HumanSL・出典摘要・許諾文を含みます。起動は検証済み利用者キャッシュ、同梱コピーの順で優先し、不足・破損時だけ取得します。`katago-runtime/` は固定 SHA-256 の Windows OpenCL ZIP（DLL 含む）または macOS Metal と全依存 bottles・宣言を含みます。初回もオフライン導入でき、Windows は GPU の OpenCL ドライバーが必要、macOS は Homebrew 不要です。minimal はこれらを含まず、自動取得しません。右上の案内に従い左上の「設定 → 囲碁モデル」で「KataGo をダウンロードして有効化」を押してください。
 
 CI は資源を検証しますが対象 GPU ドライバーがなく、Windows OpenCL / macOS Metal の実機・インストール検証を代替しません。公開前後に対象 OS で導入、起動、分析、終了を確認してください。
 
@@ -50,7 +50,7 @@ CI は資源を検証しますが対象 GPU ドライバーがなく、Windows O
 
 ## 自動更新と macOS 署名
 
-通常版は `latest.yml` / `latest-mac.yml`、minimal は `minimal.yml` / `minimal-mac.yml` で開始します。確認時に userData に SHA-256 検証済みモデルが 1 つ以上あれば通常版も minimal 通路を使い、エンジン・モデルを含まないアプリのみ取得します。共通 app ID/userData により選択・一覧・エンジン・調整キャッシュを維持し、アプリ更新ごとにモデルを再取得しません。将来の engine revision 変更でも不足するエンジン資源だけ取得し、同一摘要のモデルを再利用します。有効モデルが皆無なら通常版のまま、部分キャッシュでも minimal を選び、起動時に不足する選択モデルだけ取得します。
+通常版は `latest.yml` / `latest-mac.yml`、minimal は `minimal.yml` / `minimal-mac.yml` で開始します。確認時に userData に SHA-256 検証済みモデルが 1 つ以上あれば通常版も minimal 通路を使い、エンジン・モデルを含まないアプリのみ取得します。共通 app ID/userData により選択・一覧・エンジン・調整キャッシュを維持し、アプリ更新ごとにモデルを再取得しません。将来の engine revision 変更でも不足するエンジン資源だけ取得し、同一摘要のモデルを再利用します。有効モデルが皆無なら通常版のまま、部分キャッシュでも minimal を選び、選択したモデルやエンジンが不足する場合は設定から手動で導入するよう案内します。
 
 manifest は electron-builder が生成し、macOS は ZIP、Windows は NSIS EXE を使います。安定 Release のみを確認し、摘要と選択した版・OS を厳格に照合します。minimal manifest がない、または通常版を指す場合はエラーとし、大きい通常版へ黙って戻しません。版をまたぐ差分 blockmap は無効で、**minimal アプリ全体**を取得し、モデルを再取得するわけではありません。更新後の表示版は minimal です。設定は `userData/updates.json`、自動更新は既定オフ、取得後は利用者が「再起動してインストール」を押します。旧版はこのロジックを含む版へ一度更新してから利用できます。
 

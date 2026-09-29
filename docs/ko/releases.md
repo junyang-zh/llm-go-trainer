@@ -40,7 +40,7 @@ npm run package:desktop -- minimal
 
 `public/logo.svg`에서 Windows 다중 해상도 ICO, macOS ICNS, 창 PNG를 생성해 무시 대상 `.local/icons/`에 둡니다. 로고 변경 후 재빌드합니다.
 
-일반판의 `Resources/katago-models/`에는 주 모델·HumanSL·출처 해시·상위 라이선스가 들어갑니다. 시작 시 검증된 사용자 캐시, 패키지 복사 순으로 우선하고 누락·손상 때만 받습니다. `katago-runtime/`에는 SHA-256 고정 Windows OpenCL ZIP(DLL 포함) 또는 macOS Metal·전체 의존 bottles와 고지문을 둡니다. 첫 실행도 오프라인 설치하며 Windows는 GPU OpenCL 드라이버가 필요하고 macOS는 Homebrew가 필요 없습니다. minimal은 이 자원을 포함하지 않고 첫 실행에 받습니다.
+일반판의 `Resources/katago-models/`에는 주 모델·HumanSL·출처 해시·상위 라이선스가 들어갑니다. 시작 시 검증된 사용자 캐시, 패키지 복사 순으로 우선하고 누락·손상 때만 받습니다. `katago-runtime/`에는 SHA-256 고정 Windows OpenCL ZIP(DLL 포함) 또는 macOS Metal·전체 의존 bottles와 고지문을 둡니다. 첫 실행도 오프라인 설치하며 Windows는 GPU OpenCL 드라이버가 필요하고 macOS는 Homebrew가 필요 없습니다. minimal은 이 자원을 포함하지 않으며 자동 다운로드하지 않습니다. 오른쪽 위 안내에 따라 왼쪽 위 **설정 → 바둑 모델**에서 **KataGo 다운로드 및 활성화**를 누르세요.
 
 CI는 자원 내용을 검사하지만 대상 GPU 드라이버가 없어 실제 Windows OpenCL·macOS Metal 및 설치 검증을 대체하지 못합니다. 공개 전후 대상 OS에서 설치·실행·분석·종료를 확인하세요.
 
@@ -50,7 +50,7 @@ CI는 자원 내용을 검사하지만 대상 GPU 드라이버가 없어 실제 
 
 ## 자동 업데이트와 macOS 서명
 
-일반판은 `latest.yml` / `latest-mac.yml`, minimal은 `minimal.yml` / `minimal-mac.yml`로 시작합니다. 매 확인 때 userData에 SHA-256 검증 모델이 하나 이상 있으면 일반판도 minimal 채널로 전환해 엔진·모델 아카이브 없는 앱 설치 파일을 받습니다. 공통 app ID/userData로 선택·목록·엔진·튜닝 캐시를 보존하며 앱 버전마다 모델을 다시 받지 않습니다. 향후 엔진 revision이 바뀌면 부족한 엔진 자원만 설치하고 같은 해시의 모델을 재사용합니다. 유효 모델이 전혀 없으면 일반판을 유지합니다. 일부만 캐시되어도 minimal을 쓰고 시작 시 부족한 선택 모델만 받습니다.
+일반판은 `latest.yml` / `latest-mac.yml`, minimal은 `minimal.yml` / `minimal-mac.yml`로 시작합니다. 매 확인 때 userData에 SHA-256 검증 모델이 하나 이상 있으면 일반판도 minimal 채널로 전환해 엔진·모델 아카이브 없는 앱 설치 파일을 받습니다. 공통 app ID/userData로 선택·목록·엔진·튜닝 캐시를 보존하며 앱 버전마다 모델을 다시 받지 않습니다. 향후 엔진 revision이 바뀌면 부족한 엔진 자원만 설치하고 같은 해시의 모델을 재사용합니다. 유효 모델이 전혀 없으면 일반판을 유지합니다. 일부만 캐시되어도 minimal을 쓰고 선택한 모델이나 엔진이 불완전하면 설정에서 수동으로 설치하도록 안내합니다.
 
 manifest는 electron-builder가 생성하고 macOS는 ZIP, Windows는 NSIS EXE로 업데이트합니다. 안정 Release만 확인하며 해시와 이번에 선택한 판·플랫폼을 엄격히 검증합니다. minimal manifest가 없거나 일반판 파일을 가리키면 오류를 내며 큰 일반판으로 조용히 돌아가지 않습니다. 판 간 업데이트는 차등 blockmap을 끄고 **minimal 앱 설치 파일 전체**를 받으며 모델 재다운로드가 아닙니다. 설치 후 판 표시는 minimal입니다. 설정은 `userData/updates.json`에 저장하고 자동 업데이트는 기본 꺼짐이며 다운로드 후 사용자가 **다시 시작하고 설치**를 누릅니다. 구버전은 먼저 이 로직이 있는 버전으로 올려야 이후 모델 없는 업데이트를 선택할 수 있습니다.
 

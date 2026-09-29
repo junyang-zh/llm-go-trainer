@@ -10,6 +10,7 @@ export function engineLabel(status?: EngineStatus) {
   const external = status.mode === 'external';
   const labels = {
     idle: t('preparing'),
+    'setup-required': t('runtimeKatagoSetupRequired'),
     downloading: t('downloading'),
     installing: t('installing'),
     starting: external ? t('connecting') : t('starting'),
@@ -114,7 +115,9 @@ function EngineConnectionSettings({
               : t('stop')
             : external
               ? t('connect')
-              : t('startEngine')}
+              : status?.phase === 'setup-required'
+                ? t('downloadAndEnableKatago')
+                : t('startEngine')}
         </button>
         {status?.ready && (
           <button disabled={!!working} onClick={() => void control('restart')}>

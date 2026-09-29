@@ -38,10 +38,10 @@ app
     const { startServer } = await import(
       pathToFileURL(join(__dirname, '../dist-server/index.js')).href
     );
-    backend = await startServer(0);
-    const url = `http://127.0.0.1:${backend.port}`;
     const metadata = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
     const edition = metadata.goTrainerEdition === 'minimal' ? 'minimal' : 'standard';
+    backend = await startServer(0, { edition });
+    const url = `http://127.0.0.1:${backend.port}`;
     const supported =
       app.isPackaged &&
       ((process.platform === 'darwin' && process.arch === 'arm64') ||

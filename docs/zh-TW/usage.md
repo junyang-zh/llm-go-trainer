@@ -10,9 +10,9 @@
 
 從 [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/releases) 下載對應平台的安裝包：Windows 10/11 x64 使用 `.exe`，macOS 15+ Apple Silicon 使用 `.dmg`。Windows 運行安裝器；macOS 將應用拖入 Applications。首次安裝無需下載供自動更新使用的 `.zip` / `.yml`，GitHub 的 Source code 是源碼，不是安裝包。
 
-普通版內建引擎、依賴、主模型與 HumanSL，支援離線準備這些資源；`minimal` 版首次啟動聯網下載，兩種版本功能相同。Windows 普通版內建 OpenCL 引擎，仍需顯卡 OpenCL 驅動；macOS 內建 Metal 引擎及動態函式庫，無需安裝 Homebrew。macOS 發佈憑據齊全時提供 Developer ID 簽名與 Apple 公證，否則提供未簽名、未公證的安裝包；Windows 安裝器尚未設定代碼簽名。
+普通版內建引擎、依賴、主模型與 HumanSL，支援離線準備這些資源；`minimal` 版不自動下載，請按右上角提示前往左上角「設定 → 圍棋模型」，點擊「下載並啟用 KataGo」，兩種版本功能相同。Windows 普通版內建 OpenCL 引擎，仍需顯卡 OpenCL 驅動；macOS 內建 Metal 引擎及動態函式庫，無需安裝 Homebrew。macOS 發佈憑據齊全時提供 Developer ID 簽名與 Apple 公證，否則提供未簽名、未公證的安裝包；Windows 安裝器尚未設定代碼簽名。
 
-首次啟動會在後台準備引擎、模型並初始化 GPU，在「設定 → 圍棋模型」查看進度；期間可以落子、導入 SGF 和復盤。引擎就緒後啟用分析和對戰，後續啟動復用已校驗的快取。模型選擇、下載重試和計算後端見[引擎與模型](engines.md)。
+普通版首次啟動、minimal 版手動啟用後，會在後台準備引擎、模型並初始化 GPU，在「設定 → 圍棋模型」查看進度；期間可以落子、導入 SGF 和復盤。引擎就緒後啟用分析和對戰，後續啟動復用已校驗的快取。模型選擇、下載重試和計算後端見[引擎與模型](engines.md)。
 
 在「設定 → 連接 LLM」選擇並設定 AI 教練服務，模型與思考深度會保存供後續使用。具體步驟見 [LLM 設定](llm.md)。從源碼運行見[開發指南](development.md)。
 

@@ -31,7 +31,7 @@ _在同一介面復盤棋局、探索變化，並結合 KataGo 分析與 LLM 講
 | Windows 10/11 x64         | `.exe` |
 | macOS 15+ / Apple Silicon | `.dmg` |
 
-普通版內建引擎、依賴與模型；`minimal` 版在首次運行時下載，兩種版本功能相同。安裝與首次設定見[使用指南](docs/zh-TW/usage.md#installation)，版本變化見[更新記錄](docs/zh-TW/release-notes.md)。
+普通版內建引擎、依賴與模型；`minimal` 版不自動下載，請按右上角提示前往左上角「設定 → 圍棋模型」，點擊「下載並啟用 KataGo」，兩種版本功能相同。安裝與首次設定見[使用指南](docs/zh-TW/usage.md#installation)，版本變化見[更新記錄](docs/zh-TW/release-notes.md)。
 
 ## 文檔
 

@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { EngineManager } from '../server/engine-manager';
+import { RuntimeSetupRequired } from '../server/installer';
 import { newGame } from '../shared/go';
 import { trainingForRank } from '../shared/training';
 const fixture = resolve('tests/fixtures/fake-katago.mjs');
@@ -15,12 +16,16 @@ const config = {
 };
 const managers: EngineManager[] = [];
 const directories: string[] = [];
-async function create(install?: ConstructorParameters<typeof EngineManager>[0]['install']) {
+async function create(
+  install?: ConstructorParameters<typeof EngineManager>[0]['install'],
+  downloadOnStartup = true,
+) {
   const directory = await mkdtemp(join(tmpdir(), 'go-engine-'));
   directories.push(directory);
   const manager = new EngineManager({
     root: process.cwd(),
     directory,
+    downloadOnStartup,
     ...(install ? { install } : { configured: config }),
   });
   managers.push(manager);
@@ -41,6 +46,19 @@ function alive(pid: number) {
   }
 }
 describe('managed engine lifecycle', () => {
+  it('waits for manual setup in minimal, then permits download on explicit start', async () => {
+    const install = vi.fn(async (_signal, _progress, _backend, allowDownload) => {
+      if (!allowDownload) throw new RuntimeSetupRequired();
+      return { config, backend: 'Metal' };
+    });
+    const manager = await create(install, false);
+    await manager.load();
+    await vi.waitFor(() => expect(manager.status().phase).toBe('setup-required'));
+    expect(manager.status().error).toBeUndefined();
+    await manager.start();
+    await ready(manager);
+    expect(install.mock.calls.map((call) => call[3])).toEqual([false, true]);
+  });
   it.runIf(process.platform === 'win32')(
     'switches CUDA/OpenCL, persists the backend and reuses the model',
     async () => {

@@ -10,9 +10,9 @@
 
 [GitHub Releases](https://github.com/junyang-zh/llm-go-trainer/releases)에서 Windows 10/11 x64는 `.exe`, macOS 15+ Apple Silicon은 `.dmg`를 선택하세요. Windows는 설치 파일을 실행하고 macOS는 앱을 Applications로 끌어 놓습니다. `.zip` / `.yml`은 자동 업데이트용입니다. Source code는 소스 코드이며 설치 파일이 아닙니다.
 
-일반판에는 엔진·의존 파일·주 모델·HumanSL이 포함되어 오프라인으로 준비할 수 있습니다. `minimal`은 첫 실행 때 다운로드하며 기능은 동일합니다. Windows 일반판은 OpenCL 엔진을 포함하지만 GPU의 OpenCL 드라이버는 필요합니다. macOS는 Metal과 라이브러리를 포함하므로 Homebrew가 필요 없습니다. macOS 배포 인증 정보가 모두 있으면 Developer ID 서명과 Apple 공증을 하고, 없으면 서명·공증 없이 배포합니다. Windows 코드 서명은 아직 설정하지 않았습니다.
+일반판에는 엔진·의존 파일·주 모델·HumanSL이 포함되어 오프라인으로 준비할 수 있습니다. `minimal`은 자동 다운로드하지 않습니다. 오른쪽 위 안내에 따라 왼쪽 위 **설정 → 바둑 모델**에서 **KataGo 다운로드 및 활성화**를 누르세요. 기능은 동일합니다. Windows 일반판은 OpenCL 엔진을 포함하지만 GPU의 OpenCL 드라이버는 필요합니다. macOS는 Metal과 라이브러리를 포함하므로 Homebrew가 필요 없습니다. macOS 배포 인증 정보가 모두 있으면 Developer ID 서명과 Apple 공증을 하고, 없으면 서명·공증 없이 배포합니다. Windows 코드 서명은 아직 설정하지 않았습니다.
 
-엔진·모델 준비와 GPU 초기화는 백그라운드에서 진행됩니다. **설정 → 바둑 모델**에서 상태를 확인하며, 그동안 착수·SGF 가져오기·복기를 할 수 있습니다. 준비가 끝나면 분석과 AI 대국을 사용할 수 있고 이후에는 검증된 캐시를 재사용합니다. 모델 선택, 재시도, 백엔드는 [엔진과 모델](engines.md)을 참고하세요.
+일반판 시작 시 또는 minimal에서 수동 설치를 시작한 후 엔진·모델 준비와 GPU 초기화가 백그라운드에서 진행됩니다. **설정 → 바둑 모델**에서 상태를 확인하며, 그동안 착수·SGF 가져오기·복기를 할 수 있습니다. 준비가 끝나면 분석과 AI 대국을 사용할 수 있고 이후에는 검증된 캐시를 재사용합니다. 모델 선택, 재시도, 백엔드는 [엔진과 모델](engines.md)을 참고하세요.
 
 **설정 → LLM 연결**에서 코치를 설정합니다. 모델과 추론 수준은 다음 요청에 사용할 수 있도록 저장됩니다. [LLM 설정](llm.md), 소스 실행은 [개발 안내](development.md)를 참고하세요.
 

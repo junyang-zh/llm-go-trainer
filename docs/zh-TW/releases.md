@@ -40,7 +40,7 @@ npm run package:desktop -- minimal
 
 應用圖標和介面共用 `public/logo.svg`。構建時自動生成多分辨率 Windows ICO、macOS ICNS 和窗口 PNG，輸出到忽略提交的 `.local/icons/`；修改 logo 後重新構建即可。
 
-普通版在 `Resources/katago-models/` 攜帶主模型、HumanSL、來源摘要及上游模型許可。啟動時優先復用使用者資料目錄內校驗通過的權重，再從安裝包複製，缺失/損壞時才聯網下載。普通版還在資源目錄的 `katago-runtime/` 攜帶固定 SHA-256 校驗的引擎歸檔：Windows 使用官方 OpenCL ZIP（含可執行檔案及 DLL），macOS 使用 Metal 引擎及全部動態函式庫依賴的 Homebrew bottles，並保留上游聲明。首次啟動從內建歸檔安裝，無需聯網下載引擎、依賴或模型；Windows 需要系統已安裝顯卡 OpenCL 驅動，macOS 無需安裝 Homebrew。`minimal` 不預置模型、KataGo 引擎或隨附依賴，首次啟動時聯網下載。
+普通版在 `Resources/katago-models/` 攜帶主模型、HumanSL、來源摘要及上游模型許可。啟動時優先復用使用者資料目錄內校驗通過的權重，再從安裝包複製，缺失/損壞時才聯網下載。普通版還在資源目錄的 `katago-runtime/` 攜帶固定 SHA-256 校驗的引擎歸檔：Windows 使用官方 OpenCL ZIP（含可執行檔案及 DLL），macOS 使用 Metal 引擎及全部動態函式庫依賴的 Homebrew bottles，並保留上游聲明。首次啟動從內建歸檔安裝，無需聯網下載引擎、依賴或模型；Windows 需要系統已安裝顯卡 OpenCL 驅動，macOS 無需安裝 Homebrew。`minimal` 不預置模型、KataGo 引擎或隨附依賴，不在啟動時自動下載；請前往左上角「設定 → 圍棋模型」，點擊「下載並啟用 KataGo」。
 
 當前 CI 校驗安裝包內權重和各平台引擎、依賴歸檔，但不具備目標顯卡驅動，不能代替真實 Windows OpenCL、macOS Metal 和安裝流程的驗證。公開發佈前後應在目標系統檢查安裝、啟動、引擎分析及退出。
 
@@ -50,7 +50,7 @@ npm run package:desktop -- minimal
 
 ## 自動更新與 macOS 簽名
 
-普通版初始使用 `latest.yml` / `latest-mac.yml`，minimal 使用 `minimal.yml` / `minimal-mac.yml`。每次檢查更新時，若使用者目錄已存在至少一個通過 SHA-256 校驗的模型，普通版也切換到 minimal 更新通道，下載不含模型和引擎歸檔的應用安裝包。兩個版本使用相同應用標識和使用者資料目錄，安裝後繼續復用所選模型、模型目錄、引擎安裝及調優快取；模型不會隨應用版本再次下載。若未來引擎資源 revision 變化，只安裝缺失的新引擎資源，仍復用同一 SHA-256 的模型。未快取任何有效模型的普通版保持普通版通道；只有部分模型已快取時也使用 minimal，啟動時僅下載缺失的所選模型。
+普通版初始使用 `latest.yml` / `latest-mac.yml`，minimal 使用 `minimal.yml` / `minimal-mac.yml`。每次檢查更新時，若使用者目錄已存在至少一個通過 SHA-256 校驗的模型，普通版也切換到 minimal 更新通道，下載不含模型和引擎歸檔的應用安裝包。兩個版本使用相同應用標識和使用者資料目錄，安裝後繼續復用所選模型、模型目錄、引擎安裝及調優快取；模型不會隨應用版本再次下載。若未來引擎資源 revision 變化，只安裝缺失的新引擎資源，仍復用同一 SHA-256 的模型。未快取任何有效模型的普通版保持普通版通道；只有部分模型已快取時也使用 minimal，啟動時若所選模型或引擎不完整，會提示在設定中手動下載並啟用。
 
 這些清單由 electron-builder 生成；macOS 更新讀取 ZIP，Windows 更新讀取 NSIS EXE。更新器只檢查穩定 Release，驗證下載摘要，並嚴格匹配本次選定的下載類型與平台；minimal 清單不可用或包含普通版安裝包時報告錯誤，不靜默回退到攜帶模型的大包。跨類型升級禁用差分塊圖，下載完整的 **minimal 應用安裝包**，並非重新下載模型。安裝後的版本類型會顯示為 minimal。更新設定保存到 Electron userData 的 `updates.json`，預設關閉自動更新；下載完成後由使用者點擊“重啟並安裝”。舊版本需先升級到包含此邏輯的版本，才能在之後的檢查中選擇 model-free 更新。
 

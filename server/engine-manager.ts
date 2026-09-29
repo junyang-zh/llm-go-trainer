@@ -13,6 +13,7 @@ import {
   ensureRuntime,
   prepareConfig,
   runtimePlatform,
+  RuntimeSetupRequired,
   type InstallProgress,
   type Runtime,
 } from './installer';
@@ -46,10 +47,12 @@ interface Options {
   root: string;
   directory: string;
   configured?: EngineConfig;
+  downloadOnStartup?: boolean;
   install?: (
     signal: AbortSignal,
     progress: (state: InstallProgress) => void,
     backend?: ManagedBackend,
+    allowDownload?: boolean,
   ) => Promise<Runtime>;
   factory?: (config: EngineConfig) => KataGo;
   models?: KataGoModels;
@@ -105,7 +108,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.state.error = '引擎连接配置无效，已使用内置 KataGo';
     }
-    await this.start();
+    await this.enqueue(() => this.startSelected(this.options.downloadOnStartup !== false));
   }
   private enqueue(work: () => Promise<void>) {
     const result = this.transition.then(work);
@@ -115,13 +118,13 @@ export class EngineManager implements AnalysisEngine, EngineController {
   start() {
     return this.enqueue(() => this.startSelected());
   }
-  private async startSelected() {
+  private async startSelected(allowDownload = true) {
     if (!this.closed && !this.task && !this.status().ready) {
       if (this.engine) await this.halt();
-      this.launch();
+      this.launch(undefined, allowDownload);
     }
   }
-  private launch(selection?: ModelSelection) {
+  private launch(selection?: ModelSelection, allowDownload = true) {
     const controller = new AbortController();
     this.controller = controller;
     this.state = {
@@ -158,6 +161,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
                 controller.signal,
                 (value) => Object.assign(this.state, value),
                 this.selected.backend,
+                allowDownload,
               ) ??
                 ensureRuntime(
                   this.options.root,
@@ -166,6 +170,7 @@ export class EngineManager implements AnalysisEngine, EngineController {
                   (value) => Object.assign(this.state, value),
                   runtimePlatform(undefined, undefined, undefined, this.selected.backend),
                   this.options.models?.artifacts(selection),
+                  allowDownload,
                 ));
           controller.signal.throwIfAborted();
           this.state = {
@@ -212,9 +217,14 @@ export class EngineManager implements AnalysisEngine, EngineController {
           this.state = {
             ...this.state,
             ready: false,
-            phase: 'error',
+            phase: error instanceof RuntimeSetupRequired ? 'setup-required' : 'error',
             progress: undefined,
-            error: error instanceof Error ? error.message : '引擎启动失败',
+            error:
+              error instanceof RuntimeSetupRequired
+                ? undefined
+                : error instanceof Error
+                  ? error.message
+                  : '引擎启动失败',
           };
       } finally {
         if (selection) this.options.models?.release();
@@ -287,7 +297,12 @@ export class EngineManager implements AnalysisEngine, EngineController {
   async analyze(game: Game, training: Training, options?: AnalysisOptions) {
     if (!this.status().ready || !this.engine)
       throw new Error(
-        this.state.error || (this.state.phase === 'stopped' ? '引擎已停止' : '引擎初始化中'),
+        this.state.error ||
+          (this.state.phase === 'setup-required'
+            ? new RuntimeSetupRequired().message
+            : this.state.phase === 'stopped'
+              ? '引擎已停止'
+              : '引擎初始化中'),
       );
     if (this.selected.mode === 'managed' && !this.options.configured && this.options.models) {
       const { main, human } = this.options.models.artifacts();

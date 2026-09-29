@@ -29,6 +29,11 @@ export interface Runtime {
   config: EngineConfig;
   backend: string;
 }
+export class RuntimeSetupRequired extends Error {
+  constructor() {
+    super('尚未启用，请到左上角设置中手动下载并启用 KataGo');
+  }
+}
 // Native engines cannot read Electron's app.asar virtual filesystem.
 export async function prepareConfig(source: string, directory: string) {
   await mkdir(directory, { recursive: true });
@@ -108,6 +113,7 @@ export async function ensureRuntime(
     main: artifacts.main,
     human: artifacts.human,
   },
+  allowDownload = true,
 ): Promise<Runtime> {
   await mkdir(directory, { recursive: true });
   const unlock = await installLock(directory, signal);
@@ -169,6 +175,7 @@ export async function ensureRuntime(
       /* first run or incomplete installation */
     }
     if (!installed) {
+      if (!allowDownload) throw new RuntimeSetupRequired();
       staging = await mkdtemp(join(directory, '.install-'));
       const extracted = join(staging, 'packages');
       const bin = join(staging, 'bin'),
@@ -248,6 +255,12 @@ export async function ensureRuntime(
       staging = undefined;
     }
     for (const artifact of [selection.main, ...(selection.human ? [selection.human] : [])]) {
+      // Minimal startup must never repair missing/corrupt assets over the network.
+      if (!allowDownload) {
+        if (!(await verified(join(models, modelFilename(artifact)), artifact.sha256)))
+          throw new RuntimeSetupRequired();
+        continue;
+      }
       await ensureModel(
         artifact,
         directory,

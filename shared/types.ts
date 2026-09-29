@@ -105,7 +105,15 @@ export type StreamEvent =
     }
   | { type: 'error'; error: string };
 export type EnginePhase =
-  'idle' | 'downloading' | 'installing' | 'starting' | 'ready' | 'stopping' | 'stopped' | 'error';
+  | 'idle'
+  | 'setup-required'
+  | 'downloading'
+  | 'installing'
+  | 'starting'
+  | 'ready'
+  | 'stopping'
+  | 'stopped'
+  | 'error';
 export type ManagedBackend = 'opencl' | 'cuda';
 export type EngineConnection =
   { mode: 'managed'; backend?: ManagedBackend } | { mode: 'external'; name: string; url: string };

@@ -30,7 +30,7 @@ _하나의 화면에서 기보를 복기하고 변화도를 살펴보며 KataGo 
 | Windows 10/11 x64         | `.exe`    |
 | macOS 15+ / Apple Silicon | `.dmg`    |
 
-일반판에는 엔진·의존 파일·모델이 포함됩니다. `minimal`은 첫 실행 때 다운로드하며 기능은 같습니다. [설치 안내](docs/ko/usage.md#installation)와 [변경 기록](docs/ko/release-notes.md)도 참고하세요.
+일반판에는 엔진·의존 파일·모델이 포함됩니다. `minimal`은 자동 다운로드하지 않습니다. 오른쪽 위 안내에 따라 왼쪽 위 **설정 → 바둑 모델**에서 **KataGo 다운로드 및 활성화**를 누르세요. 기능은 같습니다. [설치 안내](docs/ko/usage.md#installation)와 [변경 기록](docs/ko/release-notes.md)도 참고하세요.
 
 ## 문서
 

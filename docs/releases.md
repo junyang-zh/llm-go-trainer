@@ -40,7 +40,7 @@ npm run package:desktop -- minimal
 
 应用图标和界面共用 `public/logo.svg`。构建时自动生成多分辨率 Windows ICO、macOS ICNS 和窗口 PNG，输出到忽略提交的 `.local/icons/`；修改 logo 后重新构建即可。
 
-普通版在 `Resources/katago-models/` 携带主模型、HumanSL、来源摘要及上游模型许可。启动时优先复用用户数据目录内校验通过的权重，再从安装包复制，缺失/损坏时才联网下载。普通版还在资源目录的 `katago-runtime/` 携带固定 SHA-256 校验的引擎归档：Windows 使用官方 OpenCL ZIP（含可执行文件及 DLL），macOS 使用 Metal 引擎及全部动态库依赖的 Homebrew bottles，并保留上游声明。首次启动从内置归档安装，无需联网下载引擎、依赖或模型；Windows 需要系统已安装显卡 OpenCL 驱动，macOS 无需安装 Homebrew。`minimal` 不预置模型、KataGo 引擎或随附依赖，首次启动时联网下载。
+普通版在 `Resources/katago-models/` 携带主模型、HumanSL、来源摘要及上游模型许可。启动时优先复用用户数据目录内校验通过的权重，再从安装包复制，缺失/损坏时才联网下载。普通版还在资源目录的 `katago-runtime/` 携带固定 SHA-256 校验的引擎归档：Windows 使用官方 OpenCL ZIP（含可执行文件及 DLL），macOS 使用 Metal 引擎及全部动态库依赖的 Homebrew bottles，并保留上游声明。首次启动从内置归档安装，无需联网下载引擎、依赖或模型；Windows 需要系统已安装显卡 OpenCL 驱动，macOS 无需安装 Homebrew。`minimal` 不预置模型、KataGo 引擎或随附依赖，不在启动时自动下载；请前往左上角「设置 → 围棋模型」，点击「下载并启用 KataGo」。
 
 当前 CI 校验安装包内权重和各平台引擎、依赖归档，但不具备目标显卡驱动，不能代替真实 Windows OpenCL、macOS Metal 和安装流程的验证。公开发布前后应在目标系统检查安装、启动、引擎分析及退出。
 
@@ -50,7 +50,7 @@ npm run package:desktop -- minimal
 
 ## 自动更新与 macOS 签名
 
-普通版初始使用 `latest.yml` / `latest-mac.yml`，minimal 使用 `minimal.yml` / `minimal-mac.yml`。每次检查更新时，若用户目录已存在至少一个通过 SHA-256 校验的模型，普通版也切换到 minimal 更新通道，下载不含模型和引擎归档的应用安装包。两个版本使用相同应用标识和用户数据目录，安装后继续复用所选模型、模型目录、引擎安装及调优缓存；模型不会随应用版本再次下载。若未来引擎资源 revision 变化，只安装缺失的新引擎资源，仍复用同一 SHA-256 的模型。未缓存任何有效模型的普通版保持普通版通道；只有部分模型已缓存时也使用 minimal，启动时仅下载缺失的所选模型。
+普通版初始使用 `latest.yml` / `latest-mac.yml`，minimal 使用 `minimal.yml` / `minimal-mac.yml`。每次检查更新时，若用户目录已存在至少一个通过 SHA-256 校验的模型，普通版也切换到 minimal 更新通道，下载不含模型和引擎归档的应用安装包。两个版本使用相同应用标识和用户数据目录，安装后继续复用所选模型、模型目录、引擎安装及调优缓存；模型不会随应用版本再次下载。若未来引擎资源 revision 变化，只安装缺失的新引擎资源，仍复用同一 SHA-256 的模型。未缓存任何有效模型的普通版保持普通版通道；只有部分模型已缓存时也使用 minimal，启动时若所选模型或引擎不完整，会提示在设置中手动下载并启用。
 
 这些清单由 electron-builder 生成；macOS 更新读取 ZIP，Windows 更新读取 NSIS EXE。更新器只检查稳定 Release，验证下载摘要，并严格匹配本次选定的下载类型与平台；minimal 清单不可用或包含普通版安装包时报告错误，不静默回退到携带模型的大包。跨类型升级禁用差分块图，下载完整的 **minimal 应用安装包**，并非重新下载模型。安装后的版本类型会显示为 minimal。更新配置保存到 Electron userData 的 `updates.json`，默认关闭自动更新；下载完成后由用户点击“重启并安装”。旧版本需先升级到包含此逻辑的版本，才能在之后的检查中选择 model-free 更新。
 

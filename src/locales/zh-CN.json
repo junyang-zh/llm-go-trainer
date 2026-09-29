@@ -508,5 +508,7 @@
   "modelLicenseFullText": "官方模型许可全文",
   "cwiCopyrightNotice": "经典名局来自此棋谱库。据来源站声明，所收集的棋谱属于公共领域；本项目仅收录落子、摆子与对局事实，不包含现代评注，并保留来源信息。",
   "otherRecordsCopyrightNotice": "野狐公开对局来自野狐围棋服务；导入的 SGF 来自用户提供的文件。相关权利归各自权利人（如适用），使用与再分发须遵循原始来源的条款和授权。",
-  "dependenciesCopyrightNotice": "Electron、React 等第三方依赖的版权归各自作者或权利人所有，遵循各自许可。"
+  "dependenciesCopyrightNotice": "Electron、React 等第三方依赖的版权归各自作者或权利人所有，遵循各自许可。",
+  "runtimeKatagoSetupRequired": "尚未启用，请到左上角设置中手动下载并启用 KataGo",
+  "downloadAndEnableKatago": "下载并启用 KataGo"
 }

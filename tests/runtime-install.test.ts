@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { ensureRuntime, runtimePlatform } from '../server/installer';
+import { ensureRuntime, runtimePlatform, RuntimeSetupRequired } from '../server/installer';
 import artifacts from '../config/katago/artifacts.json';
 import cuda from '../config/katago/windows-cuda.json';
 import { zip } from './fixtures/archive';
@@ -48,7 +48,7 @@ afterEach(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-it('installs and repairs Windows standard from bundled files with networking disabled', async () => {
+it('requires manual setup for incomplete runtimes and installs or repairs from bundled files offline', async () => {
   directory = await mkdtemp(join(tmpdir(), 'go-offline-install-'));
   const runtimeBundle = join(directory, 'resources/katago-runtime');
   const modelsBundle = join(directory, 'resources/katago-models');
@@ -62,15 +62,19 @@ it('installs and repairs Windows standard from bundled files with networking dis
   const fetch = vi.fn(() => Promise.reject(new TypeError('fetch failed')));
   vi.stubGlobal('fetch', fetch);
   const data = join(directory, '用户 数据');
-  const install = () =>
+  const install = (allowDownload = true) =>
     ensureRuntime(
       resolve('.'),
       data,
       new AbortController().signal,
       () => {},
       runtimePlatform('win32', 'x64'),
+      undefined,
+      allowDownload,
     );
+  await expect(install(false)).rejects.toBeInstanceOf(RuntimeSetupRequired);
   const runtime = await install();
+  await expect(install(false)).resolves.toMatchObject({ backend: 'OpenCL' });
   expect(runtime.backend).toBe('OpenCL');
   expect(await readFile(runtime.config.executable, 'utf8')).toBe('abc');
   expect(await readFile(runtime.config.model, 'utf8')).toBe('main model fixture');
@@ -97,7 +101,10 @@ it('installs and repairs Windows standard from bundled files with networking dis
   expect(await readFile(dll, 'utf8')).toBe('abc');
   expect(await readFile(runtime.config.executable, 'utf8')).toBe('abc');
   await writeFile(runtime.config.executable, 'broken executable');
+  await expect(install(false)).rejects.toBeInstanceOf(RuntimeSetupRequired);
+  await install();
   await writeFile(runtime.config.model, 'broken model');
+  await expect(install(false)).rejects.toBeInstanceOf(RuntimeSetupRequired);
   await install();
   expect(await readFile(runtime.config.executable, 'utf8')).toBe('abc');
   expect(await readFile(runtime.config.model, 'utf8')).toBe('main model fixture');

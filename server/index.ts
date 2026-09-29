@@ -17,7 +17,10 @@ function duration(value: string | undefined, fallback: number) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 1000 ? n : fallback;
 }
-export async function startServer(port = Number(process.env.PORT ?? 3001)) {
+export async function startServer(
+  port = Number(process.env.PORT ?? 3001),
+  options: { edition?: 'standard' | 'minimal' } = {},
+) {
   const directory = resolve(process.env.GO_TRAINER_DATA_DIR || resolve(root, '.local/katago'));
   const models = new KataGoModels(directory, { canSelect: !process.env.KATAGO_MODEL });
   await models.load();
@@ -25,6 +28,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
     root,
     directory,
     models,
+    downloadOnStartup: options.edition !== 'minimal',
     // Existing custom installations remain supported. Defaults need no .env file.
     configured: process.env.KATAGO_MODEL
       ? {
@@ -96,7 +100,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
         reject(new Error('Unable to bind server'));
         return;
       }
-      // Startup is deliberately background work: the page loads while assets download and the GPU warms up.
+      // Startup stays in the background; minimal only probes installed assets until manual setup.
       void engine.load();
       done({
         port: address.port,
