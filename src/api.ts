@@ -39,7 +39,7 @@ export async function streamApi(
     const event = JSON.parse(line) as StreamEvent;
     if (event.type === 'error') throw new Error(event.error);
     onEvent(event);
-    if (event.type === 'done') {
+    if (event.type === 'done' || event.type === 'paused') {
       complete = true;
       break;
     }

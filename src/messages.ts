@@ -4,13 +4,14 @@ export type { AnalysisMessage } from '../shared/library';
 
 export function finishMessage(
   message: AnalysisMessage,
-  state: 'done' | 'error' | 'stopped',
+  state: 'done' | 'error' | 'stopped' | 'paused',
   status: string,
 ): AnalysisMessage {
   return {
     ...message,
     state,
     status,
+    continuationId: undefined,
     tools: message.tools?.map((tool) =>
       tool.state === 'running'
         ? {
@@ -25,6 +26,11 @@ export function finishMessage(
 export function updateMessage(message: AnalysisMessage, event: StreamEvent): AnalysisMessage {
   if (message.state !== 'running') return message;
   switch (event.type) {
+    case 'paused':
+      return {
+        ...finishMessage(message, 'paused', event.reason),
+        continuationId: event.continuationId,
+      };
     case 'status':
       return { ...message, status: event.text };
     case 'tool': {

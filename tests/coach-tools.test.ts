@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { defaultCoachLimits, type CoachLimits } from '../shared/llm';
 import { CoachTools } from '../server/coach-tools';
 import { trainingForRank } from '../shared/training';
 import type { ToolActivity } from '../shared/types';
@@ -6,7 +7,7 @@ import { whiteAtari, koGame, coachAnalysis } from './fixtures/coach';
 import { recordedGame } from './fixtures/evaluation';
 import type { AnalysisEngine } from '../server/engine';
 
-function harness(game = whiteAtari) {
+function harness(game = whiteAtari, limits: CoachLimits = defaultCoachLimits) {
   const events: ToolActivity[] = [];
   const engine: AnalysisEngine = {
     status: () => ({
@@ -25,7 +26,15 @@ function harness(game = whiteAtari) {
   return {
     engine,
     events,
-    tools: new CoachTools(engine, game, trainingForRank('5k'), (event) => events.push(event)),
+    tools: new CoachTools(
+      engine,
+      game,
+      trainingForRank('5k'),
+      (event) => events.push(event),
+      undefined,
+      undefined,
+      limits,
+    ),
   };
 }
 it('inspects actual liberties and legal continuations without changing the game', async () => {
@@ -93,7 +102,11 @@ it('returns illegal moves, ko and invalid arguments as recoverable tool errors w
   expect((await tools.run('inspect_position', { point: 'B2' })).isError).toBeUndefined();
 });
 it('enforces search and call budgets across a coaching request', async () => {
-  const { tools, engine } = harness();
+  const { tools, engine } = harness(whiteAtari, {
+    ...defaultCoachLimits,
+    toolCalls: 12,
+    searchVisits: 12000,
+  });
   for (const moves of [[], ['D5'], ['D5', 'F5']])
     await tools.run('analyze_variation', { moves, visits: 4000, purpose: '检查变化' });
   const exceeded = await tools.run('analyze_variation', {
@@ -254,4 +267,20 @@ it('distinguishes the original game from the current user trial as branch origin
     moves: [{ color: 'W', point: 'D4' }],
   });
   expect(library.getGame(firstGameId).game).toEqual(original);
+});
+
+it('leaves calls and cumulative searches unlimited by default', async () => {
+  const { tools, engine } = harness();
+  for (const visits of [4000, 3999, 3998, 3997]) {
+    const result = await tools.run('analyze_variation', { visits, purpose: '检查变化' });
+    expect(result.isError).toBeUndefined();
+    expect(result.data.remainingSearchVisits).toBe('unlimited');
+  }
+  for (let i = 0; i < 16; i++) {
+    const result = await tools.run('inspect_position', {});
+    expect(result.isError).toBeUndefined();
+    expect(result.data.remainingCalls).toBe('unlimited');
+  }
+  expect(engine.analyze).toHaveBeenCalledTimes(4);
+  expect(tools.available).toBe(true);
 });

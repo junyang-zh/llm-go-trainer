@@ -60,6 +60,7 @@ export interface LlmStatus {
   error?: string;
 }
 export interface LlmSettingsView extends LlmStatus {
+  limits: import('./llm').CoachLimits;
   deepseek: {
     baseUrl: string;
     model: string;
@@ -89,6 +90,7 @@ export interface ToolActivity {
   evaluation?: { visits: number; winrate: number; scoreLead: number; pv: Move[] };
 }
 export type StreamEvent =
+  | { type: 'paused'; reason: string; continuationId: string }
   | { type: 'status'; text: string }
   | { type: 'tool'; activity: ToolActivity }
   | { type: 'analysis'; phase: AnalysisPhase; analysis: Analysis; final: boolean }

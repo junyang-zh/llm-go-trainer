@@ -1,3 +1,4 @@
+import { defaultCoachLimits } from '../shared/llm';
 import { afterEach, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
 import { callCli, callDeepSeek, cliInvocation, type ProviderConfig } from '../server/providers';
@@ -23,7 +24,7 @@ const config: ProviderConfig = {
   claudeScript: resolve('tests/fixtures/agent-cli.mjs'),
   timeout: 5000,
 };
-function harness() {
+function harness(limits = defaultCoachLimits) {
   const engine: AnalysisEngine = {
     status: () => ({ configured: true, running: true, humanModel: false }),
     analyze: vi.fn(async (game, training) => coachAnalysis(game, training.visits)),
@@ -33,7 +34,15 @@ function harness() {
   return {
     engine,
     events,
-    tools: new CoachTools(engine, whiteAtari, trainingForRank('5k'), (event) => events.push(event)),
+    tools: new CoachTools(
+      engine,
+      whiteAtari,
+      trainingForRank('5k'),
+      (event) => events.push(event),
+      undefined,
+      undefined,
+      limits,
+    ),
   };
 }
 afterEach(() => vi.unstubAllGlobals());
@@ -163,8 +172,8 @@ it('returns a tool error to the API so it can correct an illegal candidate', asy
   expect(JSON.parse(followup.messages[1].content).error).toContain('已有棋子');
   expect(engine.analyze).not.toHaveBeenCalled();
 });
-it('bounds API tool rounds and requests a final answer after reaching the limit', async () => {
-  const { tools } = harness();
+it('uses the shared call allowance without imposing a separate round limit', async () => {
+  const { tools } = harness({ ...defaultCoachLimits, toolCalls: 8 });
   const fetch = vi.fn().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init.body);
     return new Response(
@@ -183,7 +192,11 @@ it('bounds API tool rounds and requests a final answer after reaching the limit'
     );
   });
   vi.stubGlobal('fetch', fetch);
-  expect(await callDeepSeek(config, [], { tools })).toBe('白棋先长出。');
+  expect(
+    await callDeepSeek(config, [], {
+      tools,
+    }),
+  ).toBe('白棋先长出。');
   expect(fetch).toHaveBeenCalledTimes(9);
   expect(JSON.parse(fetch.mock.calls[8][1].body).tools).toBeUndefined();
 });
@@ -272,4 +285,22 @@ it('passes only the scoped MCP connection and approved Go tools to CLI providers
   expect(cliInvocation('claude', config, '', true, mcp).args).toContain(
     'mcp__go_trainer__analyze_variation',
   );
+});
+
+it('runs beyond the former tool round and call limits with the unlimited defaults', async () => {
+  const { tools } = harness();
+  let calls = 0;
+  const fetch = vi.fn(async () => {
+    calls++;
+    return calls <= 14
+      ? sseResponse(
+          [{ tool_calls: [{ ...toolCall(`call-${calls}`, 'inspect_position', {}), index: 0 }] }],
+          'tool_calls',
+        )
+      : sseResponse([{ content: '完成。' }]);
+  });
+  vi.stubGlobal('fetch', fetch);
+  expect(await callDeepSeek({ ...config, timeout: 0 }, [], { tools, onText() {} })).toBe('完成。');
+  expect(fetch).toHaveBeenCalledTimes(15);
+  expect(tools.results).toHaveLength(14);
 });

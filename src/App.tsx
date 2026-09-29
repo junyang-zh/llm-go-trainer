@@ -448,26 +448,41 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  async function requestAnalysis(title: string, endpoint: 'analyze' | 'coach', payload: unknown) {
+  async function requestAnalysis(
+    title: string,
+    endpoint: 'analyze' | 'coach',
+    payload: unknown,
+    resumed?: AnalysisMessage,
+  ) {
     await run('分析中', async () => {
       const controller = new AbortController();
       activeStream.current = controller;
       followChat.current = true;
-      const id = crypto.randomUUID();
-      setMessages((previous) => [
-        ...previous,
-        {
-          id,
-          question: title,
-          text: '',
-          status: '连接中',
-          state: 'running',
-          evaluations: {},
-          context: structuredClone(boardContext),
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      if (endpoint === 'coach') setQuestion('');
+      const id = resumed?.id ?? crypto.randomUUID();
+      const requestContext = resumed?.context ?? boardContext;
+      if (resumed)
+        setMessages((previous) =>
+          previous.map((message) =>
+            message.id === id
+              ? { ...message, state: 'running', continuationId: undefined, status: '正在继续' }
+              : message,
+          ),
+        );
+      else
+        setMessages((previous) => [
+          ...previous,
+          {
+            id,
+            question: title,
+            text: '',
+            status: '连接中',
+            state: 'running',
+            evaluations: {},
+            context: structuredClone(boardContext),
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      if (endpoint === 'coach' && !resumed) setQuestion('');
       try {
         await library.flush();
         await streamApi(
@@ -481,11 +496,11 @@ export default function App() {
             );
             if (event.type === 'analysis') {
               setSearchProgress(event.analysis);
-              evaluations.record(current, event.analysis, event.final);
+              if (!resumed) evaluations.record(current, event.analysis, event.final);
             }
             if (event.type === 'done') {
               if (event.analysis) {
-                evaluations.record(current, event.analysis, true);
+                if (!resumed) evaluations.record(current, event.analysis, true);
                 setSearchProgress(event.analysis);
               }
               if (event.evidence) setEvidence(event.evidence);
@@ -494,7 +509,7 @@ export default function App() {
                   ...previous,
                   {
                     role: 'user',
-                    content: `${title}\n[棋局上下文 ${JSON.stringify(boardContext)}]`,
+                    content: `${title}\n[棋局上下文 ${JSON.stringify(requestContext)}]`,
                   },
                   { role: 'assistant', content: event.answer! },
                 ]);
@@ -970,6 +985,24 @@ export default function App() {
                   >
                     {message.state === 'running' && <i />}
                     {message.status}
+                    {message.state === 'paused' && message.continuationId && (
+                      <button
+                        type="button"
+                        className="continue-coach"
+                        disabled={locked}
+                        title="保留已有结果，补充一轮额度继续原任务"
+                        onClick={() =>
+                          void requestAnalysis(
+                            message.question,
+                            'coach',
+                            { continuationId: message.continuationId },
+                            message,
+                          )
+                        }
+                      >
+                        继续
+                      </button>
+                    )}
                   </div>
                 )}
               </article>

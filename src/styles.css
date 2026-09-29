@@ -1401,13 +1401,24 @@ h2 {
 .llm-settings {
   padding-top: 16px;
 }
-.provider-config {
+.llm-divider {
+  border: 0;
   border-top: 1px solid #e0e5d9;
+  margin: 12px 0;
+}
+.provider-config + .provider-config {
+  border-top: 1px solid #e0e5d9;
+}
+.llm-settings label,
+.llm-settings input,
+.llm-settings summary,
+.limits-help {
+  text-align: left;
 }
 .provider-config summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   cursor: pointer;
   padding: 12px 0;
   font-size: 12px;
@@ -1595,4 +1606,17 @@ h2 {
   stroke-width: 1.5;
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
+}
+
+.continue-coach {
+  padding: 2px 9px;
+  margin-left: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.limits-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #69776c;
 }

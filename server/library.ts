@@ -18,7 +18,7 @@ export const conversationSchema = z.object({
           question: z.string(),
           text: z.string(),
           status: z.string(),
-          state: z.enum(['running', 'done', 'stopped', 'error']),
+          state: z.enum(['running', 'done', 'stopped', 'error', 'paused']),
           evaluations: z.record(z.string(), z.unknown()),
         })
         .passthrough(),

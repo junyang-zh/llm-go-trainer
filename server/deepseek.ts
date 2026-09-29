@@ -32,16 +32,16 @@ export async function callDeepSeek(
   )
     throw new Error('API 地址必须使用 HTTPS');
   const signal = AbortSignal.any([
-    AbortSignal.timeout(config.timeout),
+    ...(options.budget || config.timeout <= 0 ? [] : [AbortSignal.timeout(config.timeout)]),
     ...(options.signal ? [options.signal] : []),
   ]);
   const messages = [...initial];
   let prefix = '';
-  for (let round = 0; round <= 8; round++) {
+  for (let round = 0; ; round++) {
     signal.throwIfAborted();
     options.onStatus?.(round ? 'DeepSeek 正在整理工具结果' : 'DeepSeek 正在分析');
     const stream = !!options.onText;
-    const useTools = !!options.tools?.available && round < 8;
+    const useTools = !!options.tools?.available;
     const response = await fetch(url, {
       method: 'POST',
       signal,
@@ -175,5 +175,4 @@ export async function callDeepSeek(
       messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result.data) });
     }
   }
-  throw new Error('讲解未完成');
 }

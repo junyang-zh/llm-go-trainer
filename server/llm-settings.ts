@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { LlmSettingsView, LlmStatus, Provider, ProviderAvailability } from '../shared/types';
 import type { ProviderConfig } from './providers';
-import { effortOptions } from '../shared/llm';
+import { coachLimitFields, defaultCoachLimits, effortOptions } from '../shared/llm';
 import { modelCatalog } from './model-catalog';
 
 export function apiBaseUrl(value: string) {
@@ -37,6 +37,30 @@ const baseUrl = z
   });
 export const llmUpdateSchema = z
   .object({
+    limits: z
+      .object({
+        timeoutSeconds: z
+          .number()
+          .int()
+          .min(coachLimitFields.timeoutSeconds.min)
+          .max(coachLimitFields.timeoutSeconds.max)
+          .or(z.literal(0)),
+        toolCalls: z
+          .number()
+          .int()
+          .min(coachLimitFields.toolCalls.min)
+          .max(coachLimitFields.toolCalls.max)
+          .or(z.literal(0)),
+        searchVisits: z
+          .number()
+          .int()
+          .min(coachLimitFields.searchVisits.min)
+          .max(coachLimitFields.searchVisits.max)
+          .or(z.literal(0)),
+      })
+      .strict()
+      .partial()
+      .optional(),
     preference: z.enum(['auto', 'deepseek', 'codex', 'claude']).optional(),
     deepseek: z
       .object({
@@ -185,6 +209,16 @@ export class LlmSettings {
   private config(saved = this.saved): ProviderConfig {
     return {
       ...this.defaults,
+      limits: {
+        ...defaultCoachLimits,
+        ...this.defaults.limits,
+        timeoutSeconds: this.defaults.timeout / 1000,
+        ...saved.limits,
+      },
+      timeout:
+        saved.limits?.timeoutSeconds !== undefined
+          ? saved.limits.timeoutSeconds * 1000
+          : this.defaults.timeout,
       deepseekKey: saved.deepseek?.apiKey ?? this.defaults.deepseekKey,
       deepseekUrl: saved.deepseek?.baseUrl ?? this.defaults.deepseekUrl,
       deepseekModel: saved.deepseek?.model ?? this.defaults.deepseekModel,
@@ -227,6 +261,7 @@ export class LlmSettings {
     const { saved, config, status } = await this.snapshot();
     return {
       ...status,
+      limits: config.limits!,
       models: await modelCatalog(),
       codex: { model: config.codexModel || '', effort: config.codexEffort || 'default' },
       claude: { model: config.claudeModel || '', effort: config.claudeEffort || 'default' },
@@ -256,6 +291,7 @@ export class LlmSettings {
       const next: Saved = {
         ...this.saved,
         ...patch,
+        limits: { ...this.saved.limits, ...patch.limits },
         deepseek: { ...this.saved.deepseek, ...patch.deepseek },
         codex: { ...this.saved.codex, ...patch.codex },
         claude: { ...this.saved.claude, ...patch.claude },

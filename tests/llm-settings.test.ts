@@ -176,3 +176,50 @@ describe('availability probes', () => {
     expect(JSON.stringify(result)).not.toContain('test-sensitive-error');
   });
 });
+
+it('persists workload limits, merges partial updates and validates bounds', async () => {
+  const file = await settingsFile();
+  const probe = async () => availability(true);
+  const settings = new LlmSettings(config, file, probe);
+  expect((await settings.view()).limits).toEqual({
+    timeoutSeconds: 3,
+    toolCalls: 0,
+    searchVisits: 0,
+  });
+  await settings.update({ limits: { timeoutSeconds: 600, toolCalls: 40 } });
+  await settings.update({ limits: { searchVisits: 32000 } });
+  const restarted = new LlmSettings(config, file, probe);
+  await restarted.load();
+  const resolved = await restarted.resolve();
+  expect(resolved.config.timeout).toBe(600000);
+  expect((await restarted.view()).limits).toEqual({
+    timeoutSeconds: 600,
+    toolCalls: 40,
+    searchVisits: 32000,
+  });
+  for (const limits of [
+    { timeoutSeconds: -1 },
+    { timeoutSeconds: 3601 },
+    { toolCalls: 201 },
+    { toolCalls: 1.5 },
+    { searchVisits: 3999 },
+    { unknown: 3 },
+  ])
+    await expect(async () => settings.update({ limits })).rejects.toThrow();
+  expect((await settings.resolve()).config.timeout).toBe(600000);
+});
+
+it('defaults to unlimited and persists clearing limits, including an environment timeout', async () => {
+  const file = await settingsFile();
+  const probe = async () => availability(true);
+  const unlimited = { timeoutSeconds: 0, toolCalls: 0, searchVisits: 0 };
+  const fresh = new LlmSettings({ ...config, timeout: 0 }, undefined, probe);
+  expect((await fresh.view()).limits).toEqual(unlimited);
+  const settings = new LlmSettings(config, file, probe);
+  await settings.update({ limits: { timeoutSeconds: 120, toolCalls: 12 } });
+  await settings.update({ limits: unlimited });
+  const restored = new LlmSettings(config, file, probe);
+  await restored.load();
+  expect((await restored.resolve()).config.timeout).toBe(0);
+  expect((await restored.view()).limits).toEqual(unlimited);
+});

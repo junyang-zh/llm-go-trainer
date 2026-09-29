@@ -11,7 +11,8 @@ export interface AnalysisMessage {
   question: string;
   text: string;
   status: string;
-  state: 'running' | 'done' | 'stopped' | 'error';
+  state: 'running' | 'done' | 'stopped' | 'error' | 'paused';
+  continuationId?: string;
   evaluations: Partial<Record<AnalysisPhase, { analysis: Analysis; final: boolean }>>;
   tools?: ToolActivity[];
   trials?: Record<string, import('./trial').CoachTrial>;

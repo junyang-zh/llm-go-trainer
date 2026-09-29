@@ -23,12 +23,14 @@ export interface ProviderConfig {
   codexScript?: string;
   claudeScript?: string;
   timeout: number;
+  limits?: import('../shared/llm').CoachLimits;
 }
 export interface ProviderOptions {
   onText?: (text: string) => void;
   onStatus?: (text: string) => void;
   signal?: AbortSignal;
   tools?: CoachTools;
+  budget?: import('./coach-budget').CoachBudget;
 }
 export function cliInvocation(
   provider: 'codex' | 'claude',
@@ -166,7 +168,10 @@ export async function callCli(
         child.kill('SIGKILL');
       };
       const abort = () => stop(new Error('已停止'));
-      const timer = setTimeout(() => stop(new Error(`${provider} 超时`)), config.timeout);
+      const timer =
+        options.budget || config.timeout <= 0
+          ? undefined
+          : setTimeout(() => stop(new Error(`${provider} 超时`)), config.timeout);
       const onLine = (line: string) => {
         if (!line.trim()) return;
         let event;

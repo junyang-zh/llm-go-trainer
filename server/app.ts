@@ -1,4 +1,6 @@
 import express from 'express';
+import { randomUUID } from 'node:crypto';
+import { CoachBudget } from './coach-budget';
 import { HistoryLibrary } from './library';
 import { CoachTools } from './coach-tools';
 import { join } from 'node:path';
@@ -13,7 +15,7 @@ import { buildEvidence } from './evidence';
 import { replay } from '../shared/go';
 import { selectMove } from '../shared/training';
 import { openStream } from './stream';
-import type { AnalysisPhase } from '../shared/types';
+import type { Analysis, AnalysisPhase } from '../shared/types';
 import type { KataGoModels } from './katago-models';
 import { selectionSchema } from './katago-catalog';
 
@@ -205,16 +207,32 @@ export function createApp(
     }
   });
   let coaching = false;
+  // Resumptions use server-owned evidence and the original board, never client-supplied results.
+  const continuations = new Map<
+    string,
+    {
+      expires: number;
+      request: z.infer<typeof coachRequest>;
+      tools: ReturnType<CoachTools['snapshot']>;
+      text: string;
+      after?: Analysis | null;
+      before?: Analysis | null;
+    }
+  >();
   app.post('/api/coach', async (req, res) => {
-    const {
-      game,
-      training,
-      provider: requested,
-      action,
-      question,
-      history,
-      context,
-    } = coachRequest.parse(req.body);
+    for (const [id, saved] of continuations)
+      if (saved.expires < Date.now()) continuations.delete(id);
+    const continuationId =
+      req.body?.continuationId === undefined
+        ? undefined
+        : z.object({ continuationId: z.uuid() }).strict().parse(req.body).continuationId;
+    const resumed = continuationId ? continuations.get(continuationId) : undefined;
+    if (continuationId && !resumed) {
+      res.status(410).json({ error: '继续任务已过期或应用已重启，请重新提问' });
+      return;
+    }
+    const request = resumed?.request ?? coachRequest.parse(req.body);
+    const { game, training, provider: requested, action, question, history, context } = request;
     replay(game);
     if (context) {
       const saved = library.getGame(context.gameId);
@@ -246,14 +264,20 @@ export function createApp(
       res.status(429).json({ error: '已有分析进行中' });
       return;
     }
+    if (continuationId && continuations.get(continuationId) !== resumed) {
+      res.status(410).json({ error: '本轮额度已使用，请等待当前任务完成' });
+      return;
+    }
     coaching = true;
+    if (continuationId) continuations.delete(continuationId);
     const stream = req.headers.accept?.includes('application/x-ndjson')
       ? openStream(res)
       : undefined;
     const controller = new AbortController();
+    const budget = new CoachBudget(config.timeout);
     const signal = AbortSignal.any([
       controller.signal,
-      AbortSignal.timeout(config.timeout),
+      budget.signal,
       ...(stream ? [stream.signal] : []),
     ]);
     const disconnected = () => {
@@ -267,7 +291,14 @@ export function createApp(
       (activity) => stream?.send({ type: 'tool', activity }),
       signal,
       { library, context },
+      config.limits,
+      budget,
+      resumed?.tools,
     );
+    let text = resumed?.text ?? '';
+    const prefix = text ? text + '\n\n' : '';
+    let after = resumed?.after,
+      before = resumed?.before;
     try {
       const analyze = async (phase: AnalysisPhase) => {
         stream?.send({
@@ -289,10 +320,11 @@ export function createApp(
       };
       // Engine evidence is generated on the server, never trusted from client chat text.
       const ready = engine.status().ready ?? engine.status().configured;
-      const after = ready ? await analyze('after') : null;
+      if (after === undefined) after = ready ? await analyze('after') : null;
       if (!after)
         stream?.send({ type: 'status', text: `${engine.status().name || 'KataGo'} 未就绪` });
-      const before = after && action === 'move' ? await analyze('before') : null;
+      if (before === undefined)
+        before = after && action === 'move' ? await analyze('before') : null;
       const evidence = buildEvidence(
         game,
         training,
@@ -314,24 +346,64 @@ export function createApp(
         provider,
         config,
         prompt,
-        { ...evidence, boardContext: context },
+        {
+          ...evidence,
+          boardContext: context,
+          ...(resumed
+            ? {
+                continuation: {
+                  requested: true,
+                  previousText: resumed.text,
+                  toolResults: resumed.tools.results,
+                  trials: resumed.tools.trials.map(([, trial]) => trial),
+                },
+              }
+            : {}),
+        },
         `${action}: ${tasks[action]}${action !== 'chat' && question ? '\n' + question : ''}`,
         history,
         {
           signal,
           tools,
-          onText: stream ? (text) => stream.send({ type: 'text', text }) : undefined,
+          budget,
+          onText: (value) => {
+            text = prefix + value;
+            stream?.send({ type: 'text', text });
+          },
           onStatus: stream ? (text) => stream.send({ type: 'status', text }) : undefined,
         },
       );
+      signal.throwIfAborted();
+      text = prefix + answer;
       const fullEvidence = { ...evidence, boardContext: context, toolResults: tools.results };
-      if (stream) stream.send({ type: 'done', answer, evidence: fullEvidence, analysis: after });
-      else res.json({ answer, evidence: fullEvidence, analysis: after });
-    } catch (error) {
       if (stream)
+        stream.send({ type: 'done', answer: text, evidence: fullEvidence, analysis: after });
+      else res.json({ answer: text, evidence: fullEvidence, analysis: after });
+    } catch (error) {
+      if (
+        budget.reason &&
+        !controller.signal.aborted &&
+        !stream?.signal.aborted &&
+        !res.destroyed
+      ) {
+        const id = randomUUID();
+        while (continuations.size >= 8) continuations.delete(continuations.keys().next().value!);
+        continuations.set(id, {
+          expires: Date.now() + 30 * 60 * 1000,
+          request: { ...request, provider },
+          tools: tools.snapshot(),
+          text,
+          after,
+          before,
+        });
+        const paused = { type: 'paused' as const, reason: budget.reason, continuationId: id };
+        if (stream) stream.send(paused);
+        else res.json(paused);
+      } else if (stream)
         stream.send({ type: 'error', error: error instanceof Error ? error.message : '分析失败' });
       else throw error;
     } finally {
+      budget.close();
       controller.abort();
       tools.close();
       res.off('close', disconnected);

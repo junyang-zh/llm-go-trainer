@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import type { LlmSettingsView, LlmStatus, Provider, ProviderPreference } from '../shared/types';
-import { availabilityLabel, effortLabels, effortOptions, providerNames } from '../shared/llm';
+import {
+  coachLimitFields,
+  type CoachLimits,
+  availabilityLabel,
+  effortLabels,
+  effortOptions,
+  providerNames,
+} from '../shared/llm';
 
 function ProviderForm({
   provider,
@@ -152,6 +159,65 @@ function ProviderForm({
     </form>
   );
 }
+function WorkLimits({
+  limits,
+  save,
+  working,
+}: {
+  limits: CoachLimits;
+  save: (patch: unknown) => Promise<boolean>;
+  working: boolean;
+}) {
+  const [draft, setDraft] = useState(limits);
+  useEffect(() => setDraft(limits), [limits]);
+  return (
+    <details className="provider-config">
+      <summary>Agent 工作量上限</summary>
+      <form
+        className="provider-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save({ limits: draft });
+        }}
+      >
+        <div className="model-settings">
+          {(Object.keys(coachLimitFields) as (keyof CoachLimits)[]).map((key) => {
+            const field = coachLimitFields[key];
+            return (
+              <label key={key}>
+                {field.label}
+                <input
+                  type="number"
+                  placeholder="无限制"
+                  min={field.min}
+                  max={field.max}
+                  step="1"
+                  value={draft[key] || ''}
+                  disabled={working}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      [key]: event.target.value === '' ? 0 : event.target.valueAsNumber,
+                    })
+                  }
+                />
+              </label>
+            );
+          })}
+        </div>
+        <p className="limits-help">
+          默认无限制，留空即可取消该项限制。设置上限后，达到额度会暂停，点击对话中的「继续」可补充一轮；保存后生效。
+        </p>
+        <div className="engine-actions">
+          <button type="submit" disabled={working}>
+            保存工作量上限
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
 export function LlmSettings({
   status,
   onChange,
@@ -218,6 +284,7 @@ export function LlmSettings({
           ))}
         </select>
       </label>
+      <hr className="llm-divider" />
       {view &&
         (Object.keys(providerNames) as Provider[]).map((provider) => (
           <details key={provider} className="provider-config" open={expanded === provider}>
@@ -236,6 +303,8 @@ export function LlmSettings({
             )}
           </details>
         ))}
+      <hr className="llm-divider" />
+      {view && <WorkLimits limits={view.limits} save={save} working={working} />}
       {(error || current?.error) && (
         <p className="error" role="alert">
           {error || current?.error}

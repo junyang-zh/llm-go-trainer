@@ -1,3 +1,5 @@
+import { defaultCoachLimits, type CoachLimits } from '../shared/llm';
+import type { CoachBudget } from './coach-budget';
 import type { BoardContext } from '../shared/library';
 import type { HistoryLibrary } from './library';
 import { randomUUID } from 'node:crypto';
@@ -100,6 +102,7 @@ export class CoachTools {
   private controller = new AbortController();
   private queue: Promise<unknown> = Promise.resolve();
   private calls = 0;
+  private idPrefix = '';
   private visits = 0;
   private cache = new Map<string, Analysis>();
   private trials = new Map<string, CoachTrial>();
@@ -113,11 +116,26 @@ export class CoachTools {
     private onActivity?: (activity: ToolActivity) => void,
     signal?: AbortSignal,
     private session?: { library: HistoryLibrary; context?: BoardContext },
+    private limits: CoachLimits = defaultCoachLimits,
+    private budget?: CoachBudget,
+    saved?: ReturnType<CoachTools['snapshot']>,
   ) {
+    if (saved) {
+      this.idPrefix = randomUUID() + ':';
+      this.cache = new Map(saved.cache);
+      this.trials = new Map(saved.trials);
+      this.results.push(...saved.results);
+    }
     this.signal = AbortSignal.any([this.controller.signal, ...(signal ? [signal] : [])]);
   }
+  snapshot() {
+    return { cache: [...this.cache], trials: [...this.trials], results: [...this.results] };
+  }
   get available() {
-    return this.calls < 12 && !this.signal.aborted;
+    return (
+      (!!this.budget || !this.limits.toolCalls || this.calls < this.limits.toolCalls) &&
+      !this.signal.aborted
+    );
   }
   close() {
     this.controller.abort();
@@ -128,7 +146,7 @@ export class CoachTools {
     id: string = randomUUID(),
     signal?: AbortSignal,
   ): Promise<CoachToolResult> {
-    const task = this.queue.then(() => this.execute(name, args, id, signal));
+    const task = this.queue.then(() => this.execute(name, args, this.idPrefix + id, signal));
     this.queue = task.catch(() => {});
     return task;
   }
@@ -160,7 +178,11 @@ export class CoachTools {
     };
     let result: CoachToolResult;
     try {
-      if (++this.calls > 12) throw new Error('本次工具调用额度已用完，请依据已有结果完成讲解');
+      this.calls++;
+      if (this.limits.toolCalls > 0 && this.calls > this.limits.toolCalls) {
+        this.budget?.hit('已达到工具调用次数上限');
+        throw new Error('本次工具调用额度已用完，请依据已有结果完成讲解');
+      }
       if (name === 'edit_trial') {
         const args = coachToolSchemas.edit_trial.parse(raw);
         let branch: CoachTrial | null = null;
@@ -223,7 +245,9 @@ export class CoachTools {
                   }),
                 }
               : {}),
-            remainingCalls: Math.max(0, 12 - this.calls),
+            remainingCalls: this.limits.toolCalls
+              ? Math.max(0, this.limits.toolCalls - this.calls)
+              : 'unlimited',
           },
         };
         emit({
@@ -262,7 +286,9 @@ export class CoachTools {
           data: {
             ...data,
             currentContext: this.session.context,
-            remainingCalls: Math.max(0, 12 - this.calls),
+            remainingCalls: this.limits.toolCalls
+              ? Math.max(0, this.limits.toolCalls - this.calls)
+              : 'unlimited',
           },
         };
         emit({ state: 'done' });
@@ -329,8 +355,13 @@ export class CoachTools {
         if (!analysis) {
           if (!(this.engine.status().ready ?? this.engine.status().configured))
             throw new Error('围棋引擎未就绪');
-          if (this.visits + search.visits > 12000)
+          if (
+            this.limits.searchVisits > 0 &&
+            this.visits + search.visits > this.limits.searchVisits
+          ) {
+            this.budget?.hit('已达到累计搜索量上限');
             throw new Error('本次搜索额度已用完，请依据已有结果完成讲解');
+          }
           this.visits += search.visits;
           analysis = await this.engine.analyze(
             game,
@@ -362,8 +393,12 @@ export class CoachTools {
                 engineName: this.engine.status().name || 'KataGo',
               }
             : {}),
-          remainingCalls: Math.max(0, 12 - this.calls),
-          remainingSearchVisits: 12000 - this.visits,
+          remainingCalls: this.limits.toolCalls
+            ? Math.max(0, this.limits.toolCalls - this.calls)
+            : 'unlimited',
+          remainingSearchVisits: this.limits.searchVisits
+            ? this.limits.searchVisits - this.visits
+            : 'unlimited',
         },
       };
       emit({

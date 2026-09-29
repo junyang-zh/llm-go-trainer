@@ -46,9 +46,9 @@ KataGo 开启 `reportDuringSearchEvery`，搜索中的数值只用于即时显�
 
 `server/coach-tools.ts` 提供 `inspect_position`、`analyze_variation` 和 `query_game_history`。历史工具支持分页列举棋局、按 ID 读取完整棋谱及指定手数局面，并返回当前原局手数和用户试下状态。每次讲解固定棋谱快照；工具从当前局面或最后一手之前开始，使用 `shared/` 重建和校验试下手顺，再通过同一 `AnalysisEngine` 查询。工具返回棋盘、重点棋块与气、黑方视角分析和候选变化；试下结果通过 `tool` 事件传给对话，不进入主线曲线。完整工具结果随“导出分析”一起导出。
 
-单次讲解最多调用 12 次工具、追加 12,000 visits；每次搜索 50–4,000 visits，默认 800。相同起点、手顺与 visits 的查询复用本次讲解内的缓存。调用串行执行，错误作为工具结果返回给模型修正；取消信号贯穿排队、引擎搜索和 LLM。总时限使用 `LLM_TIMEOUT_MS`。
+单次讲解的总用时、工具次数与累计搜索量默认无限制，可在 LLM 设置中分别启用上限。每次搜索仍为 50–4,000 visits，默认 800。相同起点、手顺与 visits 的查询复用本次讲解内的缓存。调用串行执行，错误作为工具结果返回给模型修正；取消信号贯穿排队、引擎搜索和 LLM。总时限优先使用 LLM 设置，未保存时使用 `LLM_TIMEOUT_MS`（默认 0，表示无限制）。
 
-DeepSeek 由 `server/deepseek.ts` 驱动多轮调用：拼接流式工具参数、执行工具、回传结果，最多 8 轮工具请求后生成最终回答。`reasoning_content` 仅在服务端回传给供应商以延续同一次讲解。
+DeepSeek 由 `server/deepseek.ts` 驱动多轮调用：拼接流式工具参数、执行工具、回传结果，和其他接入共用工具调用次数额度；达到设置的上限后会暂停并由用户决定是否继续。`reasoning_content` 仅在服务端回传给供应商以延续同一次讲解。
 
 CLI 通过 `server/coach-mcp.ts` 的临时 Streamable HTTP MCP 服务调用同一执行器。服务监听随机 loopback 端口，使用每次请求独立的令牌，校验 Host 与 Origin；令牌通过子进程环境传递。应用通过调用参数配置 MCP，并只授权这些围棋工具。CLI 退出后关闭 MCP 服务和未完成搜索。执行器回调与 Codex/Claude 的工具事件共同更新 UI，无需修改用户的全局 hook 或 MCP 配置。
 

@@ -96,3 +96,23 @@ it('persists only successful trial edits and ignores late edits after cancellati
   });
   expect(message.trials).toEqual({});
 });
+
+it('retains partial work on budget pause, stops unfinished tools and ignores late events', () => {
+  const running = updateMessage({ ...initial, text: '已有说明' }, { type: 'tool', activity });
+  const paused = updateMessage(running, {
+    type: 'paused',
+    reason: '已达到最长用时',
+    continuationId: 'token',
+  });
+  expect(paused).toMatchObject({
+    state: 'paused',
+    text: '已有说明',
+    continuationId: 'token',
+    tools: [{ state: 'stopped' }],
+  });
+  expect(updateMessage(paused, { type: 'text', text: 'late' })).toBe(paused);
+  expect(finishMessage(paused, 'stopped', '已停止').continuationId).toBeUndefined();
+  expect(
+    updateMessage(initial, { type: 'error', error: '超时文字但不是额度事件' }).continuationId,
+  ).toBeUndefined();
+});

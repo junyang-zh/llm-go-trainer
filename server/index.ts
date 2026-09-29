@@ -53,7 +53,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
     claudePath: process.env.CLAUDE_PATH || 'claude',
     codexScript: process.env.CODEX_SCRIPT,
     claudeScript: process.env.CLAUDE_SCRIPT,
-    timeout: duration(process.env.LLM_TIMEOUT_MS, 120000),
+    timeout: duration(process.env.LLM_TIMEOUT_MS, 0),
   };
   const llm = new LlmSettings(
     providers,
