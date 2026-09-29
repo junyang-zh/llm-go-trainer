@@ -1,26 +1,26 @@
 # Release notes
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ko/release-notes.md)
 
-## v0.1.4
+## v0.1.5
 
-- Added English, Simplified Chinese, Traditional Chinese, Japanese and Korean interfaces. The default follows the system language; General settings saves an explicit selection. Notifications, model panels and existing statuses update with the language.
-- Fixed layout jumps in the Score / Win rate panel during and after searches. Candidate space is reserved, the current win rate shares the title row and hides when collapsed, and visits/visits per second appear beside analysis progress.
-- Added interactive coaching: coordinate highlights and board links, grouped variation selectors, and coach-created/edited trial branches saved with conversations without changing the played game.
-- Added per-round agent limits for time, tool calls and total search visits. Reaching a limit preserves results and offers continuation; all limits default to unlimited.
-- Codex / Claude Code coaches can research online and cite sources. Position-specific tactics and numbers still require board/engine evidence. DeepSeek does not currently offer web search.
-- Added five-language READMEs and user, engine, LLM, development, release and architecture documentation, plus CI and latest Release badges.
+- Agents can now load games, save the current position or trial branches, and rename games, keeping the board and library in sync. Trials are saved as new related games without overwriting their sources; continuation retains the updated game context.
+- Fixed “CLI output exceeds limit” during long coaching sessions. Removed fixed limits on cumulative Codex / Claude CLI output, the Codex answer file and local frontend messages, so tool results no longer exhaust a hidden total-output allowance.
+- Added library search, pagination, renaming, source details and groups of related branches. Standard bundles the full CWI game archive; minimal can install it from the record downloader. No joseki or life-and-death collection is bundled.
+- Added Fox Go record lookup and import by username or UID. Downloaded games are saved locally, and repeated imports reuse the same record.
+- Minimal no longer downloads engines or models automatically at first launch. To use a local engine, choose “Download and enable KataGo” in Settings → Go models. Existing models, records and conversations are preserved.
+- Adopted the MIT license, added an in-app license notice and expanded third-party component and record-source notices. Third-party resources retain their own licenses.
 
 Choose one installer matching your system:
 
 | Filename suffix           | System                    | Bundled weights          |
 | ------------------------- | ------------------------- | ------------------------ |
 | `windows-x64.exe`         | Windows 10/11 x64         | Main + HumanSL           |
-| `windows-x64-minimal.exe` | Windows 10/11 x64         | Download on first launch |
+| `windows-x64-minimal.exe` | Windows 10/11 x64         | Manual setup in Settings |
 | `mac-arm64.dmg`           | macOS 15+ / Apple Silicon | Main + HumanSL           |
-| `mac-arm64-minimal.dmg`   | macOS 15+ / Apple Silicon | Download on first launch |
+| `mac-arm64-minimal.dmg`   | macOS 15+ / Apple Silicon | Manual setup in Settings |
 
-Both editions have identical features. Windows standard bundles KataGo OpenCL and DLLs, needing no engine/model download but still requiring the GPU's OpenCL driver. macOS standard includes Metal and libraries, without engine/model downloads or Homebrew. Minimal on both platforms downloads engines, dependencies and models at first launch. Download errors identify resource, source host and available network error code. LLM credentials are never bundled; configure them in settings.
+Both editions have identical features. Windows standard bundles KataGo OpenCL and DLLs, needing no engine/model download but still requiring the GPU's OpenCL driver. macOS standard includes Metal and libraries, without engine/model downloads or Homebrew. Minimal on both platforms requires manual engine, dependency and model setup in Settings → Go models. Download errors identify resource, source host and available network error code. LLM credentials are never bundled; configure them in settings.
 
 On macOS drag the app into Applications. With complete release credentials it is Developer ID signed and Apple notarized; otherwise it is unsigned/unnotarized and macOS may block first launch. Run `.exe` on Windows; installers are not code signed and may trigger an unknown-publisher prompt.
 
