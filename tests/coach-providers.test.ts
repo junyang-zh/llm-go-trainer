@@ -274,7 +274,7 @@ it.each(['codex', 'claude'] as const)(
     expect(events.at(-1)).toMatchObject({ name: 'analyze_variation', state: 'stopped' });
   },
 );
-it('passes only the scoped MCP connection and approved Go tools to CLI providers', () => {
+it('passes the scoped MCP connection and approved Go tools alongside native web tools', () => {
   const mcp = { url: 'http://127.0.0.1:1234/mcp', token: 'private-session-token' };
   for (const provider of ['codex', 'claude'] as const) {
     const args = cliInvocation(provider, config, 'answer.txt', true, mcp).args;

@@ -55,6 +55,8 @@ export function cliInvocation(
         '--sandbox',
         'read-only',
         '-c',
+        'web_search="live"',
+        '-c',
         'features.shell_tool=false',
         '-c',
         'features.unified_exec=false',
@@ -93,7 +95,7 @@ export function cliInvocation(
       stream ? 'stream-json' : 'text',
       ...(stream ? ['--verbose', '--include-partial-messages'] : []),
       '--tools',
-      '',
+      'WebSearch,WebFetch',
       '--strict-mcp-config',
       '--mcp-config',
       JSON.stringify({
@@ -107,12 +109,10 @@ export function cliInvocation(
             }
           : {},
       }),
-      ...(mcp
-        ? [
-            '--allowedTools',
-            ...coachToolDefinitions.map((tool) => `mcp__${coachMcpName}__${tool.name}`),
-          ]
-        : []),
+      '--allowedTools',
+      'WebSearch',
+      'WebFetch',
+      ...(mcp ? coachToolDefinitions.map((tool) => `mcp__${coachMcpName}__${tool.name}`) : []),
       '--setting-sources',
       '',
       '--no-session-persistence',
@@ -187,6 +187,10 @@ export async function callCli(
           if (event.type === 'turn.failed' || event.type === 'error')
             throw new Error('Codex 分析失败');
           const item = event.item;
+          if (item?.type === 'web_search') {
+            if (event.type === 'item.started') options.onStatus?.('Codex 正在搜索网页');
+            if (event.type === 'item.completed') options.onStatus?.('Codex 正在整理资料');
+          }
           if (item?.type === 'mcp_tool_call') {
             if (event.type === 'item.started') options.onStatus?.('Codex 正在调用围棋工具');
             if (event.type === 'item.completed') options.onStatus?.('Codex 正在整理分析');
@@ -207,7 +211,14 @@ export async function callCli(
             options.onStatus?.('Claude 正在重试连接');
           if (event.parent_tool_use_id) return;
           const block = event.type === 'stream_event' ? event.event?.content_block : undefined;
-          if (block?.type === 'tool_use') options.onStatus?.('Claude 正在调用围棋工具');
+          if (block?.type === 'tool_use')
+            options.onStatus?.(
+              block.name === 'WebSearch'
+                ? 'Claude 正在搜索网页'
+                : block.name === 'WebFetch'
+                  ? 'Claude 正在读取网页'
+                  : 'Claude 正在调用围棋工具',
+            );
           if (
             event.type === 'user' &&
             event.message?.content?.some((part: { type?: string }) => part.type === 'tool_result')

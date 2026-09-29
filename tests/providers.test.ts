@@ -14,6 +14,29 @@ const config: ProviderConfig = {
 };
 afterEach(() => vi.unstubAllGlobals());
 describe('LLM adapters', () => {
+  it.each([false, true])('enables native web tools with MCP=%s', (withMcp) => {
+    const mcp = withMcp ? { url: 'http://127.0.0.1:1234/mcp', token: 'test-token' } : undefined;
+    const codex = cliInvocation('codex', config, 'answer.txt', true, mcp).args;
+    const overrides = codex.filter((_, index) => codex[index - 1] === '-c');
+    expect(overrides).toContain('web_search="live"');
+    expect(overrides).toContain('features.shell_tool=false');
+    expect(overrides).toContain('features.unified_exec=false');
+    expect(codex[codex.indexOf('--sandbox') + 1]).toBe('read-only');
+    const claude = cliInvocation('claude', config, '', true, mcp).args;
+    expect(claude[claude.indexOf('--tools') + 1]).toBe('WebSearch,WebFetch');
+    const allowed = claude.slice(
+      claude.indexOf('--allowedTools') + 1,
+      claude.indexOf('--setting-sources'),
+    );
+    expect(allowed).toContain('WebSearch');
+    expect(allowed).toContain('WebFetch');
+    expect(allowed.includes('mcp__go_trainer__analyze_variation')).toBe(withMcp);
+    expect(
+      allowed.every(
+        (tool) => ['WebSearch', 'WebFetch'].includes(tool) || tool.startsWith('mcp__go_trainer__'),
+      ),
+    ).toBe(true);
+  });
   it.each(['default', 'none', 'low', 'high', 'max'])(
     'sends DeepSeek effort %s without leaking it into the prompt',
     async (effort) => {
@@ -93,6 +116,20 @@ describe('LLM adapters', () => {
 });
 
 describe('live provider output', () => {
+  it.each(['codex', 'claude'] as const)(
+    '%s reports native web activity separately from Go tools',
+    async (provider) => {
+      const statuses: string[] = [];
+      expect(
+        await callCli(provider, config, 'web-search', {
+          onStatus: (status) => statuses.push(status),
+        }),
+      ).toBe('讲解：web-search');
+      expect(statuses).toContain(`${provider === 'codex' ? 'Codex' : 'Claude'} 正在搜索网页`);
+      if (provider === 'claude') expect(statuses).toContain('Claude 正在读取网页');
+      expect(statuses.join('')).not.toContain('围棋工具');
+    },
+  );
   it('streams DeepSeek answer before completion, preserves split UTF-8 and omits private reasoning', async () => {
     let source!: ReadableStreamDefaultController<Uint8Array>;
     const body = new ReadableStream<Uint8Array>({

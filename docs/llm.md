@@ -50,6 +50,8 @@ Claude 使用 print 模式，模型和思考深度通过 `--model` / `--effort` 
 
 应用为每次 CLI 讲解自动接入临时 MCP 围棋工具，需使用支持 Streamable HTTP MCP 的 CLI 版本。DeepSeek 使用 API 原生工具调用，三种接入共用相同的搜索工具与执行记录。
 
+CLI 教练可按需联网查阅围棋资料并附来源链接：Codex 显式设置 `web_search="live"`，Claude 开启并预授权内置 `WebSearch` / `WebFetch`。无需另配搜索 API key。当前局面的战术与数值仍由棋盘和围棋引擎支撑。DeepSeek API 接入目前不提供网页搜索。[Codex 网页搜索配置](https://learn.chatgpt.com/docs/config-file/config-basic#web-search) · [Claude 工具权限参数](https://code.claude.com/docs/en/cli-reference)
+
 CLI 的环境默认值为 `CODEX_MODEL` / `CODEX_EFFORT`、`CLAUDE_MODEL` / `CLAUDE_EFFORT`；留空使用 CLI 默认。应用内保存的模型与深度优先。
 
 Windows：优先使用原生 CLI `.exe`。若通过 npm 安装得到 `.cmd` shim，不能把它当原生可执行文件。用 `npm root -g` 确认安装目录，再设置 Node 与实际 JS 入口，例如 Codex：

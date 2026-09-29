@@ -9,6 +9,20 @@ const output = args.indexOf('--output-last-message');
 const stream = args.includes('--json') || args.includes('stream-json');
 const emit = (event) => process.stdout.write(JSON.stringify(event) + '\n');
 if (stream) {
+  if (prompt === 'web-search') {
+    if (output >= 0) {
+      const item = { id: 'web', type: 'web_search', query: '围棋规则' };
+      emit({ type: 'item.started', item });
+      emit({ type: 'item.completed', item });
+    } else {
+      for (const name of ['WebSearch', 'WebFetch']) {
+        emit({
+          type: 'stream_event',
+          event: { type: 'content_block_start', content_block: { type: 'tool_use', name } },
+        });
+      }
+    }
+  }
   if (output >= 0) {
     emit({ type: 'turn.started' });
     emit({
