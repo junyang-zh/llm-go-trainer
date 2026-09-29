@@ -1,15 +1,15 @@
 # Release notes
 
-[English](release-notes.md) · [简体中文](../release-notes.md) · [繁體中文](../zh-TW/release-notes.md) · [日本語](../ja/release-notes.md) · [한국어](../ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ko/release-notes.md)
 
-## v0.1.3
+## v0.1.4
 
-- Go model management: recommendation tiers, official catalog, custom models, download progress/cancel, selection and deletion.
-- Windows CUDA backend with persistent OpenCL/CUDA switching. CUDA is not bundled; first selection downloads about 1.45 GiB of verified dependencies and reuses existing models.
-- Notifications show live visits and average visits/s. Search limits support visits or time and save automatically.
-- With cached models, updates use the minimal installer without models, reusing models, backends and tuning caches. Older apps must first update to this version before subsequent updates can use this policy.
-- Fixed startup status/timeouts during initial Windows OpenCL tuning and hid the Windows menu bar.
-- Simplified settings into General, Go models, AI auto-play and Connect LLM.
+- Added English, Simplified Chinese, Traditional Chinese, Japanese and Korean interfaces. The default follows the system language; General settings saves an explicit selection. Notifications, model panels and existing statuses update with the language.
+- Fixed layout jumps in the Score / Win rate panel during and after searches. Candidate space is reserved, the current win rate shares the title row and hides when collapsed, and visits/visits per second appear beside analysis progress.
+- Added interactive coaching: coordinate highlights and board links, grouped variation selectors, and coach-created/edited trial branches saved with conversations without changing the played game.
+- Added per-round agent limits for time, tool calls and total search visits. Reaching a limit preserves results and offers continuation; all limits default to unlimited.
+- Codex / Claude Code coaches can research online and cite sources. Position-specific tactics and numbers still require board/engine evidence. DeepSeek does not currently offer web search.
+- Added five-language READMEs and user, engine, LLM, development, release and architecture documentation, plus CI and latest Release badges.
 
 Choose one installer matching your system:
 

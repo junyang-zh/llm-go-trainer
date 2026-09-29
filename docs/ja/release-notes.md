@@ -1,15 +1,15 @@
 # 更新履歴
 
-[English](../en/release-notes.md) · [简体中文](../release-notes.md) · [繁體中文](../zh-TW/release-notes.md) · [日本語](release-notes.md) · [한국어](../ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ko/release-notes.md)
 
-## v0.1.3
+## v0.1.4
 
-- 囲碁モデル管理：推奨区分、公式カタログ、独自モデル、ダウンロード進捗・取消、切り替え・削除。
-- Windows CUDA を追加し、OpenCL との選択を保存。CUDA は非同梱で、初回選択時に約 1.45 GiB の検証済み依存ファイルを取得し、モデルは再利用します。
-- 通知に探索数と平均探索数/秒を表示。探索回数・時間制限を自動保存します。
-- モデルのキャッシュがあれば minimal 更新を使用し、モデル・バックエンド・調整キャッシュを再利用。旧版は一度この版へ更新すると、その後この方式を利用できます。
-- Windows 初回 OpenCL 調整中の状態・タイムアウトを修正し、メニューバーを非表示にしました。
-- 設定を「一般」「囲碁モデル」「AI 自動着手」「LLM 接続」に整理しました。
+- 英語、簡体字中国語、繁体字中国語、日本語、韓国語の UI を追加しました。既定はシステム言語に従い、一般設定で選択を保存できます。通知、モデルパネル、表示済みの状態も切り替わります。
+- 「目差 / 勝率」の探索前後の高さ変動を修正しました。候補変化の領域を確保し、現在の勝率を見出し横に表示して折りたたみ時は非表示にします。探索数と探索数/秒は分析進捗の横に移しました。
+- 対話型解説を強化しました。座標の強調と盤面への接続、グループ別変化切り替え、コーチによる試し打ち分岐の作成・編集に対応し、実戦棋譜を変えず会話と保存します。
+- 1 回の時間、ツール回数、累計探索数の上限を追加しました。上限到達時は結果を保持して続行でき、既定ではすべて無制限です。
+- Codex / Claude Code コーチは必要に応じウェブを調べて出典を示せます。現在局面の戦術・数値は引き続き盤面・エンジンを根拠とします。DeepSeek のウェブ検索は未対応です。
+- README と使用・エンジン・LLM・開発・公開・設計文書を 5 言語化し、CI と最新 Release のバッジを追加しました。
 
 環境に合うインストーラーを 1 つ選んでください。
 

@@ -1,15 +1,15 @@
 # 更新記錄
 
-[English](../en/release-notes.md) · [简体中文](../release-notes.md) · [繁體中文](release-notes.md) · [日本語](../ja/release-notes.md) · [한국어](../ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.4/docs/ko/release-notes.md)
 
-## v0.1.3
+## v0.1.4
 
-- 新增圍棋模型管理：推薦檔位、官方模型目錄、自訂模型、下載進度與取消、模型切換和刪除。
-- Windows 新增 CUDA 後端，支援與 OpenCL 切換並保存選擇。CUDA 不預裝；首次選擇時下載約 1.45 GiB 的已校驗依賴，復用已有模型。
-- 通知顯示實時搜索次數和平均每秒搜索數；支援按搜索次數或時間限制分析，設定自動保存。
-- 已快取模型時，自動更新使用不含模型的 minimal 安裝包，繼續復用模型、後端和調優快取。舊版需先更新到本版，後續更新才能使用此策略。
-- 修復 Windows 首次 OpenCL 調優期間的啟動狀態和超時處理，隱藏 Windows 菜單欄。
-- 精簡設定介面，調整標籤為「通用」「圍棋模型」「AI 自動落子」「連接 LLM」。
+- 新增五語言介面：英文、簡體中文、繁體中文、日語及韓語，預設跟隨系統語言，可在一般設定中切換並儲存偏好。通知、模型面板及已顯示的狀態會同步切換語言。
+- 修正「目差 / 勝率」面板在計算前後的高度跳動：預留候選變化空間，目前勝率與標題同行，收合時隱藏；搜尋次數及次數/秒移至已分析進度處。
+- 增強互動講棋：正文座標可醒目提示並連接棋盤，支援分組變化開關；教練可建立與編輯試下分支，隨對話儲存，不修改實戰棋譜。
+- 新增 Agent 工作量上限，可限制單輪用時、工具呼叫次數及累計搜尋量；達到上限後保留結果並可繼續，預設無限制。
+- Codex / Claude Code 教練可視需要連網查閱資料並提供來源；目前局面的戰術及數值仍以棋盤與引擎證據為準。DeepSeek 暫不提供網頁搜尋。
+- README 及使用、引擎、LLM、開發、發布、架構文件提供五語言版本，並加入 CI 及最新 Release 徽章。
 
 請選擇與你的系統匹配的一個安裝包：
 
