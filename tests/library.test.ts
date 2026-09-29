@@ -1,3 +1,4 @@
+import { useRecordFixture } from './fixtures/presets';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +7,54 @@ import { HistoryLibrary } from '../server/library';
 import { libraryFixture } from './fixtures/library';
 import { newGame, toIndex } from '../shared/go';
 import { trialStoneNumbers } from '../shared/trial';
+import { configurePresets, presetRecord } from '../server/presets';
+import { randomUUID } from 'node:crypto';
+
+it('persists multi-generation source groups, preserves rights, and rejects false ancestry', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'go-lineage-test-'));
+  try {
+    const library = new HistoryLibrary(directory);
+    const source = presetRecord('c0000000-0000-4000-8000-000000000001')!;
+    const branch = {
+      id: randomUUID(),
+      title: '试下',
+      updatedAt: source.updatedAt,
+      sourceId: source.id,
+      groupId: source.id,
+      forkTurn: 2,
+      game: { ...source.game, metadata: { GN: '试下' }, moves: source.game.moves.slice(0, 2) },
+    };
+    const saved = library.saveGame(branch);
+    expect(saved.game.metadata.CP).toBe(source.game.metadata.CP);
+    const child = library.saveGame({
+      ...saved,
+      id: randomUUID(),
+      sourceId: saved.id,
+      forkTurn: 1,
+      game: { ...saved.game, moves: saved.game.moves.slice(0, 1) },
+    });
+    const reopened = new HistoryLibrary(directory);
+    expect(reopened.getGame(child.id)).toMatchObject({
+      sourceId: saved.id,
+      groupId: source.id,
+      forkTurn: 1,
+    });
+    expect(reopened.getGame(source.id).game.moves).toHaveLength(2);
+    expect(() => library.saveGame({ ...branch, id: randomUUID(), groupId: randomUUID() })).toThrow(
+      '不匹配',
+    );
+    expect(() => library.saveGame({ ...branch, id: randomUUID(), forkTurn: 326 })).toThrow('超出');
+    expect(() =>
+      library.saveGame({ ...branch, id: randomUUID(), game: { ...branch.game, moves: [] } }),
+    ).toThrow('超出');
+    expect(() => library.saveGame({ ...saved, sourceId: child.id })).toThrow('不能改变');
+    expect(() =>
+      library.saveGame({ ...branch, id: randomUUID(), game: { ...branch.game, komi: 7.5 } }),
+    ).toThrow('保留');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 it('atomically persists independent records across restarts and rejects illegal game updates', () => {
   const directory = mkdtempSync(join(tmpdir(), 'go-history-test-'));
@@ -79,3 +128,37 @@ it('numbers trials relative to the historical turn, including passes and replaye
     ]),
   );
 });
+
+it('renames persisted branches with missing optional catalogs while keeping source identity', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'go-rename-test-'));
+  const source = presetRecord('c0000000-0000-4000-8000-000000000001')!;
+  try {
+    const library = new HistoryLibrary(directory);
+    const branch = library.saveGame({
+      ...source,
+      preset: undefined,
+      id: randomUUID(),
+      sourceId: source.id,
+      groupId: source.id,
+      forkTurn: 2,
+      game: { ...source.game, moves: source.game.moves.slice(0, 2) },
+    });
+    configurePresets(join(directory, 'absent'));
+    const renamed = library.renameGame(branch.id, '  我的研究  ');
+    expect(renamed.title).toBe('我的研究');
+    expect(renamed.game.metadata.GN).toBe('我的研究');
+    expect(renamed).toMatchObject({ sourceId: source.id, groupId: source.id, forkTurn: 2 });
+    expect(renamed.game.moves).toEqual(branch.game.moves);
+    expect(library.saveGame(renamed)).toEqual(renamed);
+    expect(new HistoryLibrary(directory).getGame(branch.id)).toEqual(renamed);
+    expect(() => library.renameGame(source.id, 'change')).toThrow('只读');
+    expect(() => library.saveGame(source)).toThrow('只读');
+    expect(() => library.renameGame(branch.id, '  ')).toThrow();
+    expect(() => library.renameGame(branch.id, 'x'.repeat(201))).toThrow();
+  } finally {
+    configurePresets(recordFixture.directory);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+const recordFixture = useRecordFixture();

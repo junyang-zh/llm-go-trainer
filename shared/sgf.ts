@@ -130,7 +130,7 @@ export function importSgf(text: string): { game: Game; warnings: string[] } {
   if (pl && pl !== 'B' && pl !== 'W') throw new Error('PL 行棋方无效');
   game.initialPlayer =
     (pl as Color) ?? firstMoveColor ?? (Number(props.HA?.[0] ?? 0) >= 2 ? 'W' : 'B');
-  for (const key of ['PB', 'PW', 'BR', 'WR', 'DT', 'RE', 'EV', 'GN', 'AP', 'HA'])
+  for (const key of ['PB', 'PW', 'BR', 'WR', 'DT', 'RE', 'EV', 'GN', 'AP', 'HA', 'SO', 'CP'])
     if (props[key]) game.metadata[key] = props[key][0];
   let node: SgfNode | undefined = root;
   while (node) {
@@ -180,7 +180,7 @@ export function exportSgf(game: Game): string {
   };
   let text = `(;GM[1]FF[4]CA[UTF-8]AP[llm-go-trainer:0.1]SZ[${game.size}]KM[${game.komi}]RU[${game.rules === 'chinese' ? 'Chinese' : 'Japanese'}]PL[${game.initialPlayer}]`;
   for (const [key, value] of Object.entries(game.metadata))
-    if (['PB', 'PW', 'BR', 'WR', 'DT', 'RE', 'EV', 'GN', 'HA'].includes(key))
+    if (['PB', 'PW', 'BR', 'WR', 'DT', 'RE', 'EV', 'GN', 'HA', 'SO', 'CP'].includes(key))
       text += `${key}[${esc(value)}]`;
   for (const color of ['B', 'W'] as const) {
     const stones = game.initialStones.filter((s) => s.color === color);

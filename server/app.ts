@@ -1,4 +1,7 @@
+import type { RecordSources } from './record-sources';
 import express from 'express';
+import { presetRecord, presetSgf, presetSummary, searchPresets } from './presets';
+import { cwiPresetInfo } from '../shared/presets';
 import { randomUUID } from 'node:crypto';
 import { CoachBudget } from './coach-budget';
 import { HistoryLibrary } from './library';
@@ -28,6 +31,7 @@ export function createApp(
   llm = new LlmSettings(providers),
   library = new HistoryLibrary(),
   models?: KataGoModels,
+  records?: RecordSources,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -68,7 +72,56 @@ export function createApp(
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
+  app.get('/api/library/sources', (_req, res) => res.json(records?.list() ?? []));
+  app.post('/api/library/sources/:id/download', (req, res) => {
+    if (!records) throw new Error('Record downloader unavailable');
+    res.json(records.start(req.params.id));
+  });
+  app.post('/api/library/sources/:id/cancel', async (req, res) => {
+    if (!records) throw new Error('Record downloader unavailable');
+    res.json(await records.cancel(req.params.id));
+  });
+  app.post('/api/library/games/:id/name', (req, res) => {
+    const title = z.string().trim().min(1).max(200).parse(req.body.title);
+    res.json(library.renameGame(z.uuid().parse(req.params.id), title));
+  });
   app.get('/api/library', (_req, res) => res.json(library.snapshot()));
+  app.get('/api/library/presets', (req, res) => {
+    const query = z
+      .object({
+        query: z.string().max(200).default(''),
+        offset: z.coerce.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        groupId: z.uuid().optional(),
+      })
+      .parse(req.query);
+    res.json(searchPresets(query.query, query.offset, query.limit, query.groupId));
+  });
+  app.get('/api/library/presets/:id/sgf', (req, res) => {
+    const id = z.uuid().parse(req.params.id);
+    const sgf = presetSgf(id);
+    const esc = (value: string) => value.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
+    const source = presetSummary(id)!.preset!;
+    const notice = `SO[${esc(source.source + ' · ' + source.sourceUrl)}]CP[${esc(cwiPresetInfo.license + ' ' + cwiPresetInfo.licenseUrl)}]`;
+    res.json({ sgf: sgf.replace(/\(\s*;/, (root) => root + notice) });
+  });
+  app.get('/api/library/presets/:id/summary', (req, res) => {
+    const record = presetSummary(z.uuid().parse(req.params.id));
+    if (!record) {
+      res.status(404).json({ error: '找不到预置棋谱' });
+      return;
+    }
+    res.json(record);
+  });
+  app.get('/api/library/presets/:id', (req, res) => {
+    const record = presetRecord(z.uuid().parse(req.params.id));
+    if (!record) {
+      res.status(404).json({ error: '找不到预置棋谱' });
+      return;
+    }
+    res.json(record);
+  });
+
   app.post('/api/library/games', (req, res) => res.json(library.saveGame(req.body)));
   app.post('/api/library/conversations', (req, res) =>
     res.json(library.saveConversation(req.body)),

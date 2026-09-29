@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { RecordSources } from './record-sources';
 import { HistoryLibrary } from './library';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -60,6 +61,12 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
     resolve(process.env.GO_TRAINER_SETTINGS_DIR || resolve(root, '.local/settings'), 'llm.json'),
   );
   await llm.load();
+  const records = new RecordSources(
+    resolve(process.env.GO_TRAINER_RECORDS_DIR || resolve(root, '.local/records')),
+    process.env.GO_TRAINER_BUNDLED_RECORDS
+      ? resolve(process.env.GO_TRAINER_BUNDLED_RECORDS)
+      : undefined,
+  );
   const app = createApp(
     engine,
     providers,
@@ -71,6 +78,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
       resolve(process.env.GO_TRAINER_HISTORY_DIR || resolve(root, '.local/history')),
     ),
     models,
+    records,
   );
   return new Promise<{
     port: number;
@@ -97,7 +105,7 @@ export async function startServer(port = Number(process.env.PORT ?? 3001)) {
               server.close((error) => (error ? reject(error) : resolve())),
             );
             server.closeAllConnections();
-            await Promise.all([stopped, httpClosed, models.close()]);
+            await Promise.all([stopped, httpClosed, models.close(), records.close()]);
           })()),
       });
     });

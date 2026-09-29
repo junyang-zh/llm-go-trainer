@@ -177,3 +177,17 @@ it('keeps standard updates when no verified model is cached and reevaluates it o
   expect((await controller.check()).downloadEdition).toBe('minimal');
   expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('minimal'));
 });
+
+it('retains the standard feed when a minimal update would remove bundled records', async () => {
+  const { options } = await setup();
+  const updater = new TestUpdater();
+  const controller = new DesktopUpdates({
+    ...options,
+    updater: updater.adapter(),
+    hasCachedModels: async () => true,
+    hasBundledRecords: () => true,
+  });
+  controllers.push(controller);
+  expect((await controller.check()).downloadEdition).toBe('standard');
+  expect(updater.setFeedURL).toHaveBeenLastCalledWith(updateFeed('standard'));
+});

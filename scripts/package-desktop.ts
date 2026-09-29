@@ -1,3 +1,6 @@
+import { prepareRecords } from './prepare-records';
+import { tmpdir } from 'node:os';
+import { cwiSource } from '../server/cwi-source';
 import { copyFile, mkdir, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { build, Platform, Arch } from 'electron-builder';
@@ -5,9 +8,10 @@ import { downloadArtifact } from '../server/download';
 import artifacts from '../config/katago/artifacts.json';
 import bottles from '../config/katago/macos-bottles.json';
 
-const variant = process.argv[2] ?? 'standard';
-if (!['standard', 'minimal'].includes(variant) || process.argv.length > 3)
+const edition = process.argv[2] ?? 'standard';
+if (!['standard', 'minimal'].includes(edition) || process.argv.length > 3)
   throw new Error('Usage: npm run package:desktop -- [standard|minimal]');
+const variant = edition as 'standard' | 'minimal';
 const mac = process.platform === 'darwin' && process.arch === 'arm64';
 const win = process.platform === 'win32' && process.arch === 'x64';
 const requireSigning = mac && process.env.GO_TRAINER_REQUIRE_SIGNING === '1';
@@ -60,6 +64,10 @@ if (variant === 'standard') {
   await copyFile(join(root, 'config/katago/MODEL-LICENSE.txt'), join(staging, 'LICENSE.txt'));
   await copyFile(join(root, 'config/katago/artifacts.json'), join(staging, 'sources.json'));
 }
+const recordResources = await prepareRecords(
+  join(tmpdir(), 'llm-go-trainer-records', cwiSource.artifact.sha256),
+  variant,
+);
 await build({
   projectDir: root,
   targets: mac
@@ -89,6 +97,7 @@ await build({
       { from: join(root, '.local/icons/icon.png'), to: 'app-icon.png' },
       ...(bundleRuntime ? [{ from: runtimeStaging, to: 'katago-runtime' }] : []),
       ...(variant === 'standard' ? [{ from: staging, to: 'katago-models' }] : []),
+      ...recordResources,
     ],
   },
 });

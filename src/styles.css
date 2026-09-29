@@ -1554,6 +1554,7 @@ h2 {
   flex: 1;
   min-width: 0;
   text-align: left;
+  white-space: normal;
 }
 .history-list b,
 .history-list small {
@@ -1649,4 +1650,109 @@ h2 {
   font-size: 12px;
   line-height: 1.6;
   color: #69776c;
+}
+
+.record-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 12px;
+}
+.record-filters [aria-pressed='true'] {
+  background: #294d40;
+  color: white;
+}
+.record-library > input {
+  width: 100%;
+  border: 1px solid #d8ded3;
+  border-radius: 5px;
+  background: #fafbf7;
+  padding: 8px;
+}
+.record-details {
+  font-size: 12px;
+  color: #52624d;
+  line-height: 1.6;
+}
+.record-group h3 {
+  font-size: 14px;
+  margin: 18px 0 6px;
+  overflow-wrap: anywhere;
+}
+.record-entry {
+  min-width: 0;
+  border: 1px solid #dce3d5;
+  border-radius: 8px;
+  background: #fafbf7;
+  padding: 12px;
+}
+.record-details {
+  padding: 0 10px;
+  overflow-wrap: anywhere;
+}
+.record-details p {
+  margin: 8px 0;
+}
+.record-source-link {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #697565;
+}
+.record-source-link a {
+  color: inherit;
+  text-decoration: none;
+}
+.record-source-link a:hover {
+  color: #294d40;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.record-source-link a:focus-visible {
+  outline: 2px solid #294d40;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.record-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.record-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.record-rename input {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid #d8ded3;
+  border-radius: 5px;
+  padding: 8px;
+}
+.record-source {
+  padding: 16px;
+  border: 1px solid #d8ded3;
+  border-radius: 8px;
+  background: #fafbf7;
+  overflow-wrap: anywhere;
+}
+.record-source h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+.record-source p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.record-source progress {
+  width: 100%;
+  margin-bottom: 12px;
 }

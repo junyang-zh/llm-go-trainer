@@ -1,8 +1,10 @@
+import { useRecordFixture } from './fixtures/presets';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import App from '../src/App';
+import { presetRecord, presetSummary, searchPresets } from '../server/presets';
 import { api, streamApi } from '../src/api';
 import type { Library } from '../shared/library';
 import {
@@ -14,6 +16,7 @@ import {
   libraryBotMove,
   libraryCandidateAnalysis,
   captureTrialGame,
+  passedHistoryGame,
 } from './fixtures/library';
 vi.mock('../src/api', () => ({ api: vi.fn(), streamApi: vi.fn() }));
 let root: Root, host: HTMLDivElement, saved: Library;
@@ -31,7 +34,37 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (path, body) => {
     if (path === 'status')
       return { ...chatStatus, engine: { ...chatStatus.engine, ready: engineReady } };
+    if (path === 'library/sources')
+      return [
+        {
+          id: 'cwi',
+          name: 'CWI',
+          url: 'https://homepages.cwi.nl/~aeb/go/games/index.html',
+          count: 96143,
+          sizeBytes: 46246395,
+          state: 'installed',
+          bundled: true,
+        },
+      ];
+    if (path.endsWith('/name')) {
+      const record = saved.games.find((item) => item.id === path.split('/')[2])!;
+      record.title = (body as { title: string }).title;
+      record.game.metadata.GN = record.title;
+      return structuredClone(record);
+    }
     if (path === 'library') return structuredClone(saved);
+    if (path.startsWith('library/presets?')) {
+      const params = new URLSearchParams(path.split('?')[1]);
+      return searchPresets(
+        params.get('query') ?? '',
+        Number(params.get('offset') ?? 0),
+        Number(params.get('limit') ?? 20),
+      );
+    }
+    if (path.startsWith('library/presets/')) {
+      const id = path.split('/')[2];
+      return path.endsWith('/summary') ? presetSummary(id) : presetRecord(id);
+    }
     const kind = path === 'library/games' ? 'games' : 'conversations';
     const record = structuredClone(body) as Library[typeof kind][number];
     (saved[kind] as (typeof record)[]) = [
@@ -337,7 +370,7 @@ it('keeps a conversation across navigation and games, snapshots trial context, r
     libraryFixture.games[0].game.moves,
   );
   expect(host.querySelector('.trial-stone')).toBeNull();
-  await click('历史棋局');
+  await click('棋谱');
   await act(async () =>
     [...host.querySelectorAll('.history-list b')]
       .find((item) => item.textContent === '第二局')!
@@ -427,27 +460,23 @@ it('AI and manual moves from history share a trial branch; forking makes followi
   expect(saved.games[0].game.moves).toHaveLength(5);
   expect(saved.games.find((item) => item.id === firstGameId)!.game.moves).toHaveLength(3);
 });
-it('the home page AI switch and color selector play real moves at the main-line end', async () => {
+it('restored historical games also keep AI moves in trials at the main-line end', async () => {
   engineReady = true;
   await act(async () => root.render(<App />));
   expect(host.querySelector('[aria-label="对局模式"]')).toBeNull();
   await act(async () =>
     (host.querySelector('[aria-label="AI 自动落子"]') as HTMLInputElement).click(),
   );
-  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves.at(-1)).toEqual({
-    color: 'W',
-    point: 'E5',
-  });
+  expect(host.querySelector('[aria-label="E5 试下"]')).not.toBeNull();
+  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves).toHaveLength(3);
   const color = host.querySelector('[aria-label="AI 执子"]') as HTMLSelectElement;
   await act(async () => {
     color.value = 'B';
     color.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves.at(-1)).toEqual({
-    color: 'B',
-    point: 'F5',
-  });
-  expect(host.querySelector('.trial-stone')).toBeNull();
+  expect(host.querySelector('[aria-label="F5 试下"]')).not.toBeNull();
+  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves).toHaveLength(3);
+  expect(host.querySelectorAll('.trial-stone')).toHaveLength(2);
 });
 
 it('inserts quick prompts as editable drafts and only requests coaching after send', async () => {
@@ -527,7 +556,7 @@ it('restores saved coach branches, switches exclusive selectors, jumps across ga
   await click('实战');
   expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('1');
   expect(host.querySelector('.trial-stone')).toBeNull();
-  await click('历史棋局');
+  await click('棋谱');
   await act(async () =>
     [...host.querySelectorAll('.history-list b')]
       .find((el) => el.textContent === '第二局')!
@@ -546,3 +575,117 @@ it('restores saved coach branches, switches exclusive selectors, jumps across ga
   );
   expect(host.querySelector('[data-go-point]')).toBeNull();
 });
+
+it('opening history at its final move creates trials and saving keeps repeated branches in one group', async () => {
+  await act(async () => root.render(<App />));
+  await click('棋谱');
+  await act(async () =>
+    (host.querySelector('.history-list article button') as HTMLButtonElement).click(),
+  );
+  await point('D4');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves).toHaveLength(3);
+  await click('保存试下为新棋局');
+  const branch = saved.games[0];
+  expect(branch).toMatchObject({ sourceId: firstGameId, groupId: firstGameId, forkTurn: 3 });
+  await click('棋谱');
+  expect(host.querySelector('.record-group h3')?.textContent).toContain('同源棋谱组（2）');
+  await act(async () =>
+    (host.querySelector('.history-list article button') as HTMLButtonElement).click(),
+  );
+  await point('E4');
+  await click('保存试下为新棋局');
+  expect(saved.games[0]).toMatchObject({ sourceId: branch.id, groupId: firstGameId, forkTurn: 4 });
+});
+
+it('browses the paginated CWI catalog, removes authored content and never auto-saves originals', async () => {
+  await act(async () => root.render(<App />));
+  const originalCount = saved.games.length;
+  await click('棋谱');
+  expect(host.querySelector('.record-help')).toBeNull();
+  expect(
+    [...host.querySelectorAll('.record-filters button')].some(
+      (button) => button.textContent === '全部',
+    ),
+  ).toBe(false);
+  await click('死活题');
+  expect(host.querySelectorAll('.record-entry')).toHaveLength(0);
+  await click('定式');
+  expect(host.querySelectorAll('.record-entry')).toHaveLength(0);
+  await click('经典名局');
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
+  expect(host.querySelectorAll('.record-entry')).toHaveLength(20);
+  await click('下一页');
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
+  expect(host.querySelector('.record-pagination')?.textContent).toContain('21–40');
+  const search = host.querySelector('input[type="search"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      search,
+      'fixture/1.sgf',
+    );
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
+  expect(host.querySelectorAll('.record-entry')).toHaveLength(1);
+  expect(host.querySelector('.record-details')!.textContent).not.toContain('公共领域');
+  expect(host.querySelector('.record-library')!.textContent).not.toMatch(
+    /使用依据|日本规则终局|000001/,
+  );
+  expect([...host.querySelectorAll('button')].some((button) => button.textContent === '改名')).toBe(
+    false,
+  );
+  await act(async () =>
+    (host.querySelector('.history-list article button') as HTMLButtonElement).click(),
+  );
+  expect((host.querySelector('.timeline') as HTMLInputElement).value).toBe('0');
+  await point('D4');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  expect(saved.games).toHaveLength(originalCount);
+  await click('保存试下为新棋局');
+  expect(saved.games).toHaveLength(originalCount + 1);
+  expect(saved.games[0].sourceId).toBe('c0000000-0000-4000-8000-000000000001');
+  expect(saved.games[0].game.metadata.CP).toContain('公共领域');
+});
+
+it('allows review trials after the historical game ended with two passes', async () => {
+  saved.games[0].game = structuredClone(passedHistoryGame);
+  await act(async () => root.render(<App />));
+  await point('D4');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  expect(saved.games.find((item) => item.id === firstGameId)!.game.moves).toEqual(
+    passedHistoryGame.moves,
+  );
+});
+
+it('renames personal games without changing the review cursor, and shows download sources', async () => {
+  await act(async () => root.render(<App />));
+  await seek(1);
+  await click('棋谱');
+  expect(host.querySelector('.record-library')!.textContent).not.toContain(firstGameId.slice(-6));
+  await click('改名');
+  const input = host.querySelector('[aria-label="棋谱名称"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      '我的复盘',
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('保存名称');
+  expect(
+    saved.games.some((item) => item.title === '我的复盘' && item.game.metadata.GN === '我的复盘'),
+  ).toBe(true);
+  expect((host.querySelector('.timeline') as HTMLInputElement).value).toBe('1');
+  await click('下载棋谱');
+  expect(host.querySelector('.record-source')!.textContent).toContain('已随应用预置');
+  expect(host.querySelector('.record-source')!.textContent).toContain('96,143');
+});
+
+const recordFixture = useRecordFixture();

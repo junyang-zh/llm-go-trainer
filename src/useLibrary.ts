@@ -1,3 +1,4 @@
+import { recordGroupId } from '../shared/library';
 import { t } from './i18n';
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { api } from './api';
@@ -19,6 +20,9 @@ export function useLibrary(initialGame: Game) {
   const [games, setGames] = useState<SavedGame[]>([]);
   const [gameId, setGameId] = useState<string>(() => crypto.randomUUID());
   const [game, setGame] = useState(initialGame);
+  const [review, setReview] = useState(false);
+  const [lineage, setLineage] = useState<Pick<SavedGame, 'groupId' | 'sourceId' | 'forkTurn'>>({});
+  const [presets, setPresets] = useState<SavedGame[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>(() => [conversation()]);
   const [conversationId, setConversationId] = useState(conversations[0].id);
   const [ready, setReady] = useState(false);
@@ -52,6 +56,8 @@ export function useLibrary(initialGame: Game) {
         if (last) {
           setGame(last.game);
           setGameId(last.id);
+          setReview(true);
+          setLineage({ groupId: last.groupId, sourceId: last.sourceId, forkTurn: last.forkTurn });
         }
         if (data.conversations.length) {
           const restored = data.conversations.map((item) => ({
@@ -77,8 +83,9 @@ export function useLibrary(initialGame: Game) {
     };
   }, [loadAttempt]);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || review) return;
     const record = {
+      ...lineage,
       id: gameId,
       title: gameTitle(game),
       game,
@@ -86,7 +93,7 @@ export function useLibrary(initialGame: Game) {
     };
     setGames((items) => [record, ...items.filter((item) => item.id !== gameId)]);
     save('library/games', record);
-  }, [game, gameId, ready]);
+  }, [game, gameId, ready, review, lineage]);
   const activeConversation = conversations.find((item) => item.id === conversationId)!;
   useEffect(() => {
     if (ready) save('library/conversations', activeConversation);
@@ -115,7 +122,8 @@ export function useLibrary(initialGame: Game) {
     game,
     setGame,
     gameId,
-    games,
+    games: [...games, ...presets],
+    review,
     ready,
     error,
     conversations,
@@ -136,11 +144,47 @@ export function useLibrary(initialGame: Game) {
       setConversations((items) => [item, ...items]);
       setConversationId(item.id);
     },
+    async renameGame(id: string, title: string) {
+      await flush();
+      const renamed = await api<SavedGame>(`library/games/${id}/name`, { title });
+      setGames((items) => items.map((item) => (item.id === id ? renamed : item)));
+      if (id === gameId)
+        setGame((value) => ({ ...value, metadata: { ...value.metadata, GN: renamed.title } }));
+    },
+    async findGame(id: string) {
+      const found = [...games, ...presets].find((item) => item.id === id);
+      if (found || !id.startsWith('c0000000-')) return found;
+      return api<SavedGame>(`library/presets/${encodeURIComponent(id)}`);
+    },
     selectGame(item: SavedGame) {
+      if (item.preset)
+        setPresets((items) => [item, ...items.filter((value) => value.id !== item.id)]);
+      setReview(true);
+      setLineage({ groupId: item.groupId, sourceId: item.sourceId, forkTurn: item.forkTurn });
       setGame(item.game);
       setGameId(item.id);
     },
-    newGame(value: Game) {
+    newGame(value: Game, source?: SavedGame, forkTurn?: number, asReview = false) {
+      setReview(false);
+      const ancestry = source
+        ? { groupId: recordGroupId(source), sourceId: source.id, forkTurn }
+        : {};
+      setLineage(ancestry);
+      if (asReview) {
+        const record = {
+          id: crypto.randomUUID(),
+          game: value,
+          title: gameTitle(value),
+          updatedAt: new Date().toISOString(),
+          ...ancestry,
+        };
+        setGames((items) => [record, ...items]);
+        save('library/games', record);
+        setGame(value);
+        setGameId(record.id);
+        setReview(true);
+        return;
+      }
       setGame(value);
       setGameId(crypto.randomUUID());
     },

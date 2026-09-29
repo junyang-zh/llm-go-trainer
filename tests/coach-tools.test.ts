@@ -1,3 +1,4 @@
+import { useRecordFixture } from './fixtures/presets';
 import { expect, it, vi } from 'vitest';
 import { defaultCoachLimits, type CoachLimits } from '../shared/llm';
 import { CoachTools } from '../server/coach-tools';
@@ -186,6 +187,38 @@ it('queries another historical game and reports the current user trial separatel
   expect(engine.analyze).not.toHaveBeenCalled();
 });
 
+it('searches bundled records by category and keywords, paginates and reads attributed positions', async () => {
+  const { HistoryLibrary } = await import('../server/library');
+  const library = new HistoryLibrary();
+  const { engine } = harness();
+  const tools = new CoachTools(engine, recordedGame, trainingForRank('5k'), undefined, undefined, {
+    library,
+  });
+  const result = await tools.run('query_game_history', {
+    category: 'famous',
+    query: 'fixture/1.sgf',
+  });
+  expect(result.data.total).toBe(1);
+  const [record] = result.data.games as { id: string; preset: { sourceUrl: string } }[];
+  expect(record.preset.sourceUrl).toContain('fixture/1.sgf');
+  const detail = await tools.run('query_game_history', { gameId: record.id, turn: 1 });
+  expect(detail.data.turn).toBe(1);
+  expect(detail.data.position).toBeDefined();
+  expect((detail.data.game as import('../shared/types').Game).moves).toHaveLength(2);
+  const page = await tools.run('query_game_history', {
+    category: 'famous',
+    query: 'Fixture',
+    offset: 1,
+    limit: 1,
+  });
+  expect(page.data.total).toBeGreaterThan(20);
+  expect(page.data.games).toHaveLength(1);
+  expect(
+    (await tools.run('query_game_history', { category: 'joseki', query: '找不到' })).data.total,
+  ).toBe(0);
+  expect(engine.analyze).not.toHaveBeenCalled();
+});
+
 it('atomically edits, forks, truncates and deletes legal coach trials without changing the real game', async () => {
   const { tools, events, engine } = harness();
   const initial = structuredClone(whiteAtari);
@@ -284,3 +317,5 @@ it('leaves calls and cumulative searches unlimited by default', async () => {
   expect(engine.analyze).toHaveBeenCalledTimes(4);
   expect(tools.available).toBe(true);
 });
+
+const recordFixture = useRecordFixture();

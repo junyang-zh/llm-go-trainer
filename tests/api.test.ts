@@ -1,3 +1,4 @@
+import { useRecordFixture } from './fixtures/presets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, request, type Server } from 'node:http';
 import { resolve } from 'node:path';
@@ -248,3 +249,24 @@ it('saves independent library records and validates the coach board context agai
   );
   expect((await post('/api/library/games', { ...saved, id: '../bad' })).status).toBe(400);
 });
+
+it('serves bounded CWI summary pages, details, provenance exports and rejects preset writes', async () => {
+  const page = await (await fetch(base + '/api/library/presets?limit=2')).json();
+  expect(page.total).toBe(41);
+  expect(page.games).toHaveLength(2);
+  expect(page.games[0].game).toBeUndefined();
+  expect((await fetch(base + '/api/library/presets?limit=10000')).status).toBe(400);
+  const id = 'c0000000-0000-4000-8000-000000000001';
+  const summary = await (await fetch(base + `/api/library/presets/${id}/summary`)).json();
+  expect(summary.moves).toBe(2);
+  const record = await (await fetch(base + `/api/library/presets/${id}`)).json();
+  expect(record.game.moves).toHaveLength(2);
+  const exported = await (await fetch(base + `/api/library/presets/${id}/sgf`)).json();
+  expect(exported.sgf).toContain('CP[');
+  expect(exported.sgf).toContain('SO[');
+  expect((await post('/api/library/games', record)).ok).toBe(false);
+  const unknown = 'c0000000-0000-4000-8000-000000000003';
+  expect((await fetch(base + `/api/library/presets/${unknown}`)).status).toBe(404);
+});
+
+const recordFixture = useRecordFixture();

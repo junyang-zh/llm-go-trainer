@@ -24,6 +24,40 @@ export interface SavedGame {
   title: string;
   updatedAt: string;
   game: Game;
+  // The root ID identifies the group; roots need no rewrite when their first branch is saved.
+  groupId?: string;
+  sourceId?: string;
+  forkTurn?: number;
+  preset?: PresetInfo;
+}
+export type RecordCategory = 'history' | 'famous' | 'joseki' | 'tsumego';
+export interface PresetInfo {
+  category: Exclude<RecordCategory, 'history'>;
+  description: string;
+  tags: string[];
+  source: string;
+  sourceUrl?: string;
+  license: string;
+  licenseUrl?: string;
+}
+export const recordGroupId = (record: Pick<SavedGame, 'id' | 'groupId'>) =>
+  record.groupId ?? record.id;
+export function matchesRecord(record: SavedGame, query: string) {
+  const text = [
+    record.title,
+    ...Object.values(record.game.metadata),
+    record.preset?.description,
+    ...(record.preset?.tags ?? []),
+  ]
+    .join(' ')
+    .normalize('NFKC')
+    .toLowerCase();
+  return query
+    .normalize('NFKC')
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .every((word) => text.includes(word));
 }
 export interface Conversation {
   id: string;

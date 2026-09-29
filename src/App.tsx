@@ -9,6 +9,7 @@ import {
   type MessageKey,
 } from './i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RecordLibrary } from './RecordLibrary';
 import { useLibrary } from './useLibrary';
 import { type BoardContext } from '../shared/library';
 import { extendTrial, trialStoneNumbers, trialVariation, type TrialBranch } from '../shared/trial';
@@ -353,7 +354,7 @@ export default function App() {
   ]);
   function appendMove(move: Move) {
     play(position, move, game.size, game.rules);
-    if (turn < game.moves.length || trial) {
+    if (library.review || turn < game.moves.length || trial) {
       setTrial((previous) => extendTrial(previous, [move]));
       setError('');
       setDead([]);
@@ -370,7 +371,11 @@ export default function App() {
     delete branch.metadata.RE;
     invalidate();
     evaluations.reset();
-    library.newGame(branch);
+    library.newGame(
+      branch,
+      library.games.find((item) => item.id === library.gameId),
+      turn,
+    );
     setTurn(branch.moves.length);
     setNotice({ kind: 'fork' });
   }
@@ -389,7 +394,10 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  function selectCoach(message: AnalysisMessage, link: Extract<CoachLink, { kind: 'selector' }>) {
+  async function selectCoach(
+    message: AnalysisMessage,
+    link: Extract<CoachLink, { kind: 'selector' }>,
+  ) {
     if (lock.current) return;
     if (activeCoach?.message === message.id && activeCoach.group === link.group) {
       setCoachSelection(undefined);
@@ -402,7 +410,7 @@ export default function App() {
           : undefined;
       if (link.branch && !branch) throw new Error(t('trialMissing'));
       const gameId = branch?.gameId ?? message.context?.gameId;
-      const saved = library.games.find((item) => item.id === gameId);
+      const saved = await library.findGame(gameId ?? '');
       if (!saved) throw new Error(t('coachGameMissing'));
       const source = saved.id === library.gameId ? game : saved.game;
       const baseTurn = branch?.baseTurn ?? link.turn ?? message.context!.turn;
@@ -412,6 +420,8 @@ export default function App() {
       let cursor: number;
       if (branch) {
         const expected = { ...branch.base, moves: branch.base.moves.slice(0, baseTurn) };
+        // A display-name change does not invalidate an existing coach variation.
+        expected.metadata = { ...expected.metadata, GN: base.metadata.GN };
         if (JSON.stringify(expected) !== JSON.stringify(base))
           throw new Error(t('trialGameChanged'));
         const prefix = branch.base.moves.slice(baseTurn);
@@ -465,7 +475,7 @@ export default function App() {
       );
       return;
     }
-    if (position.passes >= 2) {
+    if (position.passes >= 2 && !library.review) {
       setError(t('bothPlayersHavePassed'));
       return;
     }
@@ -598,7 +608,8 @@ export default function App() {
       const imported = importSgf(decodeSgf(await file.arrayBuffer()));
       invalidate();
       evaluations.reset();
-      library.newGame(imported.game);
+      setAutoPlay(false);
+      library.newGame(imported.game, undefined, undefined, true);
       setTurn(imported.game.moves.length);
       setShowGames(false);
       setNotice({
@@ -839,7 +850,10 @@ export default function App() {
                 v2: game.komi,
               })}
             </div>
-            <div className="trial-bar" aria-hidden={turn === game.moves.length && !trial}>
+            <div
+              className="trial-bar"
+              aria-hidden={!library.review && turn === game.moves.length && !trial}
+            >
               <span>
                 {trial
                   ? t('trialProgress', { v0: turn, v1: trial.cursor, v2: trial.moves.length })
@@ -1020,10 +1034,6 @@ export default function App() {
                           ? t('trialMoves', { v0: message.context.trialMoves.length })
                           : '',
                     })}
-                    <small title={message.context.gameId}>
-                      {' '}
-                      · {message.context.gameId.slice(0, 8)}
-                    </small>
                   </div>
                 )}
                 <div className="chat-question">
@@ -1333,46 +1343,34 @@ export default function App() {
         </Dialog>
       )}
       {showGames && (
-        <Dialog title={t('gameHistory')} onClose={() => setShowGames(false)}>
-          <div className="history-actions">
-            <button disabled={locked} onClick={() => fileInput.current?.click()}>
-              {t('importSgf')}
-            </button>
-            <span>{t('autoSavedGames', { v0: library.games.length })}</span>
-          </div>
-          <div className="history-list">
-            {library.games.map((item) => (
-              <article key={item.id}>
-                <button
-                  disabled={locked}
-                  aria-pressed={item.id === library.gameId}
-                  onClick={() => {
-                    invalidate();
-                    evaluations.reset();
-                    library.selectGame(item);
-                    setTurn(item.game.moves.length);
-                    setShowGames(false);
-                  }}
-                >
-                  <b>{gameTitle(item.game)}</b>
-                  <small>
-                    {t('gameHistoryEntry', {
-                      v0: item.game.moves.length,
-                      v1: formatDate(item.updatedAt),
-                      v2: item.id.slice(0, 8),
-                    })}
-                  </small>
-                </button>
-                <button
-                  onClick={() =>
-                    download(`${item.id}.sgf`, exportSgf(item.game), 'application/x-go-sgf')
-                  }
-                >
-                  {t('exportSgf')}
-                </button>
-              </article>
-            ))}
-          </div>
+        <Dialog title={t('gameHistory')} wide onClose={() => setShowGames(false)}>
+          <RecordLibrary
+            games={library.games}
+            selectedId={library.gameId}
+            disabled={locked}
+            onImport={() => fileInput.current?.click()}
+            onRename={library.renameGame}
+            onExport={(item) =>
+              download(
+                `${item.title.replace(/[\\/:*?"<>|]/g, '_')}.sgf`,
+                exportSgf(item.game),
+                'application/x-go-sgf',
+              )
+            }
+            onSelect={(item) => {
+              invalidate();
+              evaluations.reset();
+              setAutoPlay(false);
+              library.selectGame(item);
+              setTurn(item.preset ? 0 : item.game.moves.length);
+              // The game-ID effect also handles first-time preset selection.
+              pendingCoach.current =
+                item.id !== library.gameId
+                  ? { turn: item.preset ? 0 : item.game.moves.length, trial: null }
+                  : null;
+              setShowGames(false);
+            }}
+          />
         </Dialog>
       )}
       {showConversations && (

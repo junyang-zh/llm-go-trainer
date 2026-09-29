@@ -35,6 +35,7 @@ interface Options {
   updater?: AppUpdater;
   beforeInstall: () => Promise<void>;
   hasCachedModels?: () => Promise<boolean>;
+  hasBundledRecords?: () => boolean;
 }
 export class DesktopUpdates {
   private state: UpdateStatus;
@@ -162,7 +163,10 @@ export class DesktopUpdates {
     this.task = Promise.resolve()
       .then(async () => {
         try {
-          const reusesModels = (await this.options.hasCachedModels?.()) ?? false;
+          // Keep bundled records when updating a standard installation.
+          const reusesModels =
+            !this.options.hasBundledRecords?.() &&
+            ((await this.options.hasCachedModels?.()) ?? false);
           const edition = reusesModels ? 'minimal' : this.options.edition;
           if (edition !== this.downloadEdition) {
             this.options.updater!.setFeedURL(updateFeed(edition));

@@ -1,3 +1,6 @@
+import { matchesRecord } from '../shared/library';
+import { searchPresets } from './presets';
+import { summarizeRecord } from '../shared/presets';
 import { defaultCoachLimits, type CoachLimits } from '../shared/llm';
 import type { CoachBudget } from './coach-budget';
 import type { BoardContext } from '../shared/library';
@@ -51,7 +54,17 @@ export const coachToolSchemas = {
     .strict(),
   query_game_history: z
     .object({
-      gameId: z.uuid().optional().describe('省略时列出历史棋局；提供 ID 时读取该棋局'),
+      gameId: z.uuid().optional().describe('省略时搜索棋谱；提供 ID 时读取历史或预置棋谱'),
+      query: z
+        .string()
+        .max(200)
+        .default('')
+        .describe('按名称、棋手、关键词搜索；空格分隔多个关键词'),
+      category: z
+        .enum(['all', 'history', 'famous', 'joseki', 'tsumego'])
+        .default('history')
+        .describe('history 历史对局；famous CWI 全库；joseki 定式；tsumego 死活；all 全部'),
+      groupId: z.uuid().optional().describe('仅查询指定同源棋谱组'),
       turn: z
         .number()
         .int()
@@ -82,7 +95,7 @@ const descriptions = {
   edit_trial:
     '创建、修改或删除讲解用的试下分支，不修改实战棋谱。可从当前局面（含用户试下）、原局某手或本轮已有分支某手开始。合法性检查成功后保存到对话并返回可点击的 Markdown selector 链接；用户点击才切换棋盘。',
   query_game_history:
-    '查询本地历史棋局列表或按棋局 ID 读取完整棋谱及指定手数的棋盘。返回当前选中的棋局 ID、原局手数及用户试下手顺；历史棋局和对话独立。',
+    '搜索本地历史对局和预置著名棋谱、定式、死活题；支持 query、category、groupId 和分页。按 gameId 读取完整棋谱、来源版权和指定手数的棋盘。返回当前选中的棋局 ID、原局手数及用户试下手顺；历史棋局和对话独立。',
   inspect_position:
     '查看当前或试下后的棋盘、棋块和气。可指定 point 检查一块棋；试下只作用于本次查询，不改变实战棋谱。',
   analyze_variation:
@@ -166,7 +179,7 @@ export class CoachTools {
         name === 'edit_trial'
           ? '编辑试下'
           : name === 'query_game_history'
-            ? '查询棋局历史'
+            ? '搜索棋谱'
             : name === 'inspect_position'
               ? '检查棋块'
               : '搜索变化',
@@ -272,14 +285,30 @@ export class CoachTools {
             position: positionFacts({ ...saved.game, moves: saved.game.moves.slice(0, turn) }),
           };
         } else {
-          const games = this.session.library
-            .snapshot()
-            .games.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+          const history = ['all', 'history'].includes(args.category)
+            ? this.session.library
+                .snapshot()
+                .games.filter(
+                  (item) =>
+                    (!args.groupId || (item.groupId ?? item.id) === args.groupId) &&
+                    matchesRecord(item, args.query),
+                )
+                .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
+            : [];
+          const historicalPage = history
+            .slice(args.offset, args.offset + args.limit)
+            .map(summarizeRecord);
+          const presets = ['all', 'famous'].includes(args.category)
+            ? searchPresets(
+                args.query,
+                Math.max(0, args.offset - history.length),
+                args.limit - historicalPage.length,
+                args.groupId,
+              )
+            : { total: 0, games: [] };
           data = {
-            total: games.length,
-            games: games
-              .slice(args.offset, args.offset + args.limit)
-              .map(({ game, ...item }) => ({ ...item, size: game.size, moves: game.moves.length })),
+            total: history.length + presets.total,
+            games: [...historicalPage, ...presets.games],
           };
         }
         result = {

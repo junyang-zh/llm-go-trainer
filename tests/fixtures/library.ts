@@ -54,3 +54,11 @@ export function libraryCandidateAnalysis(game: import('../../shared/types').Game
   ];
   return analysis;
 }
+
+export const passedHistoryGame = {
+  ...newGame(9),
+  moves: [
+    { color: 'B' as const, point: 'pass' },
+    { color: 'W' as const, point: 'pass' },
+  ],
+};
