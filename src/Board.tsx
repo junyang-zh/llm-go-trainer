@@ -177,6 +177,7 @@ export function Board({
             )}
             <rect
               className="point-target"
+              data-board-point={toPoint(i, size)}
               x={x - 15.5}
               y={y - 15.5}
               width="31"

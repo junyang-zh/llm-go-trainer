@@ -6,6 +6,26 @@ export interface TrialBranch {
   cursor: number;
 }
 
+// A coach line owns an immutable starting position, including any user trial prefix.
+export interface CoachTrial {
+  id: string;
+  label: string;
+  gameId?: string;
+  baseTurn: number;
+  base: Game;
+  moves: Move[];
+}
+
+export function editCoachTrial(base: Game, prefix: Move[], ply: number, points: string[]): Move[] {
+  if (!Number.isInteger(ply) || ply < 0 || ply > prefix.length) throw new Error('试下手数超出范围');
+  const kept = prefix.slice(0, ply);
+  const moves = trialVariation(
+    { ...base, moves: [...base.moves, ...kept] },
+    points.map((p) => (p.toLowerCase() === 'pass' ? 'pass' : p.toUpperCase())),
+  );
+  return [...kept, ...moves];
+}
+
 // Navigation only changes the cursor; playing a new line replaces the recoverable suffix.
 export function extendTrial(branch: TrialBranch | null, moves: Move[]): TrialBranch {
   const next = [...(branch?.moves.slice(0, branch.cursor) ?? []), ...moves];

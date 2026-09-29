@@ -6,6 +6,7 @@ import { groupAt, other, play, replay, toIndex, toPoint } from '../shared/go';
 import type { Analysis, Game, Move, ToolActivity, Training } from '../shared/types';
 import type { AnalysisEngine } from './engine';
 import { compact, positionFacts } from './evidence';
+import { editCoachTrial, type CoachTrial } from '../shared/trial';
 
 const context = {
   base: z.enum(['current', 'before']).default('current').describe('从当前局面或最后一手之前开始'),
@@ -17,6 +18,35 @@ const context = {
   point: z.string().max(4).optional().describe('需要重点观察的棋块坐标'),
 };
 export const coachToolSchemas = {
+  edit_trial: z
+    .object({
+      id: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]{1,40}$/)
+        .describe('本轮讲解中的稳定分支 ID；重复 ID 原子替换，失败保留原分支'),
+      label: z.string().trim().min(1).max(80).default('试下变化'),
+      operation: z.enum(['set', 'delete']).default('set'),
+      base: z.enum(['current', 'main', 'branch']).default('current'),
+      turn: z.number().int().min(0).max(1500).optional().describe('base=main 时指定原局起点手数'),
+      source: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]{1,40}$/)
+        .optional()
+        .describe('base=branch 时指定本轮已创建的分支 ID'),
+      ply: z
+        .number()
+        .int()
+        .min(0)
+        .max(1500)
+        .optional()
+        .describe('base=branch 时保留前几手，再用 moves 替换后缀；省略则追加'),
+      moves: z
+        .array(z.string().max(4))
+        .max(60)
+        .default([])
+        .describe('从起点依次试下，自动交替颜色；空数组可截断分支'),
+    })
+    .strict(),
   query_game_history: z
     .object({
       gameId: z.uuid().optional().describe('省略时列出历史棋局；提供 ID 时读取该棋局'),
@@ -47,6 +77,8 @@ export const coachToolSchemas = {
     .strict(),
 };
 const descriptions = {
+  edit_trial:
+    '创建、修改或删除讲解用的试下分支，不修改实战棋谱。可从当前局面（含用户试下）、原局某手或本轮已有分支某手开始。合法性检查成功后保存到对话并返回可点击的 Markdown selector 链接；用户点击才切换棋盘。',
   query_game_history:
     '查询本地历史棋局列表或按棋局 ID 读取完整棋谱及指定手数的棋盘。返回当前选中的棋局 ID、原局手数及用户试下手顺；历史棋局和对话独立。',
   inspect_position:
@@ -70,6 +102,7 @@ export class CoachTools {
   private calls = 0;
   private visits = 0;
   private cache = new Map<string, Analysis>();
+  private trials = new Map<string, CoachTrial>();
   readonly results: { name: string; arguments: unknown; result: CoachToolResult }[] = [];
   readonly signal: AbortSignal;
 
@@ -112,11 +145,13 @@ export class CoachTools {
       id,
       name,
       label:
-        name === 'query_game_history'
-          ? '查询棋局历史'
-          : name === 'inspect_position'
-            ? '检查棋块'
-            : '搜索变化',
+        name === 'edit_trial'
+          ? '编辑试下'
+          : name === 'query_game_history'
+            ? '查询棋局历史'
+            : name === 'inspect_position'
+              ? '检查棋块'
+              : '搜索变化',
       state: 'running',
     };
     const emit = (patch: Partial<ToolActivity>) => {
@@ -126,6 +161,79 @@ export class CoachTools {
     let result: CoachToolResult;
     try {
       if (++this.calls > 12) throw new Error('本次工具调用额度已用完，请依据已有结果完成讲解');
+      if (name === 'edit_trial') {
+        const args = coachToolSchemas.edit_trial.parse(raw);
+        let branch: CoachTrial | null = null;
+        if (args.operation === 'delete') {
+          if (!this.trials.has(args.id)) throw new Error('找不到本轮试下分支');
+        } else {
+          let base = this.game;
+          let baseTurn = this.session?.context?.turn ?? this.game.moves.length;
+          let prefix: Move[] = [];
+          let ply = 0;
+          if (args.base === 'main') {
+            if (args.turn === undefined || args.source !== undefined || args.ply !== undefined)
+              throw new Error('原局起点需要 turn，不能带 source 或 ply');
+            const original = this.session?.context
+              ? this.session.library.getGame(this.session.context.gameId).game
+              : this.game;
+            if (args.turn > original.moves.length) throw new Error('原局手数超出范围');
+            base = { ...original, moves: original.moves.slice(0, args.turn) };
+            baseTurn = args.turn;
+          } else if (args.base === 'branch') {
+            if (!args.source || args.turn !== undefined)
+              throw new Error('分支起点需要 source，不能带 turn');
+            const source = this.trials.get(args.source);
+            if (!source) throw new Error('找不到本轮试下分支');
+            base = source.base;
+            baseTurn = source.baseTurn;
+            prefix = source.moves;
+            ply = args.ply ?? prefix.length;
+          } else if (
+            args.turn !== undefined ||
+            args.source !== undefined ||
+            args.ply !== undefined
+          ) {
+            throw new Error('当前局面起点不能带 turn、source 或 ply');
+          }
+          const moves = editCoachTrial(base, prefix, ply, args.moves);
+          if (base.moves.length + moves.length > 1500) throw new Error('试下总手数超出范围');
+          branch = {
+            id: args.id,
+            label: args.label,
+            gameId: this.session?.context?.gameId,
+            baseTurn,
+            base: structuredClone(base),
+            moves,
+          };
+        }
+        signal.throwIfAborted();
+        if (branch) this.trials.set(args.id, branch);
+        else this.trials.delete(args.id);
+        result = {
+          data: {
+            branch,
+            id: args.id,
+            ...(branch
+              ? {
+                  selector: `[${args.label.replace(/[\[\]\\]/g, '')}](#go/selector/${args.id}?branch=${args.id}&ply=0)`,
+                  position: positionFacts({
+                    ...branch.base,
+                    moves: [...branch.base.moves, ...branch.moves],
+                  }),
+                }
+              : {}),
+            remainingCalls: Math.max(0, 12 - this.calls),
+          },
+        };
+        emit({
+          state: 'done',
+          trialEdit: { id: args.id, branch },
+          detail: branch ? `${branch.label} · ${branch.moves.length} 手` : '分支已删除',
+        });
+        this.results.push({ name, arguments: raw, result });
+        return result;
+      }
       if (name === 'query_game_history') {
         const args = coachToolSchemas.query_game_history.parse(raw);
         if (!this.session) throw new Error('历史棋局库不可用');

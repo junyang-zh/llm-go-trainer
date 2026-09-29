@@ -465,3 +465,84 @@ it('inserts quick prompts as editable drafts and only requests coaching after se
   expect(vi.mocked(streamApi).mock.calls[0][1]).toMatchObject({ action: 'variation' });
   expect(input.value).toBe('');
 });
+
+it('restores saved coach branches, switches exclusive selectors, jumps across games and keeps edits out of the main line', async () => {
+  const base = structuredClone(saved.games[0].game);
+  vi.mocked(streamApi).mockImplementation(async (_path, _body, emit) => {
+    emit({
+      type: 'tool',
+      activity: {
+        id: 'create',
+        name: 'edit_trial',
+        label: '编辑试下',
+        state: 'done',
+        trialEdit: {
+          id: 'line',
+          branch: {
+            id: 'line',
+            label: '变化',
+            gameId: firstGameId,
+            baseTurn: 3,
+            base,
+            moves: [
+              { color: 'W', point: 'D4' },
+              { color: 'B', point: 'E4' },
+            ],
+          },
+        },
+      },
+    });
+    emit({
+      type: 'done',
+      analysis: null,
+      answer:
+        '[起点](#go/selector/a?branch=line&ply=0) [走一手](#go/selector/b?branch=line&ply=1) [实战](#go/selector/c?turn=1) [坏分支](#go/selector/bad?branch=missing) [D4](#go/point/D4?group=a) [E4](#go/point/E4?group=b)',
+    });
+  });
+  await act(async () => root.render(<App />));
+  await click('当前局势');
+  await click('发送');
+  await click('起点');
+  const anchor = host.querySelector<HTMLElement>('[data-go-point="D4"]')!;
+  anchor.focus();
+  await act(async () => root.render(<App />));
+  expect(document.activeElement).toBe(anchor);
+  expect(host.querySelector('[data-go-point="D4"]')).not.toBeNull();
+  expect(host.querySelector('[data-go-point="E4"]')).toBeNull();
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('3');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.max).toBe('5');
+  await click('走一手');
+  expect(host.querySelector('[data-go-point="D4"]')).toBeNull();
+  expect(host.querySelector('[data-go-point="E4"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  expect(host.querySelectorAll('.coach-selector[aria-pressed="true"]')).toHaveLength(1);
+  await click('走一手');
+  expect(host.querySelector('[data-go-point]')).toBeNull();
+  await click('走一手');
+  await point('F4');
+  expect(host.querySelectorAll('.coach-selector[aria-pressed="true"]')).toHaveLength(0);
+  expect(saved.games.find((g) => g.id === firstGameId)!.game).toEqual(base);
+  await click('坏分支');
+  expect(host.querySelector('.workspace-status')!.textContent).toContain('尚未生成或已删除');
+  await click('实战');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('1');
+  expect(host.querySelector('.trial-stone')).toBeNull();
+  await click('历史棋局');
+  await act(async () =>
+    [...host.querySelectorAll('.history-list b')]
+      .find((el) => el.textContent === '第二局')!
+      .parentElement!.click(),
+  );
+  await click('走一手');
+  expect(host.querySelector<HTMLInputElement>('.timeline')!.value).toBe('4');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await act(async () => root.render(<App />));
+  await click('走一手');
+  expect(host.querySelector('[aria-label="D4 试下"]')).not.toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="收起对话面板"]')!.click(),
+  );
+  expect(host.querySelector('[data-go-point]')).toBeNull();
+});

@@ -14,6 +14,7 @@ export interface AnalysisMessage {
   state: 'running' | 'done' | 'stopped' | 'error';
   evaluations: Partial<Record<AnalysisPhase, { analysis: Analysis; final: boolean }>>;
   tools?: ToolActivity[];
+  trials?: Record<string, import('./trial').CoachTrial>;
   context?: BoardContext;
   createdAt?: string;
 }

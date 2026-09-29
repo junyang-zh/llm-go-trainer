@@ -85,6 +85,7 @@ export interface ToolActivity {
   moves?: Move[];
   detail?: string;
   elapsedMs?: number;
+  trialEdit?: { id: string; branch: import('./trial').CoachTrial | null };
   evaluation?: { visits: number; winrate: number; scoreLead: number; pv: Move[] };
 }
 export type StreamEvent =

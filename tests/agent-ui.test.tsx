@@ -59,3 +59,40 @@ it('preserves completed tools but marks remaining work failed when the provider 
   message = updateMessage(message, { type: 'error', error: '连接中断' });
   expect(message.tools?.map((tool) => tool.state)).toEqual(['done', 'error']);
 });
+
+it('persists only successful trial edits and ignores late edits after cancellation', async () => {
+  const { newGame } = await import('../shared/go');
+  const branch = {
+    id: 'line',
+    label: '变化',
+    baseTurn: 0,
+    base: newGame(9),
+    moves: [{ color: 'B' as const, point: 'D4' }],
+  };
+  const edit: ToolActivity = {
+    id: 'edit',
+    name: 'edit_trial',
+    label: '编辑',
+    state: 'done',
+    trialEdit: { id: 'line', branch },
+  };
+  let message = updateMessage(initial, { type: 'tool', activity: edit });
+  expect(message.trials?.line).toEqual(branch);
+  message = updateMessage(message, {
+    type: 'tool',
+    activity: { ...edit, id: 'failed', state: 'error', trialEdit: { id: 'line', branch: null } },
+  });
+  expect(message.trials?.line).toEqual(branch);
+  const stopped = finishMessage(message, 'stopped', '已停止');
+  expect(
+    updateMessage(stopped, {
+      type: 'tool',
+      activity: { ...edit, id: 'late', trialEdit: { id: 'line', branch: null } },
+    }),
+  ).toBe(stopped);
+  message = updateMessage(message, {
+    type: 'tool',
+    activity: { ...edit, id: 'delete', trialEdit: { id: 'line', branch: null } },
+  });
+  expect(message.trials).toEqual({});
+});

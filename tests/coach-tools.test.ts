@@ -172,3 +172,86 @@ it('queries another historical game and reports the current user trial separatel
   expect(current.data.currentContext).toEqual(context);
   expect(engine.analyze).not.toHaveBeenCalled();
 });
+
+it('atomically edits, forks, truncates and deletes legal coach trials without changing the real game', async () => {
+  const { tools, events, engine } = harness();
+  const initial = structuredClone(whiteAtari);
+  const create = await tools.run('edit_trial', { id: 'a', moves: ['d5', 'E5'] });
+  expect(create.isError).toBeUndefined();
+  expect(create.data.selector).toContain('#go/selector/a?branch=a&ply=0');
+  expect(events.at(-1)?.trialEdit?.branch?.moves.map((m) => m.point)).toEqual(['D5', 'E5']);
+  const failed = await tools.run('edit_trial', {
+    id: 'a',
+    base: 'branch',
+    source: 'a',
+    ply: 1,
+    moves: ['D4'],
+  });
+  expect(failed.isError).toBe(true);
+  expect(events.at(-1)?.trialEdit).toBeUndefined();
+  const fork = await tools.run('edit_trial', {
+    id: 'b',
+    base: 'branch',
+    source: 'a',
+    moves: ['pass'],
+  });
+  expect(
+    (fork.data.branch as import('../shared/trial').CoachTrial).moves.map((m) => m.point),
+  ).toEqual(['D5', 'E5', 'pass']);
+  await tools.run('edit_trial', { id: 'a', base: 'branch', source: 'a', ply: 1, moves: [] });
+  expect(events.at(-1)?.trialEdit?.branch?.moves).toEqual([{ color: 'W', point: 'D5' }]);
+  expect(
+    (await tools.run('edit_trial', { id: 'b', base: 'branch', source: 'b', ply: 9 })).isError,
+  ).toBe(true);
+  await tools.run('edit_trial', { id: 'a', operation: 'delete' });
+  expect(events.at(-1)?.trialEdit).toEqual({ id: 'a', branch: null });
+  expect((await tools.run('edit_trial', { id: 'c', base: 'branch', source: 'a' })).isError).toBe(
+    true,
+  );
+  expect(whiteAtari).toEqual(initial);
+  expect(engine.analyze).not.toHaveBeenCalled();
+});
+it('rejects ko and invalid origins when editing trials', async () => {
+  const { tools, events } = harness(koGame);
+  expect((await tools.run('edit_trial', { id: 'ko', moves: ['C2', 'B2'] })).isError).toBe(true);
+  for (const args of [
+    { base: 'main', turn: 1 },
+    { base: 'main' },
+    { turn: 0 },
+    { base: 'branch', source: 'missing' },
+  ])
+    expect((await tools.run('edit_trial', { id: 'a', ...args })).isError).toBe(true);
+  expect(events.some((event) => event.trialEdit)).toBe(false);
+});
+it('distinguishes the original game from the current user trial as branch origins', async () => {
+  const { HistoryLibrary } = await import('../server/library');
+  const { libraryFixture, firstGameId } = await import('./fixtures/library');
+  const library = new HistoryLibrary();
+  libraryFixture.games.forEach((game) => library.saveGame(game));
+  const original = libraryFixture.games[0].game;
+  const context = {
+    gameId: firstGameId,
+    gameTitle: '第一局',
+    turn: 1,
+    trialMoves: [{ color: 'W' as const, point: 'D4' }],
+  };
+  const current = { ...original, moves: [...original.moves.slice(0, 1), ...context.trialMoves] };
+  const { engine } = harness();
+  const tools = new CoachTools(engine, current, trainingForRank('5k'), undefined, undefined, {
+    library,
+    context,
+  });
+  const user = await tools.run('edit_trial', { id: 'user', moves: ['E4'] });
+  expect(user.data.branch).toMatchObject({
+    baseTurn: 1,
+    base: { moves: current.moves },
+    moves: [{ color: 'B', point: 'E4' }],
+  });
+  const main = await tools.run('edit_trial', { id: 'main', base: 'main', turn: 3, moves: ['D4'] });
+  expect(main.data.branch).toMatchObject({
+    baseTurn: 3,
+    base: { moves: original.moves },
+    moves: [{ color: 'W', point: 'D4' }],
+  });
+  expect(library.getGame(firstGameId).game).toEqual(original);
+});

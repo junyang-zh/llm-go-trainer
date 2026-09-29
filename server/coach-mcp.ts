@@ -47,7 +47,11 @@ export async function openCoachMcp(tools: CoachTools) {
       tools: coachToolDefinitions.map((tool) => ({
         ...tool,
         inputSchema: { ...tool.inputSchema, type: 'object' as const },
-        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        annotations: {
+          readOnlyHint: tool.name !== 'edit_trial',
+          destructiveHint: false,
+          openWorldHint: false,
+        },
       })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {

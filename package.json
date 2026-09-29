@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:layout": "npm run build && electron tests/board-layout.cjs",
+    "test:coach-layout": "npm run build && electron tests/coach-layout.cjs",
     "desktop": "npm run build && electron desktop/main.cjs",
     "package:desktop": "npm run build && tsx scripts/package-desktop.ts",
     "doctor": "node --import tsx scripts/doctor.ts",

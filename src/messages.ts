@@ -34,9 +34,16 @@ export function updateMessage(message: AnalysisMessage, event: StreamEvent): Ana
         if (tools[index].state !== 'running') return message;
         tools[index] = event.activity;
       } else tools.push(event.activity);
+      let trials = { ...message.trials };
+      const edit = event.activity.state === 'done' ? event.activity.trialEdit : undefined;
+      if (edit) {
+        if (edit.branch) trials = { ...trials, [edit.id]: edit.branch };
+        else delete trials[edit.id];
+      }
       return {
         ...message,
         tools,
+        trials,
         status: event.activity.state === 'running' ? event.activity.label : '正在整理分析',
       };
     }

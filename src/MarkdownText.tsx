@@ -1,33 +1,84 @@
-import Markdown from 'react-markdown';
+import { createContext, useContext } from 'react';
+import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { parseCoachLink, type CoachLink } from '../shared/coach-links';
+import { toIndex } from '../shared/go';
 
-export function MarkdownText({ children }: { children: string }) {
-  return (
-    <div className="markdown-text">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml
-        urlTransform={(url) => (/^https?:\/\//i.test(url) ? url : '')}
-        components={{
-          // Keep provider output from navigating the app or loading remote images.
-          a: ({ href, children }) =>
-            href ? (
-              <a href={href} target="_blank" rel="noreferrer noopener">
-                {children}
-              </a>
-            ) : (
-              <span>{children}</span>
-            ),
-          img: ({ alt }) => <span>{alt}</span>,
-          table: ({ children }) => (
-            <div className="markdown-table">
-              <table>{children}</table>
-            </div>
-          ),
-        }}
-      >
+export interface CoachMarkup {
+  size: number;
+  enabled: boolean;
+  activeGroup?: string;
+  disabled: boolean;
+  select: (link: Extract<CoachLink, { kind: 'selector' }>) => void;
+}
+const CoachContext = createContext<CoachMarkup | undefined>(undefined);
+// Stable component identities preserve focus during streaming and status polling.
+const components: Components = {
+  a: function CoachAnchor({ href, children }) {
+    const coach = useContext(CoachContext);
+    const link = href && coach ? parseCoachLink(href) : undefined;
+    if (link && coach) {
+      if (link.kind === 'selector')
+        return (
+          <button
+            type="button"
+            className="coach-selector"
+            disabled={coach.disabled}
+            aria-pressed={coach.activeGroup === link.group}
+            onClick={() => coach.select(link)}
+          >
+            {children || link.group}
+          </button>
+        );
+      let valid = false;
+      try {
+        valid = toIndex(link.point, coach.size) >= 0;
+      } catch {
+        /* out of board */
+      }
+      const active = valid && coach.enabled && (!link.group || coach.activeGroup === link.group);
+      return (
+        <span
+          className="coach-point"
+          data-go-point={active ? link.point : undefined}
+          tabIndex={active ? 0 : undefined}
+          title={link.point}
+        >
+          {children || link.point}
+        </span>
+      );
+    }
+    // Keep provider output from navigating the app or loading remote images.
+    return href ? (
+      <a href={href} target="_blank" rel="noreferrer noopener">
         {children}
-      </Markdown>
+      </a>
+    ) : (
+      <span>{children}</span>
+    );
+  },
+  img: ({ alt }) => <span>{alt}</span>,
+  table: ({ children }) => (
+    <div className="markdown-table">
+      <table>{children}</table>
     </div>
+  ),
+};
+export function MarkdownText({ children, coach }: { children: string; coach?: CoachMarkup }) {
+  return (
+    <CoachContext.Provider value={coach}>
+      <div className="markdown-text">
+        <Markdown
+          remarkPlugins={[remarkGfm]}
+          skipHtml
+          urlTransform={(url) =>
+            /^https?:\/\//i.test(url) || (coach && parseCoachLink(url)) ? url : ''
+          }
+          components={components}
+        >
+          {children}
+        </Markdown>
+      </div>
+    </CoachContext.Provider>
   );
 }

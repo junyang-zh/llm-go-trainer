@@ -12,6 +12,8 @@ import { type AnalysisMessage, updateMessage, finishMessage } from './messages';
 import { AgentActivity } from './AgentActivity';
 import { Board } from './Board';
 import { MarkdownText } from './MarkdownText';
+import { CoachOverlay } from './CoachOverlay';
+import type { CoachLink } from '../shared/coach-links';
 import { EvaluationPanel } from './EvaluationPanel';
 import { useEvaluations } from './useEvaluations';
 import { SearchLimitSettings } from './SearchLimitSettings';
@@ -65,6 +67,13 @@ export default function App() {
   const [showGames, setShowGames] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const workspace = useRef<HTMLElement>(null);
+  const [coachSelection, setCoachSelection] = useState<{
+    message: string;
+    group: string;
+    position: string;
+  }>();
+  const pendingCoach = useRef<{ turn: number; trial: TrialBranch | null } | null>(null);
   const [turn, setTurn] = useState(game.moves.length);
   const [autoPlay, setAutoPlay] = useState(false);
   const [aiColor, setAiColor] = useState<Color>('W');
@@ -133,9 +142,14 @@ export default function App() {
     turn,
     trialMoves,
   };
+  const contextKey = (context: BoardContext) =>
+    JSON.stringify([context.gameId, context.turn, context.trialMoves]);
+  const boardKey = contextKey(boardContext);
+  const activeCoach = coachSelection?.position === boardKey ? coachSelection : undefined;
   useEffect(() => {
-    setTurn(game.moves.length);
-    setTrial(null);
+    setTurn(pendingCoach.current?.turn ?? game.moves.length);
+    setTrial(pendingCoach.current?.trial ?? null);
+    pendingCoach.current = null;
   }, [library.gameId]);
   useEffect(() => {
     if (library.ready) setTurn(game.moves.length);
@@ -344,6 +358,69 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  function selectCoach(message: AnalysisMessage, link: Extract<CoachLink, { kind: 'selector' }>) {
+    if (lock.current) return;
+    if (activeCoach?.message === message.id && activeCoach.group === link.group) {
+      setCoachSelection(undefined);
+      return;
+    }
+    try {
+      const branch =
+        link.branch && message.trials && Object.hasOwn(message.trials, link.branch)
+          ? message.trials[link.branch]
+          : undefined;
+      if (link.branch && !branch) throw new Error('该试下分支尚未生成或已删除');
+      const gameId = branch?.gameId ?? message.context?.gameId;
+      const saved = library.games.find((item) => item.id === gameId);
+      if (!saved) throw new Error('找不到这段讲解对应的棋局');
+      const source = saved.id === library.gameId ? game : saved.game;
+      const baseTurn = branch?.baseTurn ?? link.turn ?? message.context!.turn;
+      if (baseTurn < 0 || baseTurn > source.moves.length) throw new Error('起点手数超出棋局范围');
+      const base = { ...source, moves: source.moves.slice(0, baseTurn) };
+      let moves: Move[];
+      let cursor: number;
+      if (branch) {
+        const expected = { ...branch.base, moves: branch.base.moves.slice(0, baseTurn) };
+        if (JSON.stringify(expected) !== JSON.stringify(base))
+          throw new Error('原局已改变，无法还原该试下');
+        const prefix = branch.base.moves.slice(baseTurn);
+        moves = [...prefix, ...branch.moves];
+        const ply = link.ply ?? 0;
+        if (ply > branch.moves.length) throw new Error('试下手数超出分支范围');
+        cursor = prefix.length + ply;
+      } else {
+        moves = link.turn === undefined ? message.context!.trialMoves : [];
+        cursor = moves.length;
+      }
+      replay({ ...base, moves: [...base.moves, ...moves] });
+      const nextTrial = branch || moves.length ? { moves, cursor } : null;
+      setAutoPlay(false);
+      setScoring(false);
+      setDead([]);
+      setError('');
+      setNotice('');
+      // Apply board and cursor in the same render when crossing games; an old trial
+      // can be illegal on the newly selected board before the game-change effect.
+      setTurn(baseTurn);
+      setTrial(nextTrial);
+      if (saved.id !== library.gameId) {
+        pendingCoach.current = { turn: baseTurn, trial: nextTrial };
+        library.selectGame(saved);
+      }
+      setCoachSelection({
+        message: message.id,
+        group: link.group,
+        position: contextKey({
+          gameId: saved.id,
+          gameTitle: saved.title,
+          turn: baseTurn,
+          trialMoves: moves.slice(0, cursor),
+        }),
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   function place(point: string) {
     if (lock.current) return;
     if (scoring) {
@@ -514,7 +591,12 @@ export default function App() {
   const timelineTotal = Math.max(game.moves.length, turn + (trial?.moves.length ?? 0));
   const timelineLimit = trial ? turn + trial.moves.length : game.moves.length;
   return (
-    <main className={`workspace${chatCollapsed ? ' chat-collapsed' : ''}`}>
+    <main ref={workspace} className={`workspace${chatCollapsed ? ' chat-collapsed' : ''}`}>
+      <CoachOverlay
+        root={workspace}
+        enabled={!chatCollapsed && !settings && !setup && !showGames && !showConversations}
+        revision={`${boardKey}:${activeCoach?.message}:${activeCoach?.group}:${library.conversationId}`}
+      />
       <section className="board-panel" aria-label="棋盘">
         <div className="board-toolbar">
           <button
@@ -864,7 +946,23 @@ export default function App() {
                   );
                 })}
                 <AgentActivity tools={message.tools ?? []} />
-                {message.text && <MarkdownText>{message.text}</MarkdownText>}
+                {message.text && (
+                  <MarkdownText
+                    coach={{
+                      size: game.size,
+                      enabled:
+                        !chatCollapsed &&
+                        ((!!message.context && contextKey(message.context) === boardKey) ||
+                          activeCoach?.message === message.id),
+                      activeGroup:
+                        activeCoach?.message === message.id ? activeCoach.group : undefined,
+                      disabled: locked || chatCollapsed,
+                      select: (link) => selectCoach(message, link),
+                    }}
+                  >
+                    {message.text}
+                  </MarkdownText>
+                )}
                 {message.state !== 'done' && (
                   <div
                     className={`message-status ${message.state}`}
