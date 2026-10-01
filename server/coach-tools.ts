@@ -281,7 +281,7 @@ export class CoachTools {
             (source &&
               (forkTurn !== source.game.moves.length || this.session.context?.trialMoves.length))
           );
-          const copy = !!(args.asCopy || source?.preset || variation);
+          const copy = !!(args.asCopy || source?.preset || source?.tree || variation);
           if (variation) delete game.metadata.RE;
           if (args.title) game.metadata.GN = args.title;
           signal.throwIfAborted();
@@ -432,14 +432,16 @@ export class CoachTools {
           const historicalPage = history
             .slice(args.offset, args.offset + args.limit)
             .map(summarizeRecord);
-          const presets = ['all', 'famous'].includes(args.category)
-            ? searchPresets(
-                args.query,
-                Math.max(0, args.offset - history.length),
-                args.limit - historicalPage.length,
-                args.groupId,
-              )
-            : { total: 0, games: [] };
+          const presets =
+            args.category !== 'history'
+              ? searchPresets(
+                  args.query,
+                  Math.max(0, args.offset - history.length),
+                  args.limit - historicalPage.length,
+                  args.groupId,
+                  args.category === 'all' ? undefined : args.category,
+                )
+              : { total: 0, games: [] };
           data = {
             total: history.length + presets.total,
             games: [...historicalPage, ...presets.games],

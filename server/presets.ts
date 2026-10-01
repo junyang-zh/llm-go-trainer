@@ -9,6 +9,7 @@ import {
   type RecordSummary,
 } from '../shared/presets';
 import type { SavedGame } from '../shared/library';
+import type { RecordCategory } from '../shared/library';
 
 let directory = join(import.meta.dirname, '../.local/records/cwi');
 export function configurePresets(path: string) {
@@ -64,7 +65,14 @@ function summary(row: CwiRow): RecordSummary {
     },
   };
 }
-export function searchPresets(query = '', offset = 0, limit = 20, groupId?: string): RecordPage {
+export function searchPresets(
+  query = '',
+  offset = 0,
+  limit = 20,
+  groupId?: string,
+  category?: RecordCategory,
+): RecordPage {
+  if (category && category !== 'famous') return { total: 0, games: [] };
   if (!presetsAvailable()) return { total: 0, games: [] };
   const data = index();
   const words = query.normalize('NFKC').toLowerCase().trim().split(/\s+/);

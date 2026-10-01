@@ -35,7 +35,7 @@ Configure your coach in **Settings → Connect LLM**. Model and reasoning effort
 | LLM        | DeepSeek API, Codex CLI and Claude Code CLI adapters                                                                   |
 | Desktop    | Electron; GitHub Release updates; optional macOS signing/notarization; Windows NSIS installer                          |
 
-Only the first SGF main line is imported; original comments and branches are not saved in training records. Unsupported mid-game setup or player changes are explicitly rejected. Japanese rules support play and engine analysis, but formal final scoring is not implemented. HumanSL ranks are not certified Fox/Golaxy ranks. Direct platform accounts, automatic whole-game LLM review, clocks, resignation and persistent analysis caches are not available.
+SGF import saves one history entry per file, retaining collections, every variation, comments and marks. Open the entry to browse variations, return to a parent and open the selected position on the main board. Import has no file-size, node-count or depth limit. Mid-game setup, stone removal and player changes retain the original diagram; illegal moves show an error while the original tree remains available. Japanese rules support play and engine analysis, but formal final scoring is not implemented. HumanSL ranks are not certified Fox/Golaxy ranks. Direct platform accounts, automatic whole-game LLM review, clocks, resignation and persistent analysis caches are not available.
 
 See [Engines and models](engines.md) for the catalog, Windows OpenCL/CUDA switching and visit/time search limits.
 

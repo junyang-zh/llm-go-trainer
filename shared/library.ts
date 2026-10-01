@@ -30,6 +30,9 @@ export interface SavedGame {
   sourceId?: string;
   forkTurn?: number;
   preset?: PresetInfo;
+  tree?: boolean;
+  treeRootId?: string;
+  treeNodes?: number;
 }
 export type RecordCategory = 'history' | 'famous' | 'joseki' | 'tsumego';
 export interface PresetInfo {

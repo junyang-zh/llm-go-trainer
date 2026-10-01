@@ -29,7 +29,6 @@
   "analyzing": "分析中",
   "resuming": "再開中",
   "connecting": "接続中",
-  "sgfTooLarge": "棋譜が 2 MB の上限を超えています",
   "importedMoves": "{v0} を読み込みました · {v1} 手",
   "llmOffline": "LLM · 未接続",
   "llmChecking": "LLM · 確認中",
@@ -340,7 +339,6 @@
   "errorSetupReversed": "石の配置範囲が逆です",
   "errorSgfNotGo": "囲碁の棋譜ではありません",
   "errorSgfSize": "9・13・19 路の棋譜のみ対応しています",
-  "warningSgfRules": "ルールが未指定または未対応です。中国ルールとして読み込みました。確認してください。",
   "warningSgfCollection": "棋譜集の最初の対局のみ読み込みました。",
   "errorKomi": "コミは -100〜100 の範囲で 0.5 刻みにしてください",
   "errorSgfPlayer": "PL の手番指定が無効です",
@@ -516,5 +514,15 @@
   "downloadAndEnableKatago": "KataGo をダウンロードして有効化",
   "providerCliPath": "{v0} のパス",
   "nodePath": "Node のパス（任意）",
-  "cliPathHelp": "引用符や引数を付けずに CLI の絶対パスを入力します。npm 版は JS エントリーポイントも指定できます。Node が見つからない場合は node 実行ファイルのパスを入力してください。Windows では .cmd ではなく .exe または JS を指定します。空欄で既定値に戻ります。保存時に再確認し、次の解説から適用します。"
+  "cliPathHelp": "引用符や引数を付けずに CLI の絶対パスを入力します。npm 版は JS エントリーポイントも指定できます。Node が見つからない場合は node 実行ファイルのパスを入力してください。Windows では .cmd ではなく .exe または JS を指定します。空欄で既定値に戻ります。保存時に再確認し、次の解説から適用します。",
+  "treeBackToRecords": "棋譜一覧に戻る",
+  "treeRoot": "ルート",
+  "treeParent": "一つ戻る",
+  "treeOpenPosition": "この局面を開く",
+  "treePath": "変化の経路",
+  "treeVariations": "続きの変化",
+  "treeEnd": "変化の終端",
+  "treeComment": "原譜の解説",
+  "errorImportedReadOnly": "インポートした棋譜は読み取り専用です。派生した分岐として保存してください。",
+  "treeHistoryEntry": "SGF ツリー · {v0} ノード · {v1}"
 }

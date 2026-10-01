@@ -6,41 +6,49 @@ export interface SgfNode {
   children: SgfNode[];
 }
 export function parseSgf(text: string, source?: 'fox'): SgfNode[] {
-  if (text.length > 2_000_000) throw new Error('棋谱超过 2 MB 限制');
   text = text.replace(/^\uFEFF/, '');
-  let i = 0,
-    count = 0;
+  let i = 0;
   const ws = () => {
-    while (/\s/.test(text[i] ?? '') && i < text.length) i++;
+    while (i < text.length && /\s/.test(text[i])) i++;
   };
   function value() {
     if (text[i++] !== '[') throw new Error('SGF 属性缺少 [');
-    let result = '';
+    const parts: string[] = [];
+    let start = i;
     while (i < text.length) {
       const c = text[i++];
-      if (c === ']') return result;
+      if (c === ']') {
+        parts.push(text.slice(start, i - 1));
+        return parts.join('');
+      }
       if (c === '\\') {
+        parts.push(text.slice(start, i - 1));
         const next = text[i++];
         if (next === '\r' && text[i] === '\n') i++;
-        else if (next !== '\n' && next !== '\r' && next !== undefined) result += next;
-      } else result += c;
+        else if (next !== '\n' && next !== '\r' && next !== undefined) parts.push(next);
+        start = i;
+      }
     }
     throw new Error('SGF 属性缺少 ]');
   }
-  function tree(depth: number): SgfNode {
-    if (depth > 100) throw new Error('棋谱分支过深');
-    ws();
-    if (text[i++] !== '(') throw new Error('SGF 缺少 (');
-    ws();
-    let root: SgfNode | undefined, tail: SgfNode | undefined;
-    while (text[i] === ';') {
-      if (++count > 10000) throw new Error('棋谱节点过多');
-      i++;
+  // Explicit frames avoid call-stack and arbitrary size/depth limits for collections.
+  const stack: { root?: SgfNode; tail?: SgfNode; variations: boolean }[] = [];
+  const roots: SgfNode[] = [];
+  ws();
+  while (i < text.length) {
+    const frame = stack.at(-1);
+    const c = text[i++];
+    if (c === '(') {
+      if (frame && !frame.tail) throw new Error('SGF 没有根节点');
+      stack.push({ variations: false });
+    } else if (c === ';') {
+      if (!frame) throw new Error('SGF 缺少 (');
+      if (frame.variations) throw new Error('SGF 缺少 )');
       ws();
       const node: SgfNode = { properties: Object.create(null), children: [] };
-      while (/[A-Za-z]/.test(text[i] ?? '') && i < text.length) {
+      while (i < text.length && /[A-Za-z]/.test(text[i])) {
         let key = '';
-        while (/[A-Za-z]/.test(text[i] ?? '') && i < text.length) key += text[i++];
+        while (i < text.length && /[A-Za-z]/.test(text[i])) key += text[i++];
         key = key.replace(/[a-z]/g, '');
         ws();
         const values: string[] = [];
@@ -48,35 +56,34 @@ export function parseSgf(text: string, source?: 'fox'): SgfNode[] {
           values.push(value());
           ws();
         }
-        const foxApplication = source === 'fox' && depth === 0 && !root && key === 'AP';
+        const foxApplication =
+          source === 'fox' && stack.length === 1 && !frame.root && key === 'AP';
         if (!key || !values.length || (node.properties[key] && !foxApplication))
           throw new Error('SGF 属性无效或重复');
         node.properties[key] = foxApplication
           ? [...(node.properties[key] ?? []), ...values]
           : values;
       }
-      if (tail) tail.children.push(node);
-      else root = node;
-      tail = node;
-    }
-    if (!root || !tail) throw new Error('SGF 没有根节点');
-    while (text[i] === '(') {
-      tail.children.push(tree(depth + 1));
-      ws();
-    }
-    if (text[i++] !== ')') throw new Error('SGF 缺少 )');
-    return root;
-  }
-  const roots: SgfNode[] = [];
-  ws();
-  while (i < text.length) {
-    roots.push(tree(0));
+      if (frame.tail) frame.tail.children.push(node);
+      else frame.root = node;
+      frame.tail = node;
+    } else if (c === ')') {
+      if (!frame) throw new Error('SGF 缺少 (');
+      if (!frame.root) throw new Error('SGF 没有根节点');
+      stack.pop();
+      const parent = stack.at(-1);
+      if (parent) {
+        parent.tail!.children.push(frame.root);
+        parent.variations = true;
+      } else roots.push(frame.root);
+    } else throw new Error(frame ? 'SGF 缺少 )' : 'SGF 缺少 (');
     ws();
   }
+  if (stack.length) throw new Error('SGF 缺少 )');
   if (!roots.length) throw new Error('空棋谱');
   return roots;
 }
-function sgfPoint(raw: string, size: number, allowPass = true): string {
+export function sgfPoint(raw: string, size: number, allowPass = true): string {
   if (allowPass && (raw === '' || raw === 'tt')) return 'pass';
   if (!/^[a-s]{2}$/.test(raw)) throw new Error(`不支持的 SGF 坐标：${raw}`);
   const x = raw.charCodeAt(0) - 97,
@@ -109,8 +116,6 @@ export function importSgf(text: string, source?: 'fox'): { game: Game; warnings:
   const ru = props.RU?.[0]?.toLowerCase() ?? '';
   const rules = /japan|日本/.test(ru) ? 'japanese' : 'chinese';
   const warnings: string[] = [];
-  if (!ru || !/chinese|china|中国|japan|日本/.test(ru))
-    warnings.push('规则未注明或暂不支持，按中国规则导入；请核对。');
   if (roots.length > 1) warnings.push('棋谱集只导入第一局。');
   let komi = Number(props.KM?.[0] ?? (rules === 'japanese' ? 6.5 : 7.5));
   // Fox's Chinese KM[375] is hundredths of a stone: 3.75 stones = 7.5 points.
@@ -182,6 +187,79 @@ export function decodeSgf(data: ArrayBuffer): string {
     return new TextDecoder('gb18030').decode(bytes);
   }
 }
+export function sgfProperties(properties: SgfNode['properties']) {
+  const escape = (value: string) => value.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
+  return Object.entries(properties)
+    .map(([key, values]) => key + values.map((value) => `[${escape(value)}]`).join(''))
+    .join('');
+}
+export function serializeSgf(roots: SgfNode[]): string {
+  const parts: string[] = [];
+  const stack: (SgfNode | string)[] = [];
+  for (const root of [...roots].reverse()) stack.push(')', root, '(');
+  while (stack.length) {
+    const item = stack.pop()!;
+    if (typeof item === 'string') {
+      parts.push(item);
+      continue;
+    }
+    parts.push(';' + sgfProperties(item.properties));
+    if (item.children.length === 1) stack.push(item.children[0]);
+    else for (const child of [...item.children].reverse()) stack.push(')', child, '(');
+  }
+  return parts.join('');
+}
+
+// A study tree can replace a diagram midway through a variation. Keep that
+// operation separate from ordinary game import, which rejects mid-game setup.
+// Each replacement starts a new position; subsequent moves still use replay().
+export function importSgfDiagramPath(path: SgfNode[]): { game: Game; warnings: string[] } {
+  if (!path.length) throw new Error('SGF 没有根节点');
+  let game: Game | undefined;
+  let segment: SgfNode[] = [];
+  const warnings = new Set<string>();
+  function flush() {
+    const imported = importSgf(
+      '(' + segment.map((node) => ';' + sgfProperties(node.properties)).join('') + ')',
+    );
+    game = imported.game;
+    imported.warnings.forEach((warning) => warnings.add(warning));
+  }
+  for (let index = 0; index < path.length; index++) {
+    const properties = path[index].properties;
+    if (['AB', 'AW', 'AE', 'PL'].some((key) => properties[key])) {
+      if (segment.length) flush();
+      const size = game?.size ?? Number(path[0].properties.SZ?.[0] ?? 19);
+      const board = game ? [...replay(game).board] : Array<Color | null>(size * size).fill(null);
+      for (const point of expandSetup(properties.AE ?? [], size))
+        board[toIndex(point, size)] = null;
+      for (const color of ['B', 'W'] as const)
+        for (const point of expandSetup(properties[`A${color}`] ?? [], size))
+          board[toIndex(point, size)] = color;
+      const nextColor = path.slice(index).find((node) => node.properties.B || node.properties.W);
+      const player =
+        properties.PL?.[0] ??
+        (nextColor ? (nextColor.properties.B ? 'B' : 'W') : game ? replay(game).toPlay : 'B');
+      const rootProperties: SgfNode['properties'] = { ...path[0].properties, PL: [player] };
+      for (const key of ['AB', 'AW', 'AE', 'B', 'W']) delete rootProperties[key];
+      for (const color of ['B', 'W'] as const) {
+        const points = board.flatMap((stone, point) =>
+          stone === color
+            ? [String.fromCharCode(97 + (point % size), 97 + Math.floor(point / size))]
+            : [],
+        );
+        if (points.length) rootProperties[`A${color}`] = points;
+      }
+      segment = [{ properties: rootProperties, children: [] }];
+      const remainder = { ...properties };
+      for (const key of ['AB', 'AW', 'AE', 'PL']) delete remainder[key];
+      segment.push({ properties: remainder, children: [] });
+    } else segment.push({ properties, children: [] });
+  }
+  flush();
+  return { game: game!, warnings: [...warnings] };
+}
+
 export function exportSgf(game: Game): string {
   const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
   const loc = (move: Move) => {

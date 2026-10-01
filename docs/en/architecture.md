@@ -74,7 +74,7 @@ SGF import does not upload. Asking sends board, short history, engine candidates
 
 ## Current limits
 
-Per-move review/coaching and complete engine curves are available; automatic whole-game LLM review is not. SGF imports the first main line only, excluding comments/branches. Manual/AI moves share logic: append at the main-line end or extend trials at historical positions/existing branches; clear/save trials or fork a historical position as a new game. PV previews never modify played games.
+Per-move review/coaching and complete engine curves are available; automatic whole-game LLM review is not. SGF files are stored as single history entries with all variations, comments and marks; tree browsing opens a selected position on the main board. Manual/AI moves share logic: append at the main-line end or extend trials at historical positions/existing branches; clear/save trials or fork a historical position as a new game. PV previews never modify played games.
 
 Scoring previews Chinese area after manual dead-stone marking, with `chinese-ogs` positional superko and handicap bonus N. Formal Japanese scoring, seki adjudication and complex cyclic no-results are incomplete. Difficulty lacks Fox/Golaxy Elo calibration; aggression approximates contact preference.
 

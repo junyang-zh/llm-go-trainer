@@ -29,7 +29,6 @@
   "analyzing": "Analyzing",
   "resuming": "Resuming",
   "connecting": "Connecting",
-  "sgfTooLarge": "The game record exceeds the 2 MB limit",
   "importedMoves": "Imported {v0} · Moves: {v1}",
   "llmOffline": "LLM · Offline",
   "llmChecking": "LLM · Checking",
@@ -340,7 +339,6 @@
   "errorSetupReversed": "Reversed setup range",
   "errorSgfNotGo": "This is not a Go game record",
   "errorSgfSize": "Only 9×9, 13×13 and 19×19 game records are supported",
-  "warningSgfRules": "Rules are unspecified or unsupported. Imported using Chinese rules; please verify.",
   "warningSgfCollection": "Only the first game in the collection was imported.",
   "errorKomi": "Komi must be between -100 and 100 in increments of 0.5",
   "errorSgfPlayer": "Invalid PL player to move",
@@ -516,5 +514,15 @@
   "downloadAndEnableKatago": "Download and enable KataGo",
   "providerCliPath": "{v0} path",
   "nodePath": "Node path (optional)",
-  "cliPathHelp": "Enter the absolute CLI path without quotes or arguments, or the JS entry point for an npm install. If Node cannot be found, enter the node executable path. On Windows, use an .exe or JS entry point, not .cmd. Leave blank to restore defaults. Saving rechecks the connection and applies to the next coaching request."
+  "cliPathHelp": "Enter the absolute CLI path without quotes or arguments, or the JS entry point for an npm install. If Node cannot be found, enter the node executable path. On Windows, use an .exe or JS entry point, not .cmd. Leave blank to restore defaults. Saving rechecks the connection and applies to the next coaching request.",
+  "treeBackToRecords": "Back to records",
+  "treeRoot": "Root",
+  "treeParent": "Parent",
+  "treeOpenPosition": "Open this position",
+  "treePath": "Variation path",
+  "treeVariations": "Variations",
+  "treeEnd": "End of variation",
+  "treeComment": "Original comments",
+  "errorImportedReadOnly": "Imported game records are read-only; save a derived branch.",
+  "treeHistoryEntry": "SGF tree: {v0} nodes · {v1}"
 }

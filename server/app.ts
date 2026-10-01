@@ -1,7 +1,6 @@
 import type { RecordSources } from './record-sources';
 import express from 'express';
 import { presetRecord, presetSgf, presetSummary, searchPresets } from './presets';
-import { cwiPresetInfo } from '../shared/presets';
 import { randomUUID } from 'node:crypto';
 import { CoachBudget } from './coach-budget';
 import { HistoryLibrary } from './library';
@@ -68,6 +67,7 @@ export function createApp(
     );
     next();
   });
+  app.use('/api/library/import-sgf', express.json({ limit: Infinity }));
   app.use('/api/library', express.json({ limit: '32mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', (_req, res, next) => {
@@ -75,6 +75,34 @@ export function createApp(
     next();
   });
   app.get('/api/library/sources', (_req, res) => res.json(records?.list() ?? []));
+  app.post('/api/library/import-sgf', (req, res) => {
+    const { sgf, filename } = z
+      .object({ sgf: z.string(), filename: z.string().max(1000) })
+      .parse(req.body);
+    res.json(library.importSgf(sgf, filename));
+  });
+  app.get('/api/library/games/:id/tree', (req, res) => {
+    const page = library.recordTree(z.uuid().parse(req.params.id));
+    if (!page) {
+      res.status(404).json({ error: '找不到历史棋局' });
+      return;
+    }
+    res.json(page);
+  });
+  app.get('/api/library/games/:id/sgf', (req, res) =>
+    res.json({ sgf: library.exportSgf(z.uuid().parse(req.params.id)) }),
+  );
+  app.get('/api/library/games/:id', (req, res) => {
+    try {
+      res.json(library.getGame(z.uuid().parse(req.params.id)));
+    } catch (error) {
+      if ((error as Error).message === '找不到历史棋局') {
+        res.status(404).json({ error: '找不到历史棋局' });
+        return;
+      }
+      throw error;
+    }
+  });
   app.get('/api/library/fox', (_req, res) => res.json(fox.snapshot()));
   app.post('/api/library/fox/sync', async (req, res) => res.json(await fox.sync(req.body)));
   app.post('/api/library/fox/open', async (req, res) => res.json(await fox.open(req.body)));
@@ -98,16 +126,17 @@ export function createApp(
         offset: z.coerce.number().int().min(0).default(0),
         limit: z.coerce.number().int().min(1).max(100).default(20),
         groupId: z.uuid().optional(),
+        category: z.enum(['famous', 'joseki', 'tsumego']).optional(),
       })
       .parse(req.query);
-    res.json(searchPresets(query.query, query.offset, query.limit, query.groupId));
+    res.json(searchPresets(query.query, query.offset, query.limit, query.groupId, query.category));
   });
   app.get('/api/library/presets/:id/sgf', (req, res) => {
     const id = z.uuid().parse(req.params.id);
     const sgf = presetSgf(id);
     const esc = (value: string) => value.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
     const source = presetSummary(id)!.preset!;
-    const notice = `SO[${esc(source.source + ' · ' + source.sourceUrl)}]CP[${esc(cwiPresetInfo.license + ' ' + cwiPresetInfo.licenseUrl)}]`;
+    const notice = `SO[${esc([source.source, source.sourceUrl].filter(Boolean).join(' · '))}]CP[${esc([source.license, source.licenseUrl].filter(Boolean).join(' '))}]`;
     res.json({ sgf: sgf.replace(/\(\s*;/, (root) => root + notice) });
   });
   app.get('/api/library/presets/:id/summary', (req, res) => {

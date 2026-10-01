@@ -115,9 +115,7 @@ export const formatDateOnly = (value: string) => new Date(value).toLocaleDateStr
 // preserving custom names, coordinates, URLs and unknown provider output verbatim.
 const diagnosticKeys = (Object.keys(zhCN) as MessageKey[]).filter(
   (key) =>
-    /^(runtime|modelName|error|warningSgf|updateInstalledOnly|updateUnsignedMac|sgfTooLarge)/.test(
-      key,
-    ) ||
+    /^(runtime|modelName|error|warningSgf|updateInstalledOnly|updateUnsignedMac)/.test(key) ||
     [
       'candidateMismatch',
       'trialMissing',

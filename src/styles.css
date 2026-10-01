@@ -1786,3 +1786,62 @@ h2 {
   width: 100%;
   margin-bottom: 12px;
 }
+.record-tree-tools,
+.record-tree-path,
+.record-tree-children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.record-tree-path,
+.record-tree-children {
+  padding: 10px;
+  border: 1px solid #bdcbbf;
+  border-radius: 6px;
+  background: #f3f6f0;
+}
+.record-tree-path {
+  max-height: 110px;
+  overflow: auto;
+}
+.record-tree-path button {
+  font-size: 12px;
+}
+.record-tree-path [aria-current] {
+  background: var(--accent-soft, #e2ece5);
+}
+.record-tree-content {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 20px;
+}
+.record-tree-board,
+.record-tree-notes {
+  min-width: 0;
+}
+.record-tree-board .go-board {
+  width: 100%;
+  height: auto;
+  max-height: 480px;
+}
+.record-tree-notes h3 {
+  margin: 0 0 12px;
+}
+.record-tree-comment p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.record-tree-children button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .record-tree-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .record-tree-board .go-board {
+    max-height: 340px;
+  }
+}

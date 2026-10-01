@@ -62,6 +62,9 @@ beforeEach(() => {
         params.get('query') ?? '',
         Number(params.get('offset') ?? 0),
         Number(params.get('limit') ?? 20),
+        undefined,
+        (params.get('category') ?? undefined) as
+          import('../shared/library').RecordCategory | undefined,
       );
     }
     if (path.startsWith('library/presets/')) {

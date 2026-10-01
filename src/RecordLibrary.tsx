@@ -1,5 +1,6 @@
 import { RecordDownloader } from './RecordDownloader';
 import { FoxRecords } from './FoxRecords';
+import { RecordTree } from './RecordTree';
 import { useEffect, useState } from 'react';
 import {
   matchesRecord,
@@ -26,14 +27,16 @@ export function RecordLibrary({
   onSelect,
   onExport,
   onRename,
+  initialTreeId,
 }: {
   games: SavedGame[];
   selectedId: string;
   disabled: boolean;
   onImport: () => void;
-  onSelect: (record: SavedGame, warnings?: string[]) => void;
+  onSelect: (record: SavedGame, warnings?: string[], turn?: number) => void;
   onExport: (record: SavedGame) => void;
   onRename: (id: string, title: string) => Promise<void>;
+  initialTreeId?: string;
 }) {
   const [category, setCategory] = useState<RecordCategory>('history');
   const [downloads, setDownloads] = useState(false);
@@ -49,14 +52,19 @@ export function RecordLibrary({
   const [loading, setLoading] = useState(false);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState('');
+  const [treeId, setTreeId] = useState(initialTreeId);
   useEffect(() => {
-    if (category !== 'famous') return;
+    if (initialTreeId) setTreeId(initialTreeId);
+  }, [initialTreeId]);
+  useEffect(() => {
+    if (category === 'history') return;
     let active = true;
     setLoading(true);
     setError('');
     setPage({ total: 0, games: [] });
     const timer = setTimeout(() => {
       const params = new URLSearchParams({
+        category,
         query,
         offset: String(offset),
         limit: String(pageSize),
@@ -100,26 +108,30 @@ export function RecordLibrary({
     };
   }, [rootIds, revision]);
   const all = [
-    ...games.map(summarizeRecord),
+    ...games.filter((item) => !item.treeRootId || item.id === item.treeRootId).map(summarizeRecord),
     ...roots.filter((root) => !games.some((game) => game.id === root.id)),
   ];
   const history = games
-    .filter((item) => !item.preset && matchesRecord(item, query))
+    .filter(
+      (item) =>
+        !item.preset &&
+        (!item.treeRootId || item.id === item.treeRootId) &&
+        matchesRecord(item, query),
+    )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map(summarizeRecord);
-  const items =
-    category === 'history'
-      ? history.slice(offset, offset + pageSize)
-      : category === 'famous'
-        ? page.games
-        : [];
-  const total = category === 'history' ? history.length : category === 'famous' ? page.total : 0;
+  const items = category === 'history' ? history.slice(offset, offset + pageSize) : page.games;
+  const total = category === 'history' ? history.length : page.total;
   const groups = new Map<string, RecordSummary[]>();
   for (const item of items) {
     const id = recordGroupId(item);
     groups.set(id, [...(groups.get(id) ?? []), item]);
   }
   async function open(item: RecordSummary) {
+    if (item.tree) {
+      setTreeId(item.id);
+      return;
+    }
     setOpening(true);
     setError('');
     try {
@@ -137,11 +149,13 @@ export function RecordLibrary({
     setError('');
     try {
       const local = games.find((game) => game.id === item.id);
-      if (local) {
+      if (local && !item.tree) {
         onExport(local);
         return;
       }
-      const { sgf } = await api<{ sgf: string }>(`library/presets/${item.id}/sgf`);
+      const { sgf } = await api<{ sgf: string }>(
+        `library/${item.preset ? 'presets' : 'games'}/${item.id}/sgf`,
+      );
       const url = URL.createObjectURL(new Blob([sgf], { type: 'application/x-go-sgf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -164,13 +178,28 @@ export function RecordLibrary({
       setRenaming(false);
     }
   }
+  if (treeId)
+    return (
+      <RecordTree
+        id={treeId}
+        disabled={disabled}
+        onBack={() => setTreeId(undefined)}
+        onSelect={onSelect}
+      />
+    );
   return (
     <div className="record-library">
       <div className="history-actions">
         <button disabled={disabled || opening} onClick={onImport}>
           {t('importSgf')}
         </button>
-        <span>{t('autoSavedGames', { v0: games.filter((item) => !item.preset).length })}</span>
+        <span>
+          {t('autoSavedGames', {
+            v0: games.filter(
+              (item) => !item.preset && (!item.treeRootId || item.id === item.treeRootId),
+            ).length,
+          })}
+        </span>
       </div>
       <div className="record-filters" role="group" aria-label={t('recordCategories')}>
         {Object.entries(categories).map(([value, key]) => (
@@ -225,7 +254,7 @@ export function RecordLibrary({
             }}
           />
           {error && <p role="alert">{localizeDiagnostic(error)}</p>}
-          {category === 'famous' && loading ? (
+          {category !== 'history' && loading ? (
             <p role="status">{t('recordsLoading')}</p>
           ) : (
             <>
@@ -257,8 +286,8 @@ export function RecordLibrary({
                               <b>{item.title}</b>
                               <small>
                                 {t(categories[item.preset?.category ?? 'history'])} ·{' '}
-                                {t('gameHistoryEntry', {
-                                  v0: item.moves,
+                                {t(item.tree ? 'treeHistoryEntry' : 'gameHistoryEntry', {
+                                  v0: item.tree ? (item.treeNodes ?? 0) : item.moves,
                                   v1: item.preset
                                     ? item.date || t('presetRecord')
                                     : formatDate(item.updatedAt),

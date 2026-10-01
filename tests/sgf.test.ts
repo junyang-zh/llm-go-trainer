@@ -55,8 +55,13 @@ describe('SGF import/export', () => {
     const gb = new Uint8Array([...prefix, 0xd6, 0xd0, 0xce, 0xc4, ...suffix]);
     expect(decodeSgf(gb.buffer)).toContain('中文');
   });
-  it('limits depth and consumes complete input', () => {
+  it('parses deep variations without a call-stack limit and consumes complete input', () => {
     expect(() => parseSgf('(;SZ[19])garbage')).toThrow();
-    expect(() => parseSgf('(;'.repeat(110) + ')'.repeat(110))).toThrow('分支过深');
+    expect(parseSgf('(;'.repeat(2000) + ')'.repeat(2000))).toHaveLength(1);
+  });
+  it('defaults unspecified rules to Chinese without a warning', () => {
+    const { game, warnings } = importSgf('(;SZ[19];B[pd];W[dd])');
+    expect(game.rules).toBe('chinese');
+    expect(warnings).toEqual([]);
   });
 });

@@ -85,6 +85,7 @@ export default function App() {
   const [trial, setTrial] = useState<TrialBranch | null>(null);
   const trialMoves = useMemo(() => trial?.moves.slice(0, trial.cursor) ?? [], [trial]);
   const [showGames, setShowGames] = useState(false);
+  const [importedTreeId, setImportedTreeId] = useState<string>();
   const [showConversations, setShowConversations] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const workspace = useRef<HTMLElement>(null);
@@ -634,24 +635,12 @@ export default function App() {
     });
   }
   async function importFile(file: File) {
-    if (file.size > 2_000_000) {
-      setError(t('sgfTooLarge'));
-      return;
-    }
     try {
-      const imported = importSgf(decodeSgf(await file.arrayBuffer()));
-      invalidate();
-      evaluations.reset();
+      const record = await library.importSgf(file.name, decodeSgf(await file.arrayBuffer()));
       setAutoPlay(false);
-      library.newGame(imported.game, undefined, undefined, true);
-      setTurn(imported.game.moves.length);
-      setShowGames(false);
-      setNotice({
-        kind: 'import',
-        name: file.name,
-        moves: imported.game.moves.length,
-        warnings: imported.warnings,
-      });
+      setImportedTreeId(record.id);
+      setShowGames(true);
+      setError('');
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1378,13 +1367,21 @@ export default function App() {
         </Dialog>
       )}
       {showGames && (
-        <Dialog title={t('gameHistory')} wide onClose={() => setShowGames(false)}>
+        <Dialog
+          title={t('gameHistory')}
+          wide
+          onClose={() => {
+            setShowGames(false);
+            setImportedTreeId(undefined);
+          }}
+        >
           <RecordLibrary
             games={library.games}
             selectedId={library.gameId}
             disabled={locked}
             onImport={() => fileInput.current?.click()}
             onRename={library.renameGame}
+            initialTreeId={importedTreeId}
             onExport={(item) =>
               download(
                 `${item.title.replace(/[\\/:*?"<>|]/g, '_')}.sgf`,
@@ -1392,7 +1389,7 @@ export default function App() {
                 'application/x-go-sgf',
               )
             }
-            onSelect={(item, warnings) => {
+            onSelect={(item, warnings, selectedTurn) => {
               invalidate();
               evaluations.reset();
               setAutoPlay(false);
@@ -1404,13 +1401,13 @@ export default function App() {
                   moves: item.game.moves.length,
                   warnings,
                 });
-              setTurn(item.preset ? 0 : item.game.moves.length);
+              const startTurn = selectedTurn ?? (item.preset ? 0 : item.game.moves.length);
+              setTurn(startTurn);
               // The game-ID effect also handles first-time preset selection.
               pendingCoach.current =
-                item.id !== library.gameId
-                  ? { turn: item.preset ? 0 : item.game.moves.length, trial: null }
-                  : null;
+                item.id !== library.gameId ? { turn: startTurn, trial: null } : null;
               setShowGames(false);
+              setImportedTreeId(undefined);
             }}
           />
         </Dialog>

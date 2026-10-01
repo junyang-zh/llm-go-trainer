@@ -125,7 +125,7 @@ export function useLibrary(initialGame: Game) {
     game,
     setGame,
     gameId,
-    games: [...games, ...presets],
+    games: [...new Map([...games, ...presets].map((record) => [record.id, record])).values()],
     review,
     ready,
     error,
@@ -149,7 +149,7 @@ export function useLibrary(initialGame: Game) {
     },
     applyGameChange(change: NonNullable<ToolActivity['gameChange']>) {
       const { record, context } = change;
-      const updateRecords = record.preset ? setPresets : setGames;
+      const updateRecords = record.preset || record.treeRootId ? setPresets : setGames;
       updateRecords((items) => [record, ...items.filter((item) => item.id !== record.id)]);
       if (context) {
         serverGame.current = { id: record.id, game: record.game };
@@ -167,16 +167,33 @@ export function useLibrary(initialGame: Game) {
       await flush();
       const renamed = await api<SavedGame>(`library/games/${id}/name`, { title });
       setGames((items) => items.map((item) => (item.id === id ? renamed : item)));
+      if (renamed.tree) {
+        const current = presets.find((item) => item.id === gameId && item.treeRootId === id);
+        const refreshed = current ? await api<SavedGame>(`library/games/${gameId}`) : undefined;
+        setPresets((items) => [
+          ...items.filter((item) => item.treeRootId !== id),
+          ...(refreshed ? [refreshed] : []),
+        ]);
+        if (refreshed) setGame(refreshed.game);
+      }
       if (id === gameId)
         setGame((value) => ({ ...value, metadata: { ...value.metadata, GN: renamed.title } }));
     },
     async findGame(id: string) {
       const found = [...games, ...presets].find((item) => item.id === id);
-      if (found || !id.startsWith('c0000000-')) return found;
-      return api<SavedGame>(`library/presets/${encodeURIComponent(id)}`);
+      if (found || !id) return found;
+      return api<SavedGame>(
+        `library/${id.startsWith('c0000000-') ? 'presets' : 'games'}/${encodeURIComponent(id)}`,
+      );
+    },
+    async importSgf(filename: string, sgf: string) {
+      await flush();
+      const record = await api<SavedGame>('library/import-sgf', { filename, sgf });
+      setGames((items) => [record, ...items]);
+      return record;
     },
     selectGame(item: SavedGame) {
-      if (item.preset)
+      if (item.preset || item.treeRootId)
         setPresets((items) => [item, ...items.filter((value) => value.id !== item.id)]);
       else setGames((items) => [item, ...items.filter((value) => value.id !== item.id)]);
       setReview(true);

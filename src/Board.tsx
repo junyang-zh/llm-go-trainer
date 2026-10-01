@@ -1,6 +1,7 @@
 import { t } from './i18n';
 import { COLUMNS, toIndex, toPoint, type Position } from '../shared/go';
 import type { Candidate } from '../shared/types';
+import { sgfPoint } from '../shared/sgf';
 
 interface Props {
   size: number;
@@ -13,6 +14,7 @@ interface Props {
   disabled: boolean;
   scoring: boolean;
   onPlay: (point: string) => void;
+  annotations?: Record<string, string[]>;
 }
 export function Board({
   size,
@@ -25,6 +27,7 @@ export function Board({
   disabled,
   scoring,
   onPlay,
+  annotations = {},
 }: Props) {
   const step = 32,
     margin = 34,
@@ -32,6 +35,17 @@ export function Board({
     extent = span + margin * 2;
   const stars = size === 19 ? [3, 9, 15] : size === 13 ? [3, 6, 9] : [2, 4, 6];
   const last = lastPoint ? toIndex(lastPoint, size) : -1;
+  const marks = new Map<number, { kind: string; text?: string }>();
+  for (const [kind, values] of Object.entries(annotations))
+    for (const raw of values) {
+      try {
+        const [coordinate, ...label] = raw.split(':');
+        const point = toIndex(sgfPoint(coordinate, size, false), size);
+        marks.set(point, { kind, text: label.join(':') });
+      } catch {
+        /* An invalid annotation does not change the study position. */
+      }
+    }
   return (
     <svg
       className={`go-board ${disabled ? 'board-disabled' : ''}`}
@@ -182,6 +196,31 @@ export function Board({
                 </text>
               </g>
             )}
+            {marks.has(i) &&
+              (() => {
+                const mark = marks.get(i)!;
+                const ink = color === 'B' ? '#fff' : '#743d28';
+                return (
+                  <g pointerEvents="none" stroke={ink} fill="none" strokeWidth="2">
+                    {mark.kind === 'TR' && <path d={`M${x} ${y - 8}l8 14h-16z`} />}
+                    {mark.kind === 'SQ' && <rect x={x - 7} y={y - 7} width="14" height="14" />}
+                    {mark.kind === 'CR' && <circle cx={x} cy={y} r="7" />}
+                    {mark.kind === 'MA' && <path d={`M${x - 6} ${y - 6}l12 12m0 -12l-12 12`} />}
+                    {mark.kind === 'LB' && (
+                      <text
+                        x={x}
+                        y={y + 5}
+                        textAnchor="middle"
+                        stroke="none"
+                        fill={ink}
+                        fontSize="15"
+                      >
+                        {mark.text}
+                      </text>
+                    )}
+                  </g>
+                );
+              })()}
             <rect
               className="point-target"
               data-board-point={toPoint(i, size)}

@@ -6,6 +6,8 @@ import { presetRecord } from './presets';
 import { recordGroupId } from '../shared/library';
 import { replay } from '../shared/go';
 import type { Conversation, Library, SavedGame } from '../shared/library';
+import { RecordTrees, treeRootFor } from './record-trees';
+import { exportSgf } from '../shared/sgf';
 
 const id = z.uuid();
 const base = { id, title: z.string().max(200), updatedAt: z.iso.datetime() };
@@ -15,6 +17,8 @@ export const savedGameSchema = z.object({
   groupId: id.optional(),
   sourceId: id.optional(),
   forkTurn: z.number().int().min(0).max(1500).optional(),
+  tree: z.boolean().optional(),
+  treeNodes: z.number().int().positive().optional(),
 });
 export const conversationSchema = z.object({
   ...base,
@@ -43,7 +47,9 @@ export const conversationSchema = z.object({
 // database bindings are needed in Electron. Never store credentials in these records.
 export class HistoryLibrary {
   private data: Library = { games: [], conversations: [] };
+  private trees: RecordTrees;
   constructor(private directory?: string) {
+    this.trees = new RecordTrees(directory && join(directory, 'sgf'));
     if (!directory) return;
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     for (const kind of ['games', 'conversations'] as const) {
@@ -61,13 +67,34 @@ export class HistoryLibrary {
     return structuredClone(this.data);
   }
   getGame(gameId: string) {
-    const game = presetRecord(gameId) ?? this.data.games.find((item) => item.id === gameId);
+    const root = treeRootFor(this.data.games, gameId);
+    const page = root && root.id !== gameId ? this.trees.page(root, gameId) : undefined;
+    if (page?.unavailable) throw new Error(page.unavailable);
+    const game =
+      presetRecord(gameId) ?? this.data.games.find((item) => item.id === gameId) ?? page?.record;
     if (!game) throw new Error('找不到历史棋局');
     return structuredClone(game);
+  }
+  importSgf(text: string, filename: string) {
+    const record = this.trees.import(text, filename);
+    this.put('games', record);
+    return structuredClone(record);
+  }
+  recordTree(gameId: string) {
+    const root = treeRootFor(this.data.games, gameId);
+    return root && this.trees.page(root, gameId);
+  }
+  exportSgf(gameId: string) {
+    const root = treeRootFor(this.data.games, gameId);
+    const text = root ? this.trees.export(root, gameId) : exportSgf(this.getGame(gameId).game);
+    if (text === undefined) throw new Error('找不到历史棋局');
+    return text;
   }
   saveGame(raw: unknown) {
     const record = savedGameSchema.parse(raw);
     if (record.id.startsWith('c0000000-')) throw new Error('预置棋谱只读，请保存为同源分支');
+    if (record.tree || treeRootFor(this.data.games, record.id))
+      throw new Error('导入棋谱只读，请保存为同源分支');
     const previous = this.data.games.find((item) => item.id === record.id);
     if (
       previous &&
@@ -110,6 +137,8 @@ export class HistoryLibrary {
   }
   renameGame(gameId: string, name: string) {
     if (gameId.startsWith('c0000000-')) throw new Error('预置棋谱只读，请保存为同源分支');
+    const root = treeRootFor(this.data.games, gameId);
+    if (root && root.id !== gameId) throw new Error('导入棋谱只读，请保存为同源分支');
     const title = z.string().trim().min(1).max(200).parse(name);
     const record = this.getGame(gameId);
     record.title = title;

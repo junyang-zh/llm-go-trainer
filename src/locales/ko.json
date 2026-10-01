@@ -29,7 +29,6 @@
   "analyzing": "분석 중",
   "resuming": "계속하는 중",
   "connecting": "연결 중",
-  "sgfTooLarge": "기보가 2 MB 제한을 초과합니다",
   "importedMoves": "{v0} 가져옴 · {v1}수",
   "llmOffline": "LLM · 연결 안 됨",
   "llmChecking": "LLM · 확인 중",
@@ -340,7 +339,6 @@
   "errorSetupReversed": "돌 배치 범위가 역순입니다",
   "errorSgfNotGo": "바둑 기보가 아닙니다",
   "errorSgfSize": "9 / 13 / 19줄 기보만 지원합니다",
-  "warningSgfRules": "규칙이 명시되지 않았거나 지원되지 않아 중국 규칙으로 가져왔습니다. 확인하세요.",
   "warningSgfCollection": "기보 모음의 첫 대국만 가져왔습니다.",
   "errorKomi": "덤은 -100부터 100 사이의 0.5 단위여야 합니다",
   "errorSgfPlayer": "PL 차례 지정이 잘못되었습니다",
@@ -516,5 +514,15 @@
   "downloadAndEnableKatago": "KataGo 다운로드 및 활성화",
   "providerCliPath": "{v0} 경로",
   "nodePath": "Node 경로 (선택 사항)",
-  "cliPathHelp": "따옴표나 인수 없이 CLI 절대 경로를 입력하세요. npm 설치는 JS 진입점도 지정할 수 있습니다. Node를 찾을 수 없다면 node 실행 파일 경로를 입력하세요. Windows에서는 .cmd 대신 .exe 또는 JS 진입점을 사용하세요. 비워 두면 기본값으로 복원됩니다. 저장하면 연결을 다시 확인하고 다음 해설부터 적용합니다."
+  "cliPathHelp": "따옴표나 인수 없이 CLI 절대 경로를 입력하세요. npm 설치는 JS 진입점도 지정할 수 있습니다. Node를 찾을 수 없다면 node 실행 파일 경로를 입력하세요. Windows에서는 .cmd 대신 .exe 또는 JS 진입점을 사용하세요. 비워 두면 기본값으로 복원됩니다. 저장하면 연결을 다시 확인하고 다음 해설부터 적용합니다.",
+  "treeBackToRecords": "기보 목록으로",
+  "treeRoot": "루트",
+  "treeParent": "상위 노드",
+  "treeOpenPosition": "이 국면 열기",
+  "treePath": "변화 경로",
+  "treeVariations": "다음 변화",
+  "treeEnd": "변화 끝",
+  "treeComment": "원본 해설",
+  "errorImportedReadOnly": "가져온 기보는 읽기 전용입니다. 파생 분기로 저장하세요.",
+  "treeHistoryEntry": "SGF 트리 · 노드 {v0}개 · {v1}"
 }

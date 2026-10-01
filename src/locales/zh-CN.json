@@ -29,7 +29,6 @@
   "analyzing": "分析中",
   "resuming": "正在继续",
   "connecting": "连接中",
-  "sgfTooLarge": "棋谱超过 2 MB 限制",
   "importedMoves": "已导入 {v0} · {v1} 手",
   "llmOffline": "LLM · 未连接",
   "llmChecking": "LLM · 检测中",
@@ -340,7 +339,6 @@
   "errorSetupReversed": "倒置的摆子范围",
   "errorSgfNotGo": "这不是围棋棋谱",
   "errorSgfSize": "仅支持 9 / 13 / 19 路棋谱",
-  "warningSgfRules": "规则未注明或暂不支持，按中国规则导入；请核对。",
   "warningSgfCollection": "棋谱集只导入第一局。",
   "errorKomi": "贴目必须是 -100 至 100 之间的整数或半整数",
   "errorSgfPlayer": "PL 行棋方无效",
@@ -516,5 +514,15 @@
   "downloadAndEnableKatago": "下载并启用 KataGo",
   "providerCliPath": "{v0} 路径",
   "nodePath": "Node 路径（可选）",
-  "cliPathHelp": "填写 CLI 的绝对路径，不加引号或参数；npm 安装版也可填写 JS 入口。若找不到 Node，请填写 node 可执行文件路径。Windows 请使用 .exe 或 JS 入口，不使用 .cmd。留空恢复默认；保存后重新检测并在下次讲棋时生效。"
+  "cliPathHelp": "填写 CLI 的绝对路径，不加引号或参数；npm 安装版也可填写 JS 入口。若找不到 Node，请填写 node 可执行文件路径。Windows 请使用 .exe 或 JS 入口，不使用 .cmd。留空恢复默认；保存后重新检测并在下次讲棋时生效。",
+  "treeBackToRecords": "返回棋谱列表",
+  "treeRoot": "回到根节点",
+  "treeParent": "返回上层",
+  "treeOpenPosition": "打开此局面",
+  "treePath": "变化路径",
+  "treeVariations": "后续变化",
+  "treeEnd": "变化结束",
+  "treeComment": "原谱注释",
+  "errorImportedReadOnly": "导入棋谱只读，请保存为同源分支",
+  "treeHistoryEntry": "SGF 树 · {v0} 个节点 · {v1}"
 }
