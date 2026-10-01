@@ -1,15 +1,14 @@
 # 更新記錄
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
 
-## v0.1.5
+## v0.1.6
 
-- Agent 現在可以載入棋局、儲存目前局面或試下分支、修改棋局名稱，棋盤與棋譜庫同步更新。試下儲存為同源新棋局，保留原譜；暫停後繼續時保留新的棋局上下文。
-- 修正長時間講棋出現「CLI 輸出超出限制」：移除 Codex / Claude CLI 累計輸出、Codex 回答檔案及前端本機訊息的固定長度限制，工具結果不再觸發隱藏的總量上限。
-- 新增棋譜庫搜尋、分頁、改名、來源資訊及同源分支分組。普通版預置 CWI 完整棋譜歸檔，minimal 版可在棋譜下載面板按需安裝；不提供預置定式或死活題。
-- 新增野狐圍棋棋譜查詢與匯入，可按使用者名稱或 UID 查詢並下載至本機棋譜庫，重複匯入保留同一棋局記錄。
-- minimal 版不再於首次啟動時自動下載引擎與模型；需要本機引擎時，在「設定 → 圍棋模型」點擊「下載並啟用 KataGo」。既有模型、棋譜及對話繼續保留。
-- 專案採用 MIT 授權，應用程式內新增授權說明，並補充第三方元件及棋譜來源聲明。第三方資源仍遵循各自授權。
+- SGF 匯入保留完整變化樹、註解與棋盤標記，支援包含多個棋局的 SGF 集合。每個檔案顯示為一個本機棋局項目，可用來瀏覽自己的定式大全。
+- 新增變化樹瀏覽：選擇手順、返回上層、切換變化，並將選定局面放到主棋盤。擺子、移除棋子及指定下一手方的節點也可瀏覽；試下可另存為同源棋局，完整原譜繼續保留並可匯出。
+- 移除 SGF 匯入的檔案大小、節點數與巢狀深度限制；未註明或不支援的規則繼續依既有邏輯使用中國規則，移除對應的匯入提示。
+- 手順路徑與變化選擇按鈕增加細線框和淺色背景，與導覽及放置到棋盤按鈕作出視覺區分。
+- Codex / Claude 設定新增 CLI 路徑及選用的 Node 路徑，支援原生程式和 Node 指令碼入口，改善桌面啟動時的 CLI 尋找與偵測。
 
 請選擇與你的系統匹配的一個安裝包：
 

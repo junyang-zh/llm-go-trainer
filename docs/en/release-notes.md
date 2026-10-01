@@ -1,15 +1,14 @@
 # Release notes
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
 
-## v0.1.5
+## v0.1.6
 
-- Agents can now load games, save the current position or trial branches, and rename games, keeping the board and library in sync. Trials are saved as new related games without overwriting their sources; continuation retains the updated game context.
-- Fixed “CLI output exceeds limit” during long coaching sessions. Removed fixed limits on cumulative Codex / Claude CLI output, the Codex answer file and local frontend messages, so tool results no longer exhaust a hidden total-output allowance.
-- Added library search, pagination, renaming, source details and groups of related branches. Standard bundles the full CWI game archive; minimal can install it from the record downloader. No joseki or life-and-death collection is bundled.
-- Added Fox Go record lookup and import by username or UID. Downloaded games are saved locally, and repeated imports reuse the same record.
-- Minimal no longer downloads engines or models automatically at first launch. To use a local engine, choose “Download and enable KataGo” in Settings → Go models. Existing models, records and conversations are preserved.
-- Adopted the MIT license, added an in-app license notice and expanded third-party component and record-source notices. Third-party resources retain their own licenses.
+- SGF imports preserve the complete variation tree, comments and board marks, including collections containing multiple games. Each file appears as one local game entry, suitable for browsing your own joseki collections.
+- Browse move paths, return to parent nodes, switch variations and open a selected position on the main board. Setup stones, stone removals and player-to-move nodes are supported. Save trials as related games while retaining and exporting the complete source SGF.
+- Removed SGF import limits on file size, node count and nesting depth. Unspecified or unsupported rules continue to use Chinese rules through the existing fallback, without the import warning.
+- Move-path and variation buttons now have a thin border and subtle background to distinguish them from navigation and board-placement controls.
+- Codex / Claude settings now offer CLI paths and optional Node paths, supporting native executables and Node script entry points and improving CLI discovery and detection when launched from the desktop.
 
 Choose one installer matching your system:
 

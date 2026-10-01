@@ -1,15 +1,14 @@
 # 更新履歴
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
 
-## v0.1.5
+## v0.1.6
 
-- Agent が棋譜の読み込み、現在局面や試し打ち分岐の保存、棋譜名の変更に対応しました。盤面と棋譜ライブラリを同期し、試し打ちは元の棋譜を残した関連棋譜として保存します。中断後の続行でも更新した棋譜のコンテキストを保持します。
-- 長い解説中に「CLI 出力が上限を超えました」となる問題を修正しました。Codex / Claude CLI の累計出力、Codex の回答ファイル、フロントエンドのローカルメッセージに対する固定長制限を撤廃し、ツール結果による隠れた総量制限を解消しました。
-- 棋譜ライブラリの検索、ページ切り替え、名前変更、出典表示、関連分岐のグループ化を追加しました。通常版は CWI の全棋譜アーカイブを同梱し、minimal 版は棋譜ダウンロード画面から必要に応じて導入できます。定石集・詰碁集は同梱していません。
-- 野狐囲碁の棋譜をユーザー名または UID で検索し、ローカルライブラリへ取り込めるようになりました。同じ棋譜を再度取り込んでも記録は重複しません。
-- minimal 版は初回起動時にエンジンやモデルを自動取得しなくなりました。ローカルエンジンを使う場合は「設定 → 囲碁モデル」で KataGo のダウンロード・有効化を選択してください。既存のモデル、棋譜、会話は保持します。
-- プロジェクトに MIT ライセンスを採用し、アプリ内のライセンス表示、第三者コンポーネントと棋譜出典の告知を追加しました。第三者のリソースにはそれぞれのライセンスが適用されます。
+- SGF の取り込みで変化ツリー全体、コメント、盤面のマークを保持し、複数の棋譜を含む SGF コレクションにも対応しました。各ファイルを 1 つのローカル棋譜として表示し、自分の定石集を閲覧できます。
+- 手順の選択、親ノードへの移動、変化の切り替え、選択した局面のメイン盤面への読み込みに対応しました。石の配置・除去や手番指定のノードも閲覧できます。試し打ちは関連棋譜として保存でき、元の SGF 全体を保持して書き出せます。
+- SGF 取り込みのファイルサイズ、ノード数、入れ子の深さの制限を撤廃しました。ルール未指定または非対応の場合は従来どおり中国ルールを使用し、その取り込み警告を表示しなくなりました。
+- 手順パスと変化選択のボタンに細い枠線と淡い背景を追加し、ナビゲーションや盤面への読み込みボタンと見分けやすくしました。
+- Codex / Claude の設定に CLI パスと任意の Node パスを追加しました。ネイティブ実行ファイルと Node スクリプトに対応し、デスクトップ起動時の CLI 検索と検出を改善しました。
 
 環境に合うインストーラーを 1 つ選んでください。
 

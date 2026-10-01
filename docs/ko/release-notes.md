@@ -1,15 +1,14 @@
 # 변경 기록
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.5/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
 
-## v0.1.5
+## v0.1.6
 
-- Agent가 기보 불러오기, 현재 국면이나 시험 분기 저장, 기보 이름 변경을 지원합니다. 바둑판과 기보 보관함을 동기화하며 시험 분기는 원본을 보존한 관련 기보로 저장합니다. 일시 중지 후 계속할 때도 변경된 기보 문맥을 유지합니다.
-- 긴 해설 중 “CLI 출력이 제한을 초과했습니다” 오류가 발생하던 문제를 수정했습니다. Codex / Claude CLI의 누적 출력, Codex 답변 파일, 프런트엔드의 로컬 메시지에 대한 고정 길이 제한을 제거하여 도구 결과가 숨겨진 총량 제한에 걸리지 않도록 했습니다.
-- 기보 보관함에 검색, 페이지 이동, 이름 변경, 출처 정보와 관련 분기 그룹을 추가했습니다. 일반판에는 전체 CWI 기보 아카이브를 포함하며 minimal판은 기보 다운로드 화면에서 필요할 때 설치할 수 있습니다. 정석이나 사활 문제 모음은 포함하지 않습니다.
-- 한큐(野狐, Fox) 바둑 기보를 사용자 이름 또는 UID로 조회하여 로컬 보관함으로 가져올 수 있습니다. 같은 기보를 다시 가져와도 중복 기록을 만들지 않습니다.
-- minimal판은 첫 실행 때 엔진과 모델을 자동으로 다운로드하지 않습니다. 로컬 엔진이 필요하면 설정 → 바둑 모델에서 KataGo 다운로드 및 활성화를 선택하세요. 기존 모델, 기보와 대화는 유지됩니다.
-- 프로젝트에 MIT 라이선스를 적용하고 앱 내 라이선스 안내와 타사 구성 요소 및 기보 출처 고지를 추가했습니다. 타사 리소스에는 각각의 라이선스가 적용됩니다.
+- SGF를 가져올 때 전체 변화 트리, 주석과 바둑판 표시를 보존하며 여러 기보가 담긴 SGF 모음도 지원합니다. 파일 하나를 로컬 기보 항목 하나로 표시하여 자신의 정석 모음을 탐색할 수 있습니다.
+- 수순 선택, 상위 노드로 이동, 변화 전환 및 선택한 국면을 메인 바둑판에 불러오기를 지원합니다. 돌 배치·제거와 다음 차례 지정 노드도 탐색할 수 있습니다. 시험 수순은 관련 기보로 저장하고 원본 SGF 전체를 보존하여 내보낼 수 있습니다.
+- SGF 가져오기의 파일 크기, 노드 수와 중첩 깊이 제한을 제거했습니다. 규칙이 지정되지 않거나 지원되지 않으면 기존처럼 중국 규칙을 적용하며 해당 가져오기 경고는 표시하지 않습니다.
+- 수순 경로와 변화 선택 버튼에 얇은 테두리와 은은한 배경을 추가하여 탐색 및 바둑판 불러오기 버튼과 구분했습니다.
+- Codex / Claude 설정에 CLI 경로와 선택적 Node 경로를 추가했습니다. 네이티브 실행 파일과 Node 스크립트를 지원하며 데스크톱에서 실행할 때 CLI 검색과 감지를 개선했습니다.
 
 환경에 맞는 설치 파일 하나를 선택하세요.
 
