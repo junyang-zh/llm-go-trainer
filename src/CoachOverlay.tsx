@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useId, useRef, type RefObject } from 'react';
 
 type XY = { x: number; y: number };
 const center = (r: DOMRect): XY => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
@@ -25,6 +25,8 @@ export function CoachOverlay({
   revision: unknown;
 }) {
   const svg = useRef<SVGSVGElement>(null);
+  const fogId = `coach-fog-${useId().replace(/:/g, '')}`;
+  const clipId = `${fogId}-clip`;
   useEffect(() => {
     const host = root.current,
       layer = svg.current;
@@ -65,10 +67,15 @@ export function CoachOverlay({
         near: number;
         light: number;
       }[] = [];
-      for (const text of log!.querySelectorAll<HTMLElement>('[data-go-point]')) {
-        const point = text.dataset.goPoint!;
-        const target = points.get(point);
-        if (!target) continue;
+      const regions = new Map<
+        string,
+        { centers: XY[]; cell: number; near: number; light: number }
+      >();
+      for (const text of log!.querySelectorAll<HTMLElement>('[data-go-point], [data-go-region]')) {
+        const region = text.dataset.goRegion;
+        const coordinates = region ? region.split(' ').sort() : [text.dataset.goPoint!];
+        const targets = coordinates.map((point) => points.get(point));
+        if (targets.some((target) => !target)) continue;
         let left = Math.max(0, clip.left),
           right = Math.min(innerWidth, clip.right);
         let top = Math.max(0, clip.top),
@@ -103,17 +110,92 @@ export function CoachOverlay({
         const rect = fragments.sort((a, b) =>
           pointer ? distance(center(a), pointer) - distance(center(b), pointer) : 0,
         )[0];
-        const boardRect = target.getBoundingClientRect();
+        const boardRects = targets.map((target) => target!.getBoundingClientRect());
+        const boardRect = boardRects[0];
         if (!boardRect.width) continue;
         const xy = center(boardRect);
-        const near = pointer
-          ? Math.min(distance(pointer, xy), distance(pointer, center(rect)))
-          : 700;
-        // All marks share a hue. Luminance follows proximity at either endpoint.
+        // Regions respond only to their text, never to a stone inside the region.
+        const near = region
+          ? text === document.activeElement
+            ? 0
+            : pointer
+              ? distance(pointer, center(rect))
+              : 700
+          : pointer
+            ? Math.min(distance(pointer, xy), distance(pointer, center(rect)))
+            : 700;
+        // All marks share a hue; nearer references use a deeper shade.
         const light = 43 + Math.min(1, near / 550) * 38;
         text.style.setProperty('--point-light', `${light}%`);
         painted.push(text);
-        entries.push({ text, rect, point, xy, radius: boardRect.width * 0.44, near, light });
+        if (region) {
+          const key = coordinates.join(' ');
+          if (!regions.has(key) || near < regions.get(key)!.near)
+            regions.set(key, {
+              centers: boardRects.map(center),
+              cell: boardRect.width,
+              near,
+              light,
+            });
+        } else {
+          entries.push({
+            text,
+            rect,
+            point: coordinates[0],
+            xy,
+            radius: boardRect.width * 0.44,
+            near,
+            light,
+          });
+        }
+      }
+      if (regions.size) {
+        const defs = document.createElementNS(ns, 'defs');
+        const filter = document.createElementNS(ns, 'filter');
+        filter.id = fogId;
+        // Blur the union once so adjacent stones form one soft patch, without rings
+        // or compounded opacity where the individual footprints overlap.
+        const blur = document.createElementNS(ns, 'feGaussianBlur');
+        blur.setAttribute('stdDeviation', String([...regions.values()][0].cell * 0.2));
+        filter.setAttribute('x', '-50%');
+        filter.setAttribute('y', '-50%');
+        filter.setAttribute('width', '200%');
+        filter.setAttribute('height', '200%');
+        filter.append(blur);
+        const clipPath = document.createElementNS(ns, 'clipPath');
+        clipPath.id = clipId;
+        clipPath.setAttribute('clipPathUnits', 'userSpaceOnUse');
+        const boardBounds = board!.getBoundingClientRect();
+        const clipRect = document.createElementNS(ns, 'rect');
+        clipRect.setAttribute('x', String(boardBounds.left));
+        clipRect.setAttribute('y', String(boardBounds.top));
+        clipRect.setAttribute('width', String(boardBounds.width));
+        clipRect.setAttribute('height', String(boardBounds.height));
+        clipPath.append(clipRect);
+        defs.append(filter, clipPath);
+        layer!.append(defs);
+        const fog = document.createElementNS(ns, 'g');
+        fog.setAttribute('clip-path', `url(#${clipId})`);
+        for (const [key, region] of regions) {
+          const patch = document.createElementNS(ns, 'path');
+          const radius = region.cell * 0.72;
+          patch.setAttribute('class', 'coach-board-region');
+          patch.setAttribute('data-points', key);
+          patch.setAttribute(
+            'd',
+            region.centers
+              .map(
+                ({ x, y }) =>
+                  `M ${x - radius},${y} a ${radius},${radius} 0 1,0 ${radius * 2},0 a ${radius},${radius} 0 1,0 ${-radius * 2},0 Z`,
+              )
+              .join(' '),
+          );
+          patch.setAttribute('fill', `hsl(174 64% ${region.light}%)`);
+          patch.setAttribute('opacity', String(0.16 + (1 - Math.min(1, region.near / 550)) * 0.2));
+          patch.setAttribute('filter', `url(#${fogId})`);
+          fog.append(patch);
+        }
+        layer!.append(fog);
       }
       // Repeated coordinates share one marker; closest text controls its brightness.
       const byPoint = new Map<string, (typeof entries)[number]>();
@@ -139,17 +221,17 @@ export function CoachOverlay({
         );
       if (active) {
         const { rect, xy, radius } = active;
-        // Leave the marker at its upper-right rim and enter the visible text's
-        // upper-left corner, with horizontal tangents at both ends.
+        // Leave the marker at its lower-right rim, heading diagonally down-right,
+        // and enter the visible text's upper-left corner from the left.
         const offset = radius / Math.SQRT2;
-        const start = { x: xy.x + offset, y: xy.y - offset };
+        const start = { x: xy.x + offset, y: xy.y + offset };
         const end = { x: rect.left, y: rect.top };
         const handle = Math.min(180, Math.max(32, Math.abs(end.x - start.x) * 0.4));
         const line = document.createElementNS(ns, 'path');
         line.setAttribute('class', 'coach-guide');
         line.setAttribute(
           'd',
-          `M ${start.x},${start.y} C ${start.x + handle},${start.y} ${end.x - handle},${end.y} ${end.x},${end.y}`,
+          `M ${start.x},${start.y} C ${start.x + handle},${start.y + handle} ${end.x - handle},${end.y} ${end.x},${end.y}`,
         );
         layer!.append(line);
       }
@@ -179,7 +261,7 @@ export function CoachOverlay({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['open', 'hidden', 'data-go-point'],
+      attributeFilter: ['open', 'hidden', 'data-go-point', 'data-go-region'],
     });
     host.addEventListener('pointermove', move);
     host.addEventListener('pointerleave', leave);
@@ -203,6 +285,6 @@ export function CoachOverlay({
       for (const text of painted) text.style.removeProperty('--point-light');
       layer.replaceChildren();
     };
-  }, [root, enabled, revision]);
+  }, [root, enabled, revision, fogId, clipId]);
   return <svg ref={svg} className="coach-overlay" aria-hidden="true" />;
 }

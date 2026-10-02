@@ -8,6 +8,8 @@ Coordinate extensions use standard Markdown fragment links in paragraphs, lists,
 | ------------------------ | ------------------------------------------------------- |
 | Ungrouped point          | `[Crawl on the second line](#C2)`                       |
 | Grouped point            | `[Atari](#go/point/B3?group=one)`                       |
+| Ungrouped region         | `[Lower-right group](#P4#Q4#Q3#R3#R2)`                  |
+| Grouped region           | `[Lower-right group](1#P4#Q4#Q3#R3#R2)`                 |
 | Exclusive selector       | `[Show variation](#go/selector/one)`                    |
 | Trial starting position  | `[Variation one](#go/selector/one?branch=line-a&ply=0)` |
 | After trial move two     | `[Continuation](#go/selector/two?branch=line-a&ply=2)`  |
@@ -15,7 +17,9 @@ Coordinate extensions use standard Markdown fragment links in paragraphs, lists,
 
 Group/branch IDs use 1–40 ASCII letters, digits, `_` or `-`, scoped to one answer. Only one group is active across the UI; clicking its selector again disables it. Ungrouped points are independent. `branch` and `turn` are mutually exclusive; `ply` requires `branch`, defaulting to 0. `turn=0` means the original initial position. Coordinates use GTP (skip I); out-of-board points do not highlight and empty labels display the coordinate.
 
-Only visible Agent text generates markers, and the board must match the message/selector's position. Tool records, user questions and collapsed panels do not. Proximity to either text or board point increases highlight intensity. Hovering either end or keyboard-focusing text displays a translucent dashed Bézier link from the board marker's upper-right edge to the visible label's upper-left corner; control points extend horizontally right/left. Repeated coordinates share a board marker; the closest visible label determines intensity/link.
+Region references list 2–361 coordinates, with at least two distinct points; duplicates are removed. The prefix `1` is a group ID enabled by `#go/selector/1`; omit it for an ungrouped region. The equivalent long form is `#go/region/P4,Q4,Q3,R3,R2?group=1`. Any out-of-board coordinate disables the entire region. List actual stones: the UI does not expand a group or judge life and death.
+
+Only visible Agent text generates markers, and the board must match the message/selector's position. Tool records, user questions and collapsed panels do not. Proximity to either text or board point increases point highlight intensity. Hovering either end or keyboard-focusing text displays a translucent dashed Bézier link from the board marker's lower-right edge to the visible label's upper-left corner; the starting control point extends diagonally down-right, the ending control point extends left. Repeated coordinates share a board marker; the closest visible label determines intensity/link. Regions form soft fog patches without individual outlines or links. Their brightness and opacity respond only to proximity to text, or keyboard focus. Repeated regions share one patch controlled by the closest visible label.
 
 ## Agent trial editing
 

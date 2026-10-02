@@ -24,6 +24,17 @@ it('parses only bounded standard fragment links without accepting unknown or amb
     ply: 2,
   });
   expect(parseCoachLink('#go/selector/review?turn=0')).toMatchObject({ turn: 0 });
+  expect(parseCoachLink('1#F4#G4#G3#F4')).toEqual({
+    kind: 'region',
+    points: ['F4', 'G4', 'G3'],
+    group: '1',
+  });
+  expect(parseCoachLink('#F4#G4')).toEqual({ kind: 'region', points: ['F4', 'G4'] });
+  expect(parseCoachLink('#go/region/F4,G4,G3?group=one')).toEqual({
+    kind: 'region',
+    points: ['F4', 'G4', 'G3'],
+    group: 'one',
+  });
   for (const href of [
     '#I2',
     '#A0',
@@ -38,8 +49,34 @@ it('parses only bounded standard fragment links without accepting unknown or amb
     '#go/point/B2?unknown=1',
     'javascript:alert(1)',
     '#go/selector/a?branch=../x',
+    '1#F4',
+    '1#F4#F4',
+    '1#F4#I4',
+    '1#F4#G20',
+    '1#F4#G4?group=two',
+    '#go/region/F4',
+    '#go/region/F4,F4',
+    '#go/region/F4,I4',
+    '#go/region/F4,G4?group=',
+    '#go/region/F4,G4?group=one&group=two',
+    '#go/region/F4,G4?branch=line',
+    `#go/region/${Array.from({ length: 362 }, (_, i) => (i % 2 ? 'F4' : 'G4')).join(',')}`,
   ])
     expect(parseCoachLink(href), href).toBeUndefined();
+});
+it('renders regions through Markdown without turning their coordinates into point marks or links', () => {
+  const text =
+    '[右下大块](1#F4#G4#G3) 不活。\n\n[常驻](#B2#B3) [关闭](2#C2#C3) [越界](1#J4#K4)\n\n`[代码](1#F4#G4)`\n\n[引用][block]\n\n[block]: #go/region/F4,G4?group=1';
+  const html = renderToStaticMarkup(<MarkdownText coach={coach}>{text}</MarkdownText>);
+  expect(html).toContain('data-go-region="F4 G4 G3"');
+  expect(html).toContain('data-go-region="B2 B3"');
+  expect(html).toContain('data-go-region="F4 G4"');
+  expect(html).not.toMatch(/data-go-region="(?:C2 C3|J4 K4)"|data-go-point|href=/);
+  expect(html).toContain('<code>[代码](1#F4#G4)</code>');
+  for (const markup of [undefined, { ...coach, enabled: false }, { ...coach, activeGroup: '2' }]) {
+    const inactive = renderToStaticMarkup(<MarkdownText coach={markup}>{text}</MarkdownText>);
+    expect(inactive).not.toContain('data-go-region="F4 G4');
+  }
 });
 it('renders only enabled in-board answer links, preserves Markdown semantics and makes selectors accessible', () => {
   const text =

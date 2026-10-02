@@ -1610,7 +1610,8 @@ h2 {
   accent-color: #294d40;
 }
 
-.coach-point[data-go-point] {
+.coach-point[data-go-point],
+.coach-point[data-go-region] {
   border-radius: 3px;
   padding: 0 2px;
   background: hsl(174 64% var(--point-light, 81%) / 0.24);

@@ -31,8 +31,9 @@ const components: Components = {
           </button>
         );
       let valid = false;
+      const points = link.kind === 'region' ? link.points : [link.point];
       try {
-        valid = toIndex(link.point, coach.size) >= 0;
+        valid = points.every((point) => toIndex(point, coach.size) >= 0);
       } catch {
         /* out of board */
       }
@@ -40,11 +41,12 @@ const components: Components = {
       return (
         <span
           className="coach-point"
-          data-go-point={active ? link.point : undefined}
+          data-go-point={active && link.kind === 'point' ? link.point : undefined}
+          data-go-region={active && link.kind === 'region' ? points.join(' ') : undefined}
           tabIndex={active ? 0 : undefined}
-          title={link.point}
+          title={points.join(', ')}
         >
-          {children || link.point}
+          {children || points.join(', ')}
         </span>
       );
     }
