@@ -208,6 +208,7 @@ export default function App() {
       setup ||
       scoring ||
       (autoPlay && position.toPlay === aiColor && position.passes < 2),
+    game,
   );
   const analysis = evaluations.analysis;
   const candidates =
@@ -981,6 +982,9 @@ export default function App() {
           </div>
           <EvaluationPanel
             history={evaluations.points}
+            mainlineHistory={evaluations.mainlinePoints}
+            mainlineTotal={game.moves.length}
+            trialTurn={trial ? turn : undefined}
             turn={current.moves.length}
             total={analysisGame.moves.length}
             disabled={locked || scoring || !!trial}

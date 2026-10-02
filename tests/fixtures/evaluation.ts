@@ -20,6 +20,14 @@ export const recordedGame: Game = {
     { color: 'B', point: 'D6' },
   ],
 };
+export const trialGame: Game = {
+  ...recordedGame,
+  moves: [recordedGame.moves[0], { color: 'W', point: 'D4' }, { color: 'B', point: 'E4' }],
+};
+export function trialEvaluation(turnNumber: number, visits = 100): Analysis {
+  const value = evaluation(turnNumber, visits);
+  return { ...value, rootInfo: { ...value.rootInfo, winrate: 0.75, scoreLead: 8 } };
+}
 export const testEngine: EngineStatus = {
   configured: true,
   running: true,

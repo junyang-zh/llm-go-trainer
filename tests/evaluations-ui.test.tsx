@@ -7,7 +7,16 @@ import { streamApi } from '../src/api';
 import { newGame } from '../shared/go';
 import { trainingForRank } from '../shared/training';
 import type { Game, StreamEvent } from '../shared/types';
-import { evaluation, recordedGame, testEngine, testStatus } from './fixtures/evaluation';
+import {
+  evaluation,
+  recordedGame,
+  trialGame,
+  trialEvaluation,
+  testEngine,
+  testStatus,
+} from './fixtures/evaluation';
+import { exportSgf } from '../shared/sgf';
+import { EvaluationChart } from '../src/EvaluationPanel';
 import App from '../src/App';
 vi.mock('../src/api', () => ({ streamApi: vi.fn(), api: vi.fn() }));
 import { api } from '../src/api';
@@ -19,13 +28,15 @@ function Harness({
   turn = game.moves.length,
   paused = false,
   pid = 100,
+  mainlineGame = game,
 }: {
   game: Game;
   turn?: number;
   paused?: boolean;
   pid?: number;
+  mainlineGame?: Game;
 }) {
-  latest = useEvaluations(game, turn, training, { ...testEngine, pid }, paused);
+  latest = useEvaluations(game, turn, training, { ...testEngine, pid }, paused, mainlineGame);
   return null;
 }
 async function render(game: Game, turn = game.moves.length, paused = false, pid = 100) {
@@ -56,6 +67,151 @@ afterEach(async () => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
+});
+it('retains the complete mainline through trial analysis, rewinding and replacing the trial', async () => {
+  await render(recordedGame);
+  await tick();
+  await act(async () => latest.complete());
+  await tick();
+  await act(async () => latest.record(recordedGame, evaluation(2, 800), true));
+  const mainline = latest.points;
+  await act(async () =>
+    root.render(<Harness game={trialGame} turn={3} mainlineGame={recordedGame} paused />),
+  );
+  expect(Object.keys(latest.points)).toEqual(['0', '1']);
+  await act(async () => {
+    latest.record(trialGame, trialEvaluation(2), true);
+    latest.record(trialGame, trialEvaluation(3), true);
+  });
+  expect(latest.points[2].winrate).toBe(0.75);
+  expect(latest.points[2].visits).toBe(100);
+  expect(latest.mainlinePoints).toEqual(mainline);
+  await act(async () =>
+    root.render(<Harness game={trialGame} turn={1} mainlineGame={recordedGame} paused />),
+  );
+  expect(latest.points[3].winrate).toBe(0.75);
+  expect(latest.mainlinePoints).toEqual(mainline);
+  const replacement = {
+    ...trialGame,
+    moves: [...trialGame.moves.slice(0, 2), recordedGame.moves[2]],
+  };
+  await act(async () =>
+    root.render(<Harness game={replacement} mainlineGame={recordedGame} paused />),
+  );
+  expect(latest.points[3]).toBeUndefined();
+  await act(async () => latest.record(replacement, trialEvaluation(3), true));
+  expect(latest.mainlinePoints).toEqual(mainline);
+  const searches = vi.mocked(streamApi).mock.calls.length;
+  await render(recordedGame, 1, true);
+  expect(latest.points).toEqual(mainline);
+  expect(streamApi).toHaveBeenCalledTimes(searches);
+  await render(recordedGame, 1);
+  await tick();
+  await act(async () => latest.complete());
+  await tick();
+  // Only the viewed position refreshes its PV; no curve completion searches are needed.
+  expect(streamApi).toHaveBeenCalledTimes(searches + 1);
+  expect(latest.points).toEqual(mainline);
+});
+
+it('draws separate trial and muted future curves and prevents navigating muted points', async () => {
+  await render(recordedGame, 3, true);
+  await act(async () => {
+    for (let turn = 0; turn <= 3; turn++) latest.record(recordedGame, evaluation(turn), true);
+  });
+  const mainline = latest.points;
+  await act(async () =>
+    root.render(<Harness game={trialGame} mainlineGame={recordedGame} paused />),
+  );
+  await act(async () => latest.record(trialGame, trialEvaluation(2), true));
+  const navigate = vi.fn();
+  await act(async () =>
+    root.render(
+      <EvaluationChart
+        history={latest.points}
+        mainlineHistory={mainline}
+        trialTurn={1}
+        turn={2}
+        total={3}
+        disabled={false}
+        navigate={navigate}
+      />,
+    ),
+  );
+  const plot = host.querySelector('.plot-winrate')!;
+  expect(plot.querySelectorAll('.mainline .plot-dot')).toHaveLength(2);
+  expect(plot.querySelectorAll('.future .plot-dot')).toHaveLength(2);
+  expect(plot.querySelectorAll('.trial .plot-dot')).toHaveLength(1);
+  expect(plot.querySelector('.trial .plot-point')!.getAttribute('aria-label')).toContain('75.0%');
+  expect(plot.querySelector('.future .plot-point')!.getAttribute('aria-label')).toContain('20.0%');
+  expect(plot.querySelector('.trial .plot-line')!.getAttribute('points')).toBe('158,62.8 278,32');
+  const future = plot.querySelector('.future .plot-point')!;
+  expect(future.getAttribute('tabindex')).toBe('-1');
+  await act(async () => {
+    future.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    future.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(navigate).not.toHaveBeenCalled();
+  await act(async () =>
+    plot
+      .querySelector('.trial .plot-point')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })),
+  );
+  expect(navigate).toHaveBeenCalledWith(2);
+});
+
+it('immediately restores the mainline chart after clearing a trial without filling it again', async () => {
+  localStorage.setItem('go-trainer-game-v1', exportSgf(recordedGame));
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === 'library' ? { games: [], conversations: [] } : testStatus,
+  );
+  vi.mocked(streamApi).mockImplementation(async (_endpoint, body, onEvent) => {
+    const game = (body as { game: Game }).game;
+    const value = game.moves.some((move) => move.point === 'D4')
+      ? trialEvaluation(game.moves.length)
+      : evaluation(game.moves.length);
+    onEvent({ type: 'done', analysis: value });
+  });
+  await act(async () => root.render(<App />));
+  await tick();
+  async function click(selector: string) {
+    await act(async () => (host.querySelector(selector) as HTMLElement).click());
+  }
+  await click('.evaluation-toggle');
+  const fill = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent === '补全曲线',
+  )!;
+  await act(async () => fill.click());
+  await tick();
+  const mainline = host.querySelector('.plot-winrate .mainline .plot-line')!.getAttribute('points');
+  expect(host.querySelectorAll('.plot-winrate .plot-dot')).toHaveLength(4);
+  await click('[aria-label="上一手"]');
+  await click('[aria-label="上一手"]');
+  await act(async () =>
+    host
+      .querySelector('[aria-label="D4 空点"]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })),
+  );
+  await tick();
+  expect(host.querySelectorAll('.plot-winrate .future .plot-dot')).toHaveLength(2);
+  expect(
+    host.querySelector('.plot-winrate .trial .plot-point')!.getAttribute('aria-label'),
+  ).toContain('75.0%');
+  expect(host.querySelector('.evaluation-chart text:last-child')!.textContent).toContain('3');
+  const searches = vi.mocked(streamApi).mock.calls.length;
+  const clear = [...host.querySelectorAll<HTMLButtonElement>('.trial-bar button')].find(
+    (button) => button.textContent === '清空试下',
+  )!;
+  await act(async () => clear.click());
+  expect(host.querySelectorAll('.plot-winrate .mainline .plot-dot')).toHaveLength(4);
+  expect(host.querySelector('.plot-series.future')).toBeNull();
+  expect(host.querySelector('.plot-series.trial')).toBeNull();
+  expect(fill.disabled).toBe(true);
+  expect(streamApi).toHaveBeenCalledTimes(searches);
+  // The cursor now sits at the trial's origin, so compare data independently of dot radius.
+  expect(host.querySelector('.plot-winrate .mainline .plot-line')!.getAttribute('points')).toBe(
+    mainline,
+  );
 });
 it('automatically analyzes positions, preserves history on navigation, and fills only missing turns', async () => {
   await render(recordedGame);

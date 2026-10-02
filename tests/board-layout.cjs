@@ -87,6 +87,14 @@ async function checkLayout() {
     await delay(50);
     document.querySelector('[aria-label="关闭通知"]').click();
     document.querySelector('.evaluation-toggle').click();
+    await until(() => document.querySelector('.evaluation-actions button'));
+    [...document.querySelectorAll('.evaluation-actions button')]
+      .find((button) => button.textContent === '补全曲线')
+      .click();
+    await until(() => document.querySelectorAll('.plot-winrate .mainline .plot-dot').length === 7);
+    const mainlineCurve = document
+      .querySelector('.plot-winrate .mainline .plot-line')
+      .getAttribute('points');
     const explain = [...document.querySelectorAll('.quick-actions button')].find(
       (button) => button.textContent === '解释这一手',
     );
@@ -113,11 +121,31 @@ async function checkLayout() {
       .querySelector('[aria-label="C4 空点"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await until(() => document.querySelector('[aria-label="C4 试下"]'));
-    await delay(100);
+    await until(() => document.querySelector('.plot-winrate .trial .plot-dot'));
+    const trialDot = document.querySelector('.plot-winrate .trial .plot-dot');
+    const futureDot = document.querySelector('.plot-winrate .future .plot-dot');
+    if (
+      getComputedStyle(trialDot).fill !== 'rgb(196, 79, 67)' ||
+      getComputedStyle(futureDot).fill !== 'rgb(161, 166, 158)' ||
+      document.querySelectorAll('.plot-winrate .mainline .plot-dot').length !== 6 ||
+      document.querySelectorAll('.plot-winrate .future .plot-dot').length !== 1 ||
+      +document
+        .querySelector('.evaluation-chart text:last-child')
+        .textContent.replace(/\D/g, '') !== 6
+    )
+      throw new Error('Trial evaluation did not preserve the full mainline with red/gray curves');
     [...document.querySelectorAll('.trial-bar button')]
       .find((button) => button.textContent === '清空试下')
       .click();
     await until(() => !document.querySelector('[aria-label="C4 试下"]'));
+    if (
+      document.querySelectorAll('.plot-winrate .mainline .plot-dot').length !== 7 ||
+      document.querySelector('.plot-winrate .mainline .plot-line').getAttribute('points') !==
+        mainlineCurve ||
+      document.querySelector('.plot-series.trial') ||
+      document.querySelector('.plot-series.future')
+    )
+      throw new Error('Clearing the trial did not immediately restore the cached mainline curve');
     document.querySelector('[aria-label="下一手"]').click();
     await delay(100);
   } finally {

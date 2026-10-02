@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Analysis, EngineStatus, Game, Training } from '../shared/types';
 import { streamApi } from './api';
 import {
-  compatibleHistory,
   positionKey,
   positionKeys,
   recordEvaluation,
   type EvaluationHistory,
+  type EvaluationPoint,
 } from './evaluation-history';
+
+function historyForKeys(cache: Record<string, EvaluationPoint>, keys: string[]): EvaluationHistory {
+  return Object.fromEntries(keys.flatMap((key, turn) => (cache[key] ? [[turn, cache[key]]] : [])));
+}
 
 export function useEvaluations(
   game: Game,
@@ -15,8 +19,10 @@ export function useEvaluations(
   training: Training,
   engine: EngineStatus | undefined,
   paused: boolean,
+  mainlineGame: Game = game,
 ) {
   const keys = useMemo(() => positionKeys(game), [game]);
+  const mainlineKeys = useMemo(() => positionKeys(mainlineGame), [mainlineGame]);
   const lastSource = useRef('');
   const source = engine?.ready
     ? JSON.stringify([engine.mode, engine.name, engine.backend, engine.pid])
@@ -24,9 +30,10 @@ export function useEvaluations(
   if (engine?.ready) lastSource.current = source;
   const generation = useRef(0);
   const [revision, setRevision] = useState(0);
-  const live = useRef({ keys, source });
-  live.current = { keys, source };
-  const store = useRef({ source: '', points: {} as EvaluationHistory });
+  const live = useRef({ keys, mainlineKeys, source });
+  live.current = { keys, mainlineKeys, source };
+  // Position keys let mainline and trial evaluations coexist at the same move number.
+  const store = useRef({ source: '', points: {} as Record<string, EvaluationPoint> });
   const [snapshot, setSnapshot] = useState(store.current);
   const [currentResult, setCurrentResult] = useState<{
     key: string;
@@ -43,8 +50,12 @@ export function useEvaluations(
   const requestKey = source + currentKey + ':' + revision;
   const error = failure?.request === requestKey ? failure.message : '';
   const points = useMemo(
-    () => (snapshot.source === source ? compatibleHistory(snapshot.points, keys) : {}),
+    () => (snapshot.source === source ? historyForKeys(snapshot.points, keys) : {}),
     [snapshot, source, keys],
+  );
+  const mainlinePoints = useMemo(
+    () => (snapshot.source === source ? historyForKeys(snapshot.points, mainlineKeys) : {}),
+    [snapshot, source, mainlineKeys],
   );
   const analysis =
     currentResult?.key === currentKey && currentResult.source === source
@@ -61,10 +72,8 @@ export function useEvaluations(
         live.current.keys[value.turnNumber] !== key
       )
         return;
-      const previous =
-        store.current.source === source
-          ? compatibleHistory(store.current.points, live.current.keys)
-          : {};
+      const cache = store.current.source === source ? store.current.points : {};
+      const previous = cache[key] ? { [value.turnNumber]: cache[key] } : {};
       const next = recordEvaluation(previous, key, value, final);
       // Keep only one full analysis (ownership/policy/PV); history stores compact root numbers.
       if (key === currentKey && next[value.turnNumber]?.key === key)
@@ -76,7 +85,15 @@ export function useEvaluations(
             : { key, source, analysis: value },
         );
       if (next === previous) return;
-      store.current = { source, points: next };
+      // Retain the real game's entire curve while pruning abandoned trial branches.
+      const retainedKeys = new Set([...live.current.mainlineKeys, ...live.current.keys]);
+      store.current = {
+        source,
+        points: {
+          ...Object.fromEntries(Object.entries(cache).filter(([key]) => retainedKeys.has(key))),
+          [key]: next[value.turnNumber],
+        },
+      };
       setSnapshot(store.current);
     },
     [source, revision, currentKey],
@@ -109,7 +126,7 @@ export function useEvaluations(
             for (const index of turns) {
               controller.signal.throwIfAborted();
               const cached =
-                store.current.source === source ? store.current.points[index] : undefined;
+                store.current.source === source ? store.current.points[keys[index]] : undefined;
               // Revisiting a position also refreshes its candidates; never reuse another turn's PV.
               if (
                 cached?.key === keys[index] &&
@@ -180,6 +197,7 @@ export function useEvaluations(
 
   return {
     points,
+    mainlinePoints,
     analysis,
     record,
     reset,

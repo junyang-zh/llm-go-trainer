@@ -558,6 +558,12 @@ h2 {
 .plot-scoreLead {
   color: #9a673a;
 }
+.plot-series.future {
+  color: #a1a69e;
+}
+.plot-series.trial {
+  color: #c44f43;
+}
 .plot-title {
   fill: currentColor;
 }

@@ -5,19 +5,44 @@ import { evaluationSegments, type EvaluationHistory } from './evaluation-history
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
 export function EvaluationChart({
   history,
+  mainlineHistory = history,
+  trialTurn,
   turn,
   total,
   disabled,
   navigate,
 }: {
   history: EvaluationHistory;
+  mainlineHistory?: EvaluationHistory;
+  trialTurn?: number;
   turn: number;
   total: number;
   disabled: boolean;
   navigate: (turn: number) => void;
 }) {
-  const points = Object.values(history).sort((a, b) => a.turn - b.turn);
-  const segments = evaluationSegments(points);
+  const mainline = Object.values(mainlineHistory).sort((a, b) => a.turn - b.turn);
+  const trial = Object.values(history).sort((a, b) => a.turn - b.turn);
+  const series =
+    trialTurn === undefined
+      ? [{ kind: 'mainline', points: trial, dots: trial }]
+      : [
+          {
+            kind: 'mainline',
+            points: mainline.filter((point) => point.turn <= trialTurn),
+            dots: mainline.filter((point) => point.turn <= trialTurn),
+          },
+          {
+            kind: 'future',
+            points: mainline.filter((point) => point.turn >= trialTurn),
+            dots: mainline.filter((point) => point.turn > trialTurn),
+          },
+          {
+            kind: 'trial',
+            points: trial.filter((point) => point.turn >= trialTurn),
+            dots: trial.filter((point) => point.turn > trialTurn),
+          },
+        ];
+  const points = series.flatMap((line) => line.dots);
   const limit = Math.max(
     5,
     Math.ceil(Math.max(0, ...points.map((point) => Math.abs(point.scoreLead))) / 5) * 5,
@@ -68,52 +93,69 @@ export function EvaluationChart({
             {plot.min}
           </text>
           <line x1={x(turn)} x2={x(turn)} y1={plot.top} y2={plot.bottom} className="plot-cursor" />
-          {segments.map((segment) => (
-            <polyline
-              key={segment[0].turn}
-              points={segment
-                .map((point) => `${x(point.turn)},${plot.y(point[plot.key])}`)
-                .join(' ')}
-              className="plot-line"
-            />
-          ))}
-          {points.map((point) => (
-            <g
-              key={point.turn}
-              role="button"
-              aria-disabled={disabled}
-              tabIndex={disabled ? -1 : 0}
-              aria-label={t('chartPointLabel', {
-                v0: point.turn,
-                v1: (point.winrate * 100).toFixed(1),
-                v2: signed(point.scoreLead),
-                v3: point.final ? '' : t('incompleteClause'),
-              })}
-              onClick={() => !disabled && navigate(point.turn)}
-              onKeyDown={(event) => {
-                if (!disabled && ['Enter', ' '].includes(event.key)) {
-                  event.preventDefault();
-                  navigate(point.turn);
-                }
-              }}
-              className={`plot-point ${point.final ? '' : 'partial'}`}
-            >
-              <title>
-                {t('chartPointTitle', {
-                  v0: point.turn,
-                  v1: (point.winrate * 100).toFixed(1),
-                  v2: signed(point.scoreLead),
-                  v3: point.visits,
-                  v4: point.final ? '' : t('incompleteSuffix'),
-                })}
-              </title>
-              <circle cx={x(point.turn)} cy={plot.y(point[plot.key])} r="6" fill="transparent" />
-              <circle
-                cx={x(point.turn)}
-                cy={plot.y(point[plot.key])}
-                r={point.turn === turn ? 3.5 : 2}
-                className="plot-dot"
-              />
+          {series.map((line) => (
+            <g key={line.kind} className={`plot-series ${line.kind}`}>
+              {evaluationSegments(line.points).map((segment) => (
+                <polyline
+                  key={segment[0].turn}
+                  points={segment
+                    .map((point) => `${x(point.turn)},${plot.y(point[plot.key])}`)
+                    .join(' ')}
+                  className="plot-line"
+                />
+              ))}
+              {line.dots.map((point) => (
+                <g
+                  key={point.turn}
+                  role="button"
+                  aria-disabled={disabled || line.kind === 'future'}
+                  tabIndex={disabled || line.kind === 'future' ? -1 : 0}
+                  aria-label={t('chartPointLabel', {
+                    v0: point.turn,
+                    v1: (point.winrate * 100).toFixed(1),
+                    v2: signed(point.scoreLead),
+                    v3:
+                      (point.final ? '' : t('incompleteClause')) +
+                      (line.kind === 'trial'
+                        ? t('trialMoves', { v0: point.turn - trialTurn! })
+                        : ''),
+                  })}
+                  onClick={() => !disabled && line.kind !== 'future' && navigate(point.turn)}
+                  onKeyDown={(event) => {
+                    if (!disabled && line.kind !== 'future' && ['Enter', ' '].includes(event.key)) {
+                      event.preventDefault();
+                      navigate(point.turn);
+                    }
+                  }}
+                  className={`plot-point ${point.final ? '' : 'partial'}`}
+                >
+                  <title>
+                    {t('chartPointTitle', {
+                      v0: point.turn,
+                      v1: (point.winrate * 100).toFixed(1),
+                      v2: signed(point.scoreLead),
+                      v3: point.visits,
+                      v4:
+                        (point.final ? '' : t('incompleteSuffix')) +
+                        (line.kind === 'trial'
+                          ? t('trialMoves', { v0: point.turn - trialTurn! })
+                          : ''),
+                    })}
+                  </title>
+                  <circle
+                    cx={x(point.turn)}
+                    cy={plot.y(point[plot.key])}
+                    r="6"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx={x(point.turn)}
+                    cy={plot.y(point[plot.key])}
+                    r={point.turn === turn && line.kind !== 'future' ? 3.5 : 2}
+                    className="plot-dot"
+                  />
+                </g>
+              ))}
             </g>
           ))}
         </g>
@@ -137,6 +179,9 @@ export function EvaluationChart({
 
 export function EvaluationPanel({
   history,
+  mainlineHistory,
+  mainlineTotal = 0,
+  trialTurn,
   turn,
   total,
   disabled,
@@ -152,6 +197,9 @@ export function EvaluationPanel({
   searchStats,
 }: {
   history: EvaluationHistory;
+  mainlineHistory?: EvaluationHistory;
+  mainlineTotal?: number;
+  trialTurn?: number;
   turn: number;
   total: number;
   disabled: boolean;
@@ -206,8 +254,10 @@ export function EvaluationPanel({
           <div className="evaluation-candidates">{children}</div>
           <EvaluationChart
             history={history}
+            mainlineHistory={mainlineHistory}
+            trialTurn={trialTurn}
             turn={turn}
-            total={total}
+            total={Math.max(total, mainlineTotal)}
             disabled={disabled}
             navigate={navigate}
           />
