@@ -1,14 +1,14 @@
 # Release notes
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ko/release-notes.md)
 
-## v0.1.6
+## v0.1.7
 
-- SGF imports preserve the complete variation tree, comments and board marks, including collections containing multiple games. Each file appears as one local game entry, suitable for browsing your own joseki collections.
-- Browse move paths, return to parent nodes, switch variations and open a selected position on the main board. Setup stones, stone removals and player-to-move nodes are supported. Save trials as related games while retaining and exporting the complete source SGF.
-- Removed SGF import limits on file size, node count and nesting depth. Unspecified or unsupported rules continue to use Chinese rules through the existing fallback, without the import warning.
-- Move-path and variation buttons now have a thin border and subtle background to distinguish them from navigation and board-placement controls.
-- Codex / Claude settings now offer CLI paths and optional Node paths, supporting native executables and Node script entry points and improving CLI discovery and detection when launched from the desktop.
+- Win-rate and score curves retain the complete game mainline during trials: trial moves appear in red and later mainline moves in gray. Clearing a trial immediately restores the cached mainline curve. All values remain in Black's perspective.
+- Background analysis automatically fills missing game and trial evaluations, prioritizing the viewed position. Search, completion and error notifications have been adjusted; completion reports the number of moves analyzed and search speed supplied by the engine.
+- Ownership predictions show only points with an absolute ownership value of at least 0.8, using clear black/white marks. They can appear alongside candidates and trial move numbers, with marks offset to avoid overlap.
+- Coach answers support multi-coordinate stone-group references with soft fog highlights, grouping and keyboard focus. Highlights hide when references leave the visible area or the board changes position. Single-point guides now start at the lower-right edge of the mark; coach instructions and documentation in all languages have been updated.
+- Updated the UI example screenshot in the README.
 
 Choose one installer matching your system:
 

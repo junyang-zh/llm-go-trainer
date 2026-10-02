@@ -1,14 +1,14 @@
 # 변경 기록
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ko/release-notes.md)
 
-## v0.1.6
+## v0.1.7
 
-- SGF를 가져올 때 전체 변화 트리, 주석과 바둑판 표시를 보존하며 여러 기보가 담긴 SGF 모음도 지원합니다. 파일 하나를 로컬 기보 항목 하나로 표시하여 자신의 정석 모음을 탐색할 수 있습니다.
-- 수순 선택, 상위 노드로 이동, 변화 전환 및 선택한 국면을 메인 바둑판에 불러오기를 지원합니다. 돌 배치·제거와 다음 차례 지정 노드도 탐색할 수 있습니다. 시험 수순은 관련 기보로 저장하고 원본 SGF 전체를 보존하여 내보낼 수 있습니다.
-- SGF 가져오기의 파일 크기, 노드 수와 중첩 깊이 제한을 제거했습니다. 규칙이 지정되지 않거나 지원되지 않으면 기존처럼 중국 규칙을 적용하며 해당 가져오기 경고는 표시하지 않습니다.
-- 수순 경로와 변화 선택 버튼에 얇은 테두리와 은은한 배경을 추가하여 탐색 및 바둑판 불러오기 버튼과 구분했습니다.
-- Codex / Claude 설정에 CLI 경로와 선택적 Node 경로를 추가했습니다. 네이티브 실행 파일과 Node 스크립트를 지원하며 데스크톱에서 실행할 때 CLI 검색과 감지를 개선했습니다.
+- 시험 수순 중에도 승률과 집 차이 그래프에 실전 본보 전체를 유지합니다. 시험 수순은 빨간색, 본보의 이후 수순은 회색으로 표시하며 시험 수순을 지우면 캐시된 본보 그래프를 즉시 복원합니다. 모든 수치는 계속 흑의 관점을 사용합니다.
+- 실전과 시험 수순의 누락된 평가를 백그라운드에서 자동으로 채우며 현재 보고 있는 국면을 우선 분석합니다. 검색 중·완료·오류 알림을 조정하고 완료 시 분석한 수와 엔진이 제공한 검색 속도를 표시합니다.
+- 영역 예측은 소유 값의 절댓값이 0.8 이상인 지점만 명확한 흑백 표시로 보여 줍니다. 후보 수 및 시험 수순 번호와 함께 표시할 수 있으며 겹치지 않도록 위치를 조정합니다.
+- 코치 답변에서 여러 좌표로 돌 무리를 참조하고 부드러운 안개 형태로 강조할 수 있으며 그룹 전환과 키보드 포커스를 지원합니다. 참조 텍스트가 화면 밖으로 나가거나 바둑판 국면이 바뀌면 강조를 숨깁니다. 단일 지점의 연결선은 표시의 오른쪽 아래 가장자리에서 시작하도록 변경하고 코치 지침과 각 언어의 문서를 업데이트했습니다.
+- README의 화면 예시 이미지를 업데이트했습니다.
 
 환경에 맞는 설치 파일 하나를 선택하세요.
 

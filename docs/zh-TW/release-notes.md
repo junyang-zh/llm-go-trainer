@@ -1,14 +1,14 @@
 # 更新記錄
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ko/release-notes.md)
 
-## v0.1.6
+## v0.1.7
 
-- SGF 匯入保留完整變化樹、註解與棋盤標記，支援包含多個棋局的 SGF 集合。每個檔案顯示為一個本機棋局項目，可用來瀏覽自己的定式大全。
-- 新增變化樹瀏覽：選擇手順、返回上層、切換變化，並將選定局面放到主棋盤。擺子、移除棋子及指定下一手方的節點也可瀏覽；試下可另存為同源棋局，完整原譜繼續保留並可匯出。
-- 移除 SGF 匯入的檔案大小、節點數與巢狀深度限制；未註明或不支援的規則繼續依既有邏輯使用中國規則，移除對應的匯入提示。
-- 手順路徑與變化選擇按鈕增加細線框和淺色背景，與導覽及放置到棋盤按鈕作出視覺區分。
-- Codex / Claude 設定新增 CLI 路徑及選用的 Node 路徑，支援原生程式和 Node 指令碼入口，改善桌面啟動時的 CLI 尋找與偵測。
+- 勝率與目差曲線在試下時保留完整實戰主線：試下使用紅色，原譜後續使用灰色；清空試下後立即恢復已快取的主線曲線。所有數值繼續使用黑方視角。
+- 背景自動補齊實戰與試下的缺失評估，優先分析目前局面；調整搜尋中、完成和錯誤通知，完成通知顯示實際分析手數及引擎提供的搜尋速度。
+- 領地預測僅顯示絕對歸屬值至少 0.8 的點，使用清晰的黑白標記；可與候選點及試下編號同時顯示，並錯開標記位置。
+- 教練回答支援整塊棋的多座標引用和柔和霧狀高亮，支援分組及鍵盤聚焦；文字離開可視範圍或棋盤切換局面時隱藏。單點引用連線改從標記右下緣出發，並同步更新教練提示詞和各語言說明。
+- 更新 README 中的介面範例截圖。
 
 請選擇與你的系統匹配的一個安裝包：
 

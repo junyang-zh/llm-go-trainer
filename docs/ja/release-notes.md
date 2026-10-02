@@ -1,14 +1,14 @@
 # 更新履歴
 
-[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.6/docs/ko/release-notes.md)
+[English](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/en/release-notes.md) · [简体中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/release-notes.md) · [繁體中文](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/zh-TW/release-notes.md) · [日本語](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ja/release-notes.md) · [한국어](https://github.com/junyang-zh/llm-go-trainer/blob/v0.1.7/docs/ko/release-notes.md)
 
-## v0.1.6
+## v0.1.7
 
-- SGF の取り込みで変化ツリー全体、コメント、盤面のマークを保持し、複数の棋譜を含む SGF コレクションにも対応しました。各ファイルを 1 つのローカル棋譜として表示し、自分の定石集を閲覧できます。
-- 手順の選択、親ノードへの移動、変化の切り替え、選択した局面のメイン盤面への読み込みに対応しました。石の配置・除去や手番指定のノードも閲覧できます。試し打ちは関連棋譜として保存でき、元の SGF 全体を保持して書き出せます。
-- SGF 取り込みのファイルサイズ、ノード数、入れ子の深さの制限を撤廃しました。ルール未指定または非対応の場合は従来どおり中国ルールを使用し、その取り込み警告を表示しなくなりました。
-- 手順パスと変化選択のボタンに細い枠線と淡い背景を追加し、ナビゲーションや盤面への読み込みボタンと見分けやすくしました。
-- Codex / Claude の設定に CLI パスと任意の Node パスを追加しました。ネイティブ実行ファイルと Node スクリプトに対応し、デスクトップ起動時の CLI 検索と検出を改善しました。
+- 試し打ち中も勝率と目差のグラフに実戦の本譜全体を保持します。試し打ちは赤、本譜の後続手は灰色で表示し、試し打ちを消すとキャッシュ済みの本譜グラフをすぐに復元します。数値は引き続き黒の視点です。
+- 実戦と試し打ちの未評価局面をバックグラウンドで自動補完し、表示中の局面を優先します。探索中・完了・エラーの通知を調整し、完了時に分析した手数とエンジンが提供する探索速度を表示します。
+- 領地予測は所有値の絶対値が 0.8 以上の点のみを明瞭な黒白のマークで表示します。候補手や試し打ちの手順番号と同時に表示でき、重ならないよう位置をずらします。
+- コーチの回答で複数座標による石の一団の参照と柔らかな霧状ハイライトに対応し、グループ切り替えやキーボードフォーカスも利用できます。参照テキストが表示範囲外に出るか盤面の局面が変わると非表示になります。単点参照の線はマーク右下端から出るよう変更し、コーチの指示と各言語の説明を更新しました。
+- README の画面例を更新しました。
 
 環境に合うインストーラーを 1 つ選んでください。
 
