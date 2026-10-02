@@ -22,7 +22,7 @@ module.exports = function i18nApi() {
       perspective: 'B',
       turnNumber: game.moves.length,
       rootInfo: { visits: stage === 'done' ? 1200 : 300, winrate: 0.65, scoreLead: 3.5 },
-      searchStats: { visitsPerSecond: 600 },
+      searchStats: { elapsedMs: stage === 'done' ? 2000 : 500, visitsPerSecond: 600 },
       moveInfos: moves.map((move, order) => ({
         move,
         order,

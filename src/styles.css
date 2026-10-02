@@ -498,6 +498,7 @@ h2 {
   border-radius: 5px;
   min-height: 0;
   max-height: 40%;
+  margin-bottom: 2px;
   overflow: hidden;
 }
 .evaluation-toggle {
@@ -527,8 +528,8 @@ h2 {
 }
 .evaluation-body {
   min-height: 0;
-  padding: 2px 8px 8px;
-  height: min(32dvh, 255px);
+  padding: 2px 8px 10px;
+  max-height: min(32dvh, 255px);
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -602,20 +603,9 @@ h2 {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 8px;
   font-size: 10px;
   color: #7b8b71;
-}
-.evaluation-progress {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-}
-.evaluation-progress > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .evaluation-actions button {
   padding: 3px 6px;

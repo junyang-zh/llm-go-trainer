@@ -166,6 +166,7 @@
   "analysisFailed": "分析失败",
   "notAnalyzed": "未分析",
   "engineNotReady": "引擎未就绪",
+  "curveAnalysisComplete": "曲线分析完成 · 已分析 {v0} 手{v1}",
   "analyzed": "已分析 {v0} / {v1}",
   "searchStatsPlaceholder": "搜索 — 次 · — 次/秒",
   "stopFill": "停止补全",

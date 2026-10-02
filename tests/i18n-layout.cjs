@@ -130,17 +130,21 @@ async function check(locale, messages) {
     );
     if (!document.querySelector('.evaluation-toggle .evaluation-current'))
       throw new Error('Win rate is outside header');
+    await until(
+      () => document.querySelector('.workspace-status')?.textContent.includes('600'),
+      'Completion notification has no search rate',
+    );
     if (
-      !document.querySelector('.evaluation-actions .evaluation-search')?.textContent.includes('600')
+      document.querySelector('.evaluation-progress') ||
+      document.querySelector('.evaluation-search')
     )
-      throw new Error('Search speed is outside progress row');
+      throw new Error('Removed curve statistics are still visible');
     const title = bounds('.evaluation-toggle > span:first-child');
     const current = bounds('.evaluation-current');
     if (Math.abs(title.y - current.y) > 1 || title.right > current.left + 1)
       throw new Error('Header wraps or overlaps');
     for (const selector of [
       '.evaluation-body',
-      '.evaluation-actions',
       '.board-panel',
       '.board-tools',
       '.conversation-toolbar',
@@ -173,13 +177,10 @@ async function check(locale, messages) {
     .querySelector('[data-board-point="Q4"]')
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
   await delay(250);
-  const pendingHeight = bounds('.evaluation').height;
   await search('error');
   await until(() => document.querySelector('.evaluation-body .error'), 'error missing');
-  if (Math.abs(pendingHeight - bounds('.evaluation').height) > 0.5)
-    throw new Error('Error changed panel height');
   await search('done', 1);
-  document.querySelectorAll('.evaluation-actions button')[1].click();
+  document.querySelector('.evaluation-actions button').click();
   await until(() => !document.querySelector('.evaluation-body .error'), 'retry failed');
   return { locale, viewport: [innerWidth, innerHeight], panelHeight, samples };
 }

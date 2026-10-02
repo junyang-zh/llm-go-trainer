@@ -4,6 +4,7 @@ import {
   localizeDiagnostic,
   useLanguage,
   formatDate,
+  formatNumber,
   locales,
   translate,
   type MessageKey,
@@ -26,7 +27,7 @@ import { MarkdownText } from './MarkdownText';
 import { CoachOverlay } from './CoachOverlay';
 import type { CoachLink } from '../shared/coach-links';
 import { EvaluationPanel } from './EvaluationPanel';
-import { useEvaluations } from './useEvaluations';
+import { useEvaluations, type EvaluationCompletion } from './useEvaluations';
 import { SearchLimitSettings } from './SearchLimitSettings';
 import { restoreSearchSettings, searchSettingsKey, searchStatsLabel } from './search-stats';
 import { api, streamApi } from './api';
@@ -126,6 +127,7 @@ export default function App() {
   const [notice, setNotice] = useState<
     | { kind: 'move'; method: string; analysis: Analysis }
     | { kind: 'import'; name: string; moves: number; warnings: string[] }
+    | { kind: 'evaluation'; summary: EvaluationCompletion }
     | { kind: 'fork' }
     | null
   >(null);
@@ -210,6 +212,9 @@ export default function App() {
       (autoPlay && position.toPlay === aiColor && position.passes < 2),
     game,
   );
+  useEffect(() => {
+    if (evaluations.completion) setNotice({ kind: 'evaluation', summary: evaluations.completion });
+  }, [evaluations.completion]);
   const analysis = evaluations.analysis;
   const candidates =
     analysis?.moveInfos
@@ -684,13 +689,23 @@ export default function App() {
           ].join(' ')
         : notice?.kind === 'fork'
           ? t('forkSaved')
-          : '';
+          : notice?.kind === 'evaluation'
+            ? t('curveAnalysisComplete', {
+                v0: formatNumber(Math.max(0, notice.summary.positions - 1)),
+                v1:
+                  notice.summary.visitsPerSecond === undefined
+                    ? ''
+                    : t('visitsS', {
+                        v0: formatNumber(Math.round(notice.summary.visitsPerSecond)),
+                      }),
+              })
+            : '';
   const workspaceStatus =
     workspaceError ||
     (busy ? [t(busy.key, busy.values), liveSearch].filter(Boolean).join(' · ') : '') ||
     engineProgress ||
-    noticeLabel ||
-    backgroundSearch;
+    backgroundSearch ||
+    noticeLabel;
   const timelineTurn = current.moves.length;
   const timelineTotal = Math.max(game.moves.length, turn + (trial?.moves.length ?? 0));
   const timelineLimit = trial ? turn + trial.moves.length : game.moves.length;
@@ -944,12 +959,13 @@ export default function App() {
               {t('retry')}
             </button>
           )}
-          {!busy && (error || (!library.error && !engineProgress && notice)) && (
+          {(error ||
+            (!busy && !backgroundSearch && !library.error && !engineProgress && notice)) && (
             <button
               aria-label={t('dismissNotification')}
               onClick={() => {
-                setError('');
-                setNotice(null);
+                if (error) setError('');
+                else setNotice(null);
               }}
             >
               ×
@@ -987,16 +1003,12 @@ export default function App() {
             trialTurn={trial ? turn : undefined}
             turn={current.moves.length}
             total={analysisGame.moves.length}
-            disabled={locked || scoring || !!trial}
+            disabled={locked || scoring}
             ready={!!status?.engine.ready}
-            completing={evaluations.completing}
             pendingTurn={evaluations.pendingTurn}
             error={localizeDiagnostic(evaluations.error)}
             navigate={navigate}
-            complete={evaluations.complete}
-            stop={evaluations.stop}
             retry={evaluations.retry}
-            searchStats={searchStatsLabel(evaluations.progress ?? analysis)}
           >
             {!scoring && candidates.length > 0 ? (
               <div className="candidates">

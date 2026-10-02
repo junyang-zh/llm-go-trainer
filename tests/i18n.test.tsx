@@ -141,8 +141,9 @@ it('switches all languages without remounting the game, closing the panel or res
     expect(host.querySelector('.evaluation-toggle .evaluation-current')?.textContent).toContain(
       '20.0%',
     );
-    expect(host.querySelector('.evaluation-actions .evaluation-search')?.textContent).toContain(
-      '100',
+    expect(host.querySelector('.evaluation-search')).toBeNull();
+    expect(host.querySelector('.workspace-status')?.textContent).toContain(
+      translate(locale, 'curveAnalysisComplete', { v0: 1, v1: '' }),
     );
     expect(host.querySelector('.evaluation-candidates .candidates')).not.toBeNull();
   }
@@ -274,7 +275,7 @@ it('rerenders an existing engine error and model notice when changing language',
     );
   }
 });
-it('keeps a completed AI move notice reactive to language changes', async () => {
+it('keeps AI move and curve completion notices reactive to language changes', async () => {
   vi.mocked(streamApi).mockImplementation(async (path, body, onEvent) => {
     const analysis = evaluation((body as { game: { moves: unknown[] } }).game.moves.length);
     onEvent(
@@ -292,7 +293,7 @@ it('keeps a completed AI move notice reactive to language changes', async () => 
   await act(async () =>
     (host.querySelector('.auto-play-toggle input') as HTMLInputElement).click(),
   );
-  await act(async () => vi.advanceTimersByTimeAsync(300));
+  await act(async () => vi.advanceTimersByTimeAsync(100));
   expect(vi.mocked(streamApi).mock.calls.some(([path]) => path === 'bot-move')).toBe(true);
   for (const locale of locales) {
     await act(async () => setLanguage(locale));
@@ -303,5 +304,12 @@ it('keeps a completed AI move notice reactive to language changes', async () => 
       t('visits', { v0: '100', v1: '' }),
     );
     expect(host.querySelector('.timeline')?.getAttribute('value')).toBe('2');
+  }
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  for (const locale of locales) {
+    await act(async () => setLanguage(locale));
+    expect(host.querySelector('.workspace-status')?.textContent).toContain(
+      t('curveAnalysisComplete', { v0: 2, v1: '' }),
+    );
   }
 });

@@ -166,6 +166,7 @@
   "analysisFailed": "Analysis failed",
   "notAnalyzed": "Not analyzed",
   "engineNotReady": "Engine not ready",
+  "curveAnalysisComplete": "Curve analysis complete · {v0} moves analyzed{v1}",
   "analyzed": "Analyzed {v0} / {v1}",
   "searchStatsPlaceholder": "— visits · — visits/s",
   "stopFill": "Stop fill",

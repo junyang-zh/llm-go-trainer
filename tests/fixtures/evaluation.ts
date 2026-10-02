@@ -51,3 +51,12 @@ export const testStatus: Status = {
     },
   },
 };
+
+export function timedEvaluation(turnNumber: number) {
+  const value = evaluation(turnNumber);
+  const elapsedMs = (turnNumber + 1) * 100;
+  return {
+    ...value,
+    searchStats: { elapsedMs, visitsPerSecond: (value.rootInfo.visits * 1000) / elapsedMs },
+  };
+}

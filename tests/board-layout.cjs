@@ -126,10 +126,6 @@ async function checkLayout() {
     await delay(50);
     document.querySelector('[aria-label="关闭通知"]').click();
     document.querySelector('.evaluation-toggle').click();
-    await until(() => document.querySelector('.evaluation-actions button'));
-    [...document.querySelectorAll('.evaluation-actions button')]
-      .find((button) => button.textContent === '补全曲线')
-      .click();
     await until(() => document.querySelectorAll('.plot-winrate .mainline .plot-dot').length === 7);
     const mainlineCurve = document
       .querySelector('.plot-winrate .mainline .plot-line')

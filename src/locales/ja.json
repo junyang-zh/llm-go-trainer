@@ -166,6 +166,7 @@
   "analysisFailed": "分析失敗",
   "notAnalyzed": "未分析",
   "engineNotReady": "エンジン未準備",
+  "curveAnalysisComplete": "グラフ分析完了 · {v0} 手を分析済み{v1}",
   "analyzed": "分析済み {v0} / {v1}",
   "searchStatsPlaceholder": "探索 — 回 · — 回/秒",
   "stopFill": "補完を停止",

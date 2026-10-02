@@ -186,15 +186,11 @@ export function EvaluationPanel({
   total,
   disabled,
   ready,
-  completing,
   pendingTurn,
   error,
   navigate,
-  complete,
-  stop,
   retry,
   children,
-  searchStats,
 }: {
   history: EvaluationHistory;
   mainlineHistory?: EvaluationHistory;
@@ -204,19 +200,14 @@ export function EvaluationPanel({
   total: number;
   disabled: boolean;
   ready: boolean;
-  completing: boolean;
   pendingTurn: number | null;
   error: string;
   navigate: (turn: number) => void;
-  complete: () => void;
-  stop: () => void;
   retry: () => void;
   children?: ReactNode;
-  searchStats?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const current = history[turn];
-  const completed = Object.values(history).filter((point) => point.final).length;
   return (
     <section className="evaluation" aria-label={t('scoreAndWinRate')}>
       <button
@@ -258,33 +249,16 @@ export function EvaluationPanel({
             trialTurn={trialTurn}
             turn={turn}
             total={Math.max(total, mainlineTotal)}
-            disabled={disabled}
+            disabled={disabled || trialTurn !== undefined}
             navigate={navigate}
           />
-          <div className="evaluation-actions">
-            <span className="evaluation-progress">
-              <span>
-                {pendingTurn !== null
-                  ? t('analyzingMove', { v0: pendingTurn })
-                  : t('analyzed', { v0: completed, v1: total + 1 })}
-              </span>
-              <span className="evaluation-search">
-                {searchStats || t('searchStatsPlaceholder')}
-              </span>
-            </span>
-            {completing ? (
-              <button onClick={stop}>{t('stopFill')}</button>
-            ) : (
-              <button disabled={disabled || !ready || completed === total + 1} onClick={complete}>
-                {t('fillGraph')}
-              </button>
-            )}
-            {error && (
+          {error && (
+            <div className="evaluation-actions">
               <button disabled={disabled || !ready} onClick={retry}>
                 {t('retry')}
               </button>
-            )}
-          </div>
+            </div>
+          )}
           {error && (
             <p className="error" role="alert">
               {error}

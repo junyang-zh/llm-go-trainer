@@ -166,6 +166,7 @@
   "analysisFailed": "분석 실패",
   "notAnalyzed": "분석 안 됨",
   "engineNotReady": "엔진 준비 안 됨",
+  "curveAnalysisComplete": "그래프 분석 완료 · {v0}수 분석됨{v1}",
   "analyzed": "분석 {v0} / {v1}",
   "searchStatsPlaceholder": "탐색 —회 · —회/초",
   "stopFill": "보완 중지",
