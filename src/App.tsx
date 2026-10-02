@@ -791,7 +791,7 @@ export default function App() {
               scoring={scoring}
               onPlay={(point) => {
                 const candidate =
-                  showCandidates && !showOwnership && !scoring
+                  showCandidates && !scoring
                     ? candidates.find((candidate) => candidate.move === point)
                     : undefined;
                 if (candidate) playCandidate(candidate);

@@ -227,6 +227,7 @@ it('does not echo an agent rename back over later server changes while a live ga
 it.each([
   ['panel', 3],
   ['board', 2],
+  ['board with ownership', 2],
 ] as const)(
   'adds whole candidate variations through the %s into a numbered, reversible trial',
   async (entry, turn) => {
@@ -244,6 +245,8 @@ it.each([
       await act(async () => host.querySelector<HTMLButtonElement>('.candidates button')!.click());
     } else {
       await click('候选点');
+      if (entry === 'board with ownership') await click('领地预测');
+      expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
       await point('D4');
     }
     const number = (point: string) => host.querySelector(`[aria-label="${point} 试下"]`)!;

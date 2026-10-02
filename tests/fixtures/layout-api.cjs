@@ -41,11 +41,25 @@ module.exports = function layoutApi() {
   function analysis(game) {
     const occupied = new Set(game.moves.map((move) => move.point));
     const pv = ['C4', 'D5', 'E4', 'F4'].filter((point) => !occupied.has(point)).slice(0, 2);
+    const ownership = Array(game.size ** 2).fill(0.3);
+    for (const [point, value] of [
+      ['C4', 0.95],
+      ['D5', -0.95],
+      ['D10', 0.79],
+      ['Q10', -0.79],
+      ['A19', 0.8],
+      ['T1', -0.8],
+    ]) {
+      const x = 'ABCDEFGHJKLMNOPQRST'.indexOf(point[0]);
+      const y = game.size - Number(point.slice(1));
+      if (x < game.size && y >= 0) ownership[y * game.size + x] = value;
+    }
     return {
       id: 'layout-fixture',
       perspective: 'B',
       turnNumber: game.moves.length,
       rootInfo: { visits: 100, winrate: 0.5, scoreLead: 0 },
+      ownership,
       moveInfos: pv.length
         ? [{ move: pv[0], order: 0, visits: 100, winrate: 0.5, scoreLead: 0, pv }]
         : [],

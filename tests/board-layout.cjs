@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const express = require('express');
-const { mkdtempSync, rmSync } = require('node:fs');
+const { mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const layoutApi = require('./fixtures/layout-api.cjs');
@@ -9,6 +9,45 @@ const layoutApi = require('./fixtures/layout-api.cjs');
 const profile = mkdtempSync(join(tmpdir(), 'go-board-layout-'));
 app.setPath('userData', profile);
 let server;
+
+async function checkOwnership() {
+  const deadline = performance.now() + 4000;
+  while (
+    !document.querySelector('.evaluation-toggle') ||
+    document.querySelector('[aria-label="AI 自动落子"]').disabled
+  ) {
+    if (performance.now() > deadline) throw new Error('Timed out waiting for ownership analysis');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  for (const label of ['候选点', '领地预测'])
+    [...document.querySelectorAll('.board-tools button')]
+      .find((button) => button.textContent === label)
+      .click();
+  while (!document.querySelector('.ownership-marker')) {
+    if (performance.now() > deadline) throw new Error('Ownership overlay did not appear');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  const candidate = document.querySelector('[aria-label="候选 A：C4"]');
+  if (!candidate) throw new Error('Ownership hid the candidate');
+  const marker = candidate.parentElement.querySelector('.ownership-marker');
+  const badge = candidate.querySelector('circle').getBoundingClientRect();
+  const territory = marker.getBoundingClientRect();
+  if (territory.left <= badge.left || territory.bottom >= badge.bottom)
+    throw new Error('Ownership did not move to the upper right');
+  const letter = candidate.querySelector('text').getBoundingClientRect();
+  if (territory.left < letter.right && territory.bottom > letter.top)
+    throw new Error('Ownership covers the candidate letter');
+  const markers = [...document.querySelectorAll('.ownership-marker')];
+  if (markers.length !== 4) throw new Error('Unclear ownership was displayed');
+  if (markers.some((element) => getComputedStyle(element).opacity !== '1'))
+    throw new Error('Ownership still uses translucent gray');
+  if (
+    !markers.some((element) => getComputedStyle(element).fill === 'rgb(255, 255, 255)') ||
+    !markers.some((element) => getComputedStyle(element).fill === 'rgb(16, 21, 15)')
+  )
+    throw new Error('Black/White ownership colors are missing');
+  return { ownershipMarkers: markers.length, candidateBadge: badge.width };
+}
 
 async function checkLayout() {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -210,7 +249,14 @@ async function checkLayout() {
   await seek(1);
   await seek(6);
   await until(() => document.querySelector('.candidates button')?.textContent.includes('C4'));
-  document.querySelector('.candidates button').click();
+  for (const label of ['候选点', '领地预测'])
+    [...document.querySelectorAll('.board-tools button')]
+      .find((button) => button.textContent === label)
+      .click();
+  await until(() => document.querySelector('[aria-label="候选 A：C4"]'));
+  document
+    .querySelector('[data-board-point="C4"]')
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
   await until(() => timeline.value === '8');
   function checkNumber(point, number, fill) {
     const label = document.querySelector(`[aria-label="${point} 试下"]`);
@@ -326,8 +372,20 @@ app.whenReady().then(async () => {
           "localStorage.setItem('go-trainer-language-v1', 'zh-CN')",
         );
         await win.loadURL(win.webContents.getURL());
+        const overlays = await win.webContents.executeJavaScript(
+          `(${checkOwnership.toString()})()`,
+        );
+        if (process.env.GO_TRAINER_LAYOUT_SCREENSHOTS)
+          writeFileSync(
+            join(process.env.GO_TRAINER_LAYOUT_SCREENSHOTS, `ownership-${width}-${height}.png`),
+            (await win.webContents.capturePage()).toPNG(),
+          );
+        await win.webContents.executeJavaScript(`
+          for (const label of ['候选点', '领地预测'])
+            [...document.querySelectorAll('.board-tools button')].find((button) => button.textContent === label).click();
+        `);
         const result = await win.webContents.executeJavaScript(`(${checkLayout.toString()})()`);
-        console.log({ ...result, pointer: await checkTimelinePointer(win) });
+        console.log({ ...result, ...overlays, pointer: await checkTimelinePointer(win) });
       } finally {
         win.destroy();
       }

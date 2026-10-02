@@ -3,6 +3,9 @@ import { COLUMNS, toIndex, toPoint, type Position } from '../shared/go';
 import type { Candidate } from '../shared/types';
 import { sgfPoint } from '../shared/sgf';
 
+// Display only clear ownership; KataGo values remain in Black's perspective.
+const OWNERSHIP_THRESHOLD = 0.8;
+
 interface Props {
   size: number;
   position: Position;
@@ -108,7 +111,13 @@ export function Board({
           y = margin + Math.floor(i / size) * step;
         const candidate = candidates.findIndex((c) => c.move === toPoint(i, size));
         const own = ownership?.[i] ?? 0;
+        const hasOwnershipMarker = Math.abs(own) >= OWNERSHIP_THRESHOLD;
         const trial = trialStones.get(i);
+        const hasCandidate = !color && candidate >= 0;
+        const offsetOwnership = hasCandidate || (!!color && !!trial);
+        const ownershipSize = offsetOwnership ? 10 : 12;
+        const ownershipX = offsetOwnership ? x + 13 : x;
+        const ownershipY = offsetOwnership ? y - 13 : y;
         return (
           <g key={i}>
             {color && (
@@ -127,19 +136,6 @@ export function Board({
                 strokeWidth={trial ? 2 : undefined}
                 filter="url(#stone-shadow)"
                 opacity={dead.includes(i) ? 0.3 : 1}
-              />
-            )}
-            {Math.abs(own) > 0.15 && (
-              <rect
-                x={x - 5}
-                y={y - 5}
-                width="10"
-                height="10"
-                rx="1"
-                fill={own > 0 ? '#19221c' : '#fffdf1'}
-                stroke={own > 0 ? '#e8d8b9' : '#777b65'}
-                strokeWidth="0.6"
-                opacity={Math.abs(own) * 0.85}
               />
             )}
             {color && trial && (
@@ -169,9 +165,10 @@ export function Board({
                 strokeWidth="1.6"
               />
             )}
-            {!color && candidate >= 0 && !ownership && (
+            {hasCandidate && (
               <g
                 role="img"
+                pointerEvents="none"
                 aria-label={t('candidate', {
                   v0: String.fromCharCode(65 + candidate),
                   v1: toPoint(i, size),
@@ -195,6 +192,20 @@ export function Board({
                   {String.fromCharCode(65 + candidate)}
                 </text>
               </g>
+            )}
+            {hasOwnershipMarker && (
+              <rect
+                className="ownership-marker"
+                x={ownershipX - ownershipSize / 2}
+                y={ownershipY - ownershipSize / 2}
+                width={ownershipSize}
+                height={ownershipSize}
+                rx="1"
+                fill={own > 0 ? '#10150f' : '#ffffff'}
+                stroke={own > 0 ? '#ffffff' : '#10150f'}
+                strokeWidth="1.2"
+                pointerEvents="none"
+              />
             )}
             {marks.has(i) &&
               (() => {

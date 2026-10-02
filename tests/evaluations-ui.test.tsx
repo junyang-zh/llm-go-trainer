@@ -348,6 +348,17 @@ it('automatically analyzes with evaluations hidden, and independently reveals de
   expect(host.querySelector('.candidates')).not.toBeNull();
   await act(async () => toggle.click());
   expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
+  const ownershipToggle = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.textContent === '领地预测',
+  )!;
+  await act(async () => ownershipToggle.click());
+  expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
+  await act(async () => toggle.click());
+  expect(host.querySelector('[aria-label="候选 A：D4"]')).toBeNull();
+  expect(ownershipToggle.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => toggle.click());
+  await act(async () => ownershipToggle.click());
+  expect(host.querySelector('[aria-label="候选 A：D4"]')).not.toBeNull();
   await act(async () => expand.click());
   expect(host.querySelector('.candidates')).toBeNull();
   expect(host.querySelector('.evaluation-current')).toBeNull();
